@@ -18,10 +18,10 @@ import argparse
 import html
 import re
 from pathlib import Path
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import unquote, urljoin
 
 import requests
-from common import SOURCES, read_sources, write_sources
+from common import HEADERS, SOURCES, read_sources, url_filename, write_sources
 
 LINK = re.compile(
     r"""<a\s[^>]*?href=["']([^"']+?\.pdf)["'][^>]*>(.*?)</a>""", re.IGNORECASE | re.DOTALL
@@ -35,7 +35,7 @@ def text(fragment: str) -> str:
 
 
 def slugify(publisher: str, url: str) -> str:
-    stem = Path(unquote(urlparse(url).path)).stem
+    stem = Path(url_filename(url)).stem
     return re.sub(r"[^a-z0-9]+", "-", f"{publisher}-{stem}".lower()).strip("-")
 
 
@@ -64,7 +64,7 @@ def main() -> None:
         if not base:
             ap.error("--base is required with a saved HTML file")
     else:
-        r = requests.get(args.index, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+        r = requests.get(args.index, headers=HEADERS, timeout=30)
         r.raise_for_status()
         page, base = r.text, args.base or args.index
 

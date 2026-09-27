@@ -29,6 +29,7 @@ import argparse
 import json
 import re
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pymupdf
@@ -71,16 +72,14 @@ def page_blocks(page: pymupdf.Page, keep_lines: bool = False) -> list[str]:
 # --- documents ------------------------------------------------------------------------------
 
 
-def line_key(line: str) -> str:
-    return " ".join(re.sub(r"\d+", "#", line.lower()).split())
-
-
 def strip_boilerplate_lines(
     pages: list[list[str]], min_frac: float = 0.3, edge: int = 3
 ) -> tuple[list[list[str]], int]:
     """Drop running headers and footers: a line (digits masked, so page numbers and dated
     manual ids match) that is among the first or last `edge` lines of more than min_frac of the
-    pages. Only page edges are candidates, so a recurring body line ("where:") survives."""
+    pages. Only page edges are candidates, so a recurring body line ("where:") survives.
+    Lines from page_blocks(keep_lines=True) are whitespace-normalised, so boilerplate_key (the
+    frozen chunk path's block key) is the line key too."""
     if len(pages) < 5:
         return pages, 0
 
@@ -90,7 +89,7 @@ def strip_boilerplate_lines(
     counts: Counter[str] = Counter()
     for blocks in pages:
         ls = lines(blocks)
-        counts.update({line_key(ln) for _, ln in ls[:edge] + ls[-edge:]})
+        counts.update({boilerplate_key(ln) for _, ln in ls[:edge] + ls[-edge:]})
     threshold = max(2, min_frac * len(pages))
     repeated = {k for k, n in counts.items() if n > threshold}
 
@@ -99,7 +98,7 @@ def strip_boilerplate_lines(
         ls = lines(blocks)
         keep: list[list[str]] = [[] for _ in blocks]
         for j, (i, ln) in enumerate(ls):
-            if (j < edge or j >= len(ls) - edge) and line_key(ln) in repeated:
+            if (j < edge or j >= len(ls) - edge) and boilerplate_key(ln) in repeated:
                 removed += 1
             else:
                 keep[i].append(ln)
@@ -111,8 +110,9 @@ def extract_doc(src: dict, encode) -> tuple[dict, dict]:
     raw, has_image = [], []
     for part in pdf_parts(pdf_path(src["slug"])):
         with part:
-            raw += [page_blocks(p, keep_lines=True) for p in part]
-            has_image += [bool(p.get_images()) for p in part]
+            for page in part:
+                raw.append(page_blocks(page, keep_lines=True))
+                has_image.append(bool(page.get_images()))
     pages, n_boiler = strip_boilerplate_lines(raw)
 
     kept, dropped_image, dropped_short = [], 0, 0
@@ -142,14 +142,27 @@ def extract_doc(src: dict, encode) -> tuple[dict, dict]:
     return doc, info
 
 
-def write_docs(sources: list[dict], out: Path, encode) -> None:
+_worker_encode = None  # each pool process loads the tokenizer once
+
+
+def _init_worker(tokenizer: str) -> None:
+    global _worker_encode
+    _worker_encode, _ = load_tokenizer(tokenizer)
+
+
+def _extract(src: dict) -> tuple[dict, dict]:
+    return extract_doc(src, _worker_encode)
+
+
+def write_docs(sources: list[dict], out: Path, tokenizer: str) -> None:
+    """PDFs are parsed in a process pool (pymupdf isn't thread-safe); map() keeps sources.csv
+    order, so the output is the same as a sequential run."""
     by_pub: dict[str, Counter] = {}
     boiler, scanned, flagged = 0, [], []
 
-    def records():
+    def records(results):
         nonlocal boiler
-        for src in tqdm(sources, desc="extract"):
-            doc, info = extract_doc(src, encode)
+        for src, (doc, info) in tqdm(zip(sources, results), total=len(sources), desc="extract"):
             c = by_pub.setdefault(src["publisher"], Counter())
             c.update(
                 docs=1,
@@ -166,7 +179,8 @@ def write_docs(sources: list[dict], out: Path, encode) -> None:
                 flagged.append(src["slug"])
             yield doc
 
-    n = write_jsonl(out, records())
+    with ProcessPoolExecutor(initializer=_init_worker, initargs=(tokenizer,)) as pool:
+        n = write_jsonl(out, records(pool.map(_extract, sources)))
     total = sum(by_pub.values(), Counter())
     update_stats(
         "extract",
@@ -358,15 +372,15 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    encode, decode = load_tokenizer(args.tokenizer)
     sources = [s for s in read_sources() if s["sha256"]]  # download.py hashes only accepted files
     if args.chunks:
         keep = eval_docs()
         sources = [s for s in sources if s["slug"] in keep]
         out = args.out or Path("data/processed/chunks.jsonl")
-        write_chunks(sources, out, Chunker(encode, decode, args.max_tokens), args.dup_threshold)
+        chunker = Chunker(*load_tokenizer(args.tokenizer), args.max_tokens)
+        write_chunks(sources, out, chunker, args.dup_threshold)
     else:
-        write_docs(sources, args.out or Path("data/processed/docs_raw.jsonl"), encode)
+        write_docs(sources, args.out or Path("data/processed/docs_raw.jsonl"), args.tokenizer)
 
 
 if __name__ == "__main__":

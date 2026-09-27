@@ -135,15 +135,20 @@ its own env: `uv sync --extra quantize`. Modal needs two secrets: `huggingface` 
 ### Data and eval tasks
 
 ```bash
+set -a; . ./.env; set +a                    # HF_TOKEN (tokenizers, FineWeb-Edu), MISTRAL_API_KEY
 make data                                   # download → extract → filter → dedup → pii → split → replay → tokenizer_coverage → stats
+python data/scripts/extract.py --chunks     # eval input: chunks.jsonl from the 52 eval documents (frozen)
 python eval/make_tasks.py                   # eval/tasks/*.jsonl + eval_chunk_ids.txt (Mistral Large 3)
 ```
 
-USACE, ROSA P and FEMA block scripted downloads: save those PDFs by hand as
-`data/raw/<slug>.pdf`, then re-run `download.py`, which records each file's sha256 and page
-count in `data/sources.csv`. `chunks.jsonl` (the eval's input, `extract.py --chunks`) is built only
-from the eval documents, so adding sources never moves chunk ids; never build SFT data from
-chunks in `eval/tasks/eval_chunk_ids.txt`.
+`make data` writes the Stage 1 corpus to `data/processed/` on the Mac (CPU and network only).
+Stage 2 uploads `train.jsonl`, `val.jsonl` and `replay.jsonl` to the Modal volume.
+USACE, fema.gov and ROSA P block scripted downloads (Akamai 403). Those PDFs were fetched in a
+browser (Chrome DevTools MCP): save them as `data/raw/<slug>.pdf` (or the URL's filename), then
+re-run `download.py`, which records each file's sha256 and page count in `data/sources.csv`
+(`stats.py` adds each document's final token count).
+`chunks.jsonl` is built only from the eval documents, so adding sources never moves chunk ids;
+never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`.
 
 ### Train
 
@@ -212,9 +217,10 @@ Override any config value from the CLI:
 ## Layout
 
 ```
-data/     sources.csv (every document: slug, publisher, title, url, sha256, pages), raw/ (PDFs,
-          gitignored), scripts/ (one per step), processed/stats.json (every corpus count,
-          committed); interim/ and the rest of processed/ gitignored
+data/     sources.csv (every document: slug, publisher, title, url, sha256, pages, tokens),
+          raw/ (PDFs, gitignored), scripts/ (one per step + common.py), processed/ (stats.json
+          and tokenizer_coverage.md committed; docs_raw, docs, train/val/replay, dropped_samples,
+          duplicates and the eval's chunks.jsonl gitignored)
 eval/     make_tasks.py (task generation), tasks/*.jsonl (KPI tasks + rejects.jsonl hand-review
           list + eval_chunk_ids.txt), prompts.py, scorers.py, judge.py, run_eval.py,
           run_lm_eval.sh, modal_app.py (Modal H100 runner)
@@ -244,8 +250,12 @@ All US federal works (public domain, 17 USC 105); documents carrying a third-par
 are excluded (`extract.py` flags them for a hand check). The full list is
 [`data/sources.csv`](data/sources.csv): slug, publisher, title, URL, and the sha256 and page count
 of the exact file processed. `download.py` reads it; each file lands at `data/raw/<slug>.pdf`.
-USACE, ROSA P and FEMA block scripted downloads (Akamai bot filter): get those in a browser, save
-them under their slug or URL filename, and re-run `download.py` to hash them.
+USACE, fema.gov and ROSA P block scripted downloads (Akamai bot filter): get those in a browser,
+save them under their slug or URL filename, and re-run `download.py` to hash them. Four FEMA
+publications come from other hosts, recorded in the url column:
+- P-695 from NIST's NEHRP clearinghouse (FEMA's copy is gone);
+- P-751 from WBDG;
+- P-58-4 and P-58-5 from ATC, their preparer (fema.gov serves them truncated).
 
 ### 3. Training
 _Per stage: data size, key hyperparameters, curves (`results/curves/`), what changed._

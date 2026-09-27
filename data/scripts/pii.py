@@ -33,22 +33,23 @@ def main() -> None:
     counts: Counter[str] = Counter()
     samples: dict[str, list[str]] = {k: [] for k in PATTERNS}
 
-    def scrub(para: str, slug: str) -> str:
+    def scrub(text: str, slug: str) -> str:
         for kind, pattern in PATTERNS.items():
-            for m in pattern.finditer(para):
+
+            def replace(m: re.Match, kind: str = kind) -> str:
                 counts[kind] += 1
                 if len(samples[kind]) < SAMPLES:
-                    samples[kind].append(
-                        f"[{slug}] ...{para[max(0, m.start() - 40) : m.end() + 40]}..."
-                    )
-            para = pattern.sub(f"[{kind}]", para)
-        return para
+                    context = m.string[max(0, m.start() - 40) : m.end() + 40]
+                    samples[kind].append(f"[{slug}] ...{context}...")
+                return f"[{kind}]"
+
+            text = pattern.sub(replace, text)
+        return text
 
     docs = read_jsonl(args.docs)  # read fully first: the output overwrites this file
     for i, d in enumerate(docs):
-        n = sum(counts.values())
         text = scrub(d["text"], d["slug"])
-        if sum(counts.values()) > n:
+        if text != d["text"]:
             docs[i] = {**d, "text": text, "n_tokens": len(encode(text))}
 
     n = write_jsonl(args.docs, docs)

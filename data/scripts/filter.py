@@ -37,6 +37,7 @@ from pathlib import Path
 
 from common import (
     BASE,
+    MIN_WORDS,
     load_tokenizer,
     read_jsonl,
     split_pages,
@@ -94,8 +95,9 @@ class Dictionary:
         return any(w[: len(w) - k] in self.words for k in (0, 1, 2, 3) if len(w) - k >= 2)
 
     def ratio(self, text: str) -> float:
-        words = WORD.findall(text.lower())
-        return sum(map(self.known, words)) / max(1, len(words))
+        counts = Counter(WORD.findall(text.lower()))  # check each distinct word once
+        known = sum(n for w, n in counts.items() if self.known(w))
+        return known / max(1, sum(counts.values()))
 
 
 class Reservoir:
@@ -115,7 +117,7 @@ def main() -> None:
     ap.add_argument("--in", dest="inp", default="data/processed/docs_raw.jsonl")
     ap.add_argument("--out", default="data/processed/docs.jsonl")
     ap.add_argument("--samples", default="data/processed/dropped_samples.jsonl")
-    ap.add_argument("--min-words", type=int, default=2000)
+    ap.add_argument("--min-words", type=int, default=MIN_WORDS)
     ap.add_argument("--min-dictionary", type=float, default=0.7)
     args = ap.parse_args()
 
@@ -123,53 +125,40 @@ def main() -> None:
     dictionary = Dictionary()
     paras_dropped, tokens_dropped = Counter(), Counter()
     samples: dict[str, Reservoir] = {}
-    docs_dropped, ratios = [], {}
+    docs_dropped, ratios, out = [], {}, []
     n_paras = tokens_in = 0
-
-    def kept_docs():
-        nonlocal n_paras, tokens_in
-        for doc in read_jsonl(args.inp):
-            tokens_in += doc["n_tokens"]
-            kept = []
-            for page_no, paras in split_pages(doc):
-                for para in paras:
-                    n_paras += 1
-                    if rule := paragraph_rule(para):
-                        paras_dropped[rule] += 1
-                        tokens_dropped[rule] += len(encode(para))
-                        samples.setdefault(rule, Reservoir(SAMPLES_PER_RULE)).add(
-                            {"rule": rule, "slug": doc["slug"], "page": page_no, "text": para}
-                        )
-                    else:
-                        kept.append(" ".join(para.split("\n")))
-            text = "\n\n".join(kept)
-            ratios[doc["slug"]] = ratio = round(dictionary.ratio(text), 3)
-            n_words = len(text.split())
-            reason = (
-                "min_words"
-                if n_words < args.min_words
-                else "dictionary"
-                if ratio < args.min_dictionary
-                else None
+    for doc in read_jsonl(args.inp):
+        tokens_in += doc["n_tokens"]
+        kept = []
+        for page_no, paras in split_pages(doc):
+            for para in paras:
+                n_paras += 1
+                if rule := paragraph_rule(para):
+                    paras_dropped[rule] += 1
+                    tokens_dropped[rule] += len(encode(para))
+                    samples.setdefault(rule, Reservoir(SAMPLES_PER_RULE)).add(
+                        {"rule": rule, "slug": doc["slug"], "page": page_no, "text": para}
+                    )
+                else:
+                    kept.append(" ".join(para.split("\n")))
+        text = "\n\n".join(kept)
+        ratios[doc["slug"]] = ratio = round(dictionary.ratio(text), 3)
+        n_words = len(text.split())
+        if n_words < args.min_words or ratio < args.min_dictionary:
+            rule = "min_words" if n_words < args.min_words else "dictionary"
+            docs_dropped.append(
+                {"slug": doc["slug"], "rule": rule, "words": n_words, "dictionary_ratio": ratio}
             )
-            if reason:
-                docs_dropped.append(
-                    {
-                        "slug": doc["slug"],
-                        "rule": reason,
-                        "words": n_words,
-                        "dictionary_ratio": ratio,
-                    }
-                )
-                continue
-            yield {
+            continue
+        out.append(
+            {
                 "slug": doc["slug"],
                 "publisher": doc["publisher"],
                 "text": text,
                 "n_tokens": len(encode(text)),
             }
+        )
 
-    out = list(kept_docs())
     write_jsonl(args.out, out)
     write_jsonl(args.samples, (s for r in sorted(samples) for s in samples[r].items))
 

@@ -6,22 +6,33 @@ the sha256 and page count of the exact file that was processed (written back by 
 Files that already exist are skipped, so anything the script can't fetch (e.g. FEMA, which
 blocks automated clients) can be downloaded in a browser and dropped into data/raw/ as either
 <slug>.pdf or its original filename; the next run renames it to <slug>.pdf and hashes it.
+
+A file is rejected (its row kept, with no sha256, so extract.py skips it) when it isn't a PDF
+(a block or landing page) or has no readable pages. There's no size floor: short documents are
+judged on their text by filter.py's word minimum, not on file size.
 """
 
 import argparse
 import hashlib
 import time
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 
 import requests
-from common import RAW, SOURCES, pdf_parts, pdf_path, read_sources, update_stats, write_sources
+from common import (
+    HEADERS,
+    RAW,
+    SOURCES,
+    pdf_parts,
+    pdf_path,
+    read_sources,
+    update_stats,
+    url_filename,
+    write_sources,
+)
 
-HEADERS = {"User-Agent": "Mozilla/5.0"}
 ATTEMPTS = 3
 RETRY_SLEEP_S = 20  # USACE intermittently 403s, then serves the same file a minute later
 POLITE_SLEEP_S = 2  # between downloads; USACE rate-limits
-MIN_BYTES = 200_000  # smaller "PDFs" are flyers, fact sheets or error stubs
 
 
 def sha256(path: Path) -> str:
@@ -36,8 +47,6 @@ def check(path: Path) -> None:
     with path.open("rb") as f:
         if f.read(5) != b"%PDF-":
             raise ValueError("not a PDF (likely a block or landing page)")
-    if path.stat().st_size < MIN_BYTES:
-        raise ValueError(f"under {MIN_BYTES // 1000} KB")
 
 
 def fetch(url: str, dest: Path) -> None:
@@ -61,7 +70,7 @@ def fetch_with_retry(url: str, dest: Path) -> None:
         try:
             return fetch(url, dest)
         except (requests.RequestException, ValueError) as e:
-            if attempt == ATTEMPTS or (isinstance(e, ValueError) and "KB" in str(e)):
+            if attempt == ATTEMPTS:
                 raise
             print(f"  attempt {attempt} failed ({e}); retrying in {RETRY_SLEEP_S}s")
             time.sleep(RETRY_SLEEP_S)
@@ -78,7 +87,7 @@ def main() -> None:
     for i, src in enumerate(sources, 1):
         dest = pdf_path(src["slug"])
         # a browser download keeps the URL's filename (e.g. EM_1110-2-2104.pdf); adopt it
-        browser_name = RAW / unquote(Path(urlparse(src["url"]).path).name)
+        browser_name = RAW / url_filename(src["url"])
         if not dest.exists() and browser_name.suffix == ".pdf" and browser_name.exists():
             browser_name.rename(dest)
         status = "cached"
@@ -102,7 +111,7 @@ def main() -> None:
             if not src["pages"]:
                 # e.g. FEMA serves P-58-4/P-58-5 cut short of the length their headers declare
                 raise ValueError("no readable pages (truncated or corrupt file)")
-        except Exception as e:  # noqa: BLE001  too small, unreadable, or a bad manual drop-in
+        except Exception as e:  # noqa: BLE001  unreadable, or a bad manual drop-in
             # the row stays as a record, but with no sha256 extract.py skips it
             print(f"  REJECTED {dest}: {e}")
             src["sha256"] = src["pages"] = ""

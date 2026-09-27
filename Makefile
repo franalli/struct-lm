@@ -1,7 +1,5 @@
 # End-to-end pipeline. Each target is resumable; outputs land in data/, checkpoints/, results/.
 PY ?= .venv/bin/python
-BASE ?= mistralai/Ministral-3-8B-Base-2512
-SEQ_LEN ?= 4096
 
 .PHONY: data train eval serve all
 

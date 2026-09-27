@@ -1,26 +1,13 @@
 {
   "download": {
     "sources": 251,
-    "downloaded": 248,
-    "bytes": 3173331592,
-    "rejected": [
-      {
-        "slug": "usace-em-1110-2-1304-2021",
-        "reason": "under 200 KB"
-      },
-      {
-        "slug": "usace-em-1110-2-2102",
-        "reason": "under 200 KB"
-      },
-      {
-        "slug": "usace-em-1110-1-4011",
-        "reason": "under 200 KB"
-      }
-    ],
+    "downloaded": 251,
+    "bytes": 3173698042,
+    "rejected": [],
     "missing": []
   },
   "extract": {
-    "docs": 248,
+    "docs": 251,
     "by_publisher": {
       "FEMA": {
         "docs": 49,
@@ -55,27 +42,26 @@
         "tokens": 2648730
       },
       "USACE": {
-        "docs": 102,
-        "pages": 27243,
-        "pages_kept": 24168,
-        "dropped_image_only": 2592,
-        "dropped_short": 483,
-        "tokens": 14111797
+        "docs": 105,
+        "pages": 27265,
+        "pages_kept": 24362,
+        "dropped_image_only": 2409,
+        "dropped_short": 494,
+        "tokens": 14200387
       }
     },
     "total": {
-      "docs": 248,
-      "pages": 60457,
-      "pages_kept": 54707,
-      "dropped_image_only": 4264,
-      "dropped_short": 1486,
-      "tokens": 31239828
+      "docs": 251,
+      "pages": 60479,
+      "pages_kept": 54901,
+      "dropped_image_only": 4081,
+      "dropped_short": 1497,
+      "tokens": 31328418
     },
-    "boilerplate_lines_removed": 122667,
+    "boilerplate_lines_removed": 123528,
     "likely_scanned": [
       "fhwa-sbdh-v03",
       "usace-em-1110-2-1424",
-      "usace-em-1110-2-3200",
       "fema-nehrp-examples-v3",
       "fema-p-2192",
       "fema-p-1100-2c"
@@ -111,8 +97,8 @@
     ]
   },
   "filter": {
-    "docs_in": 248,
-    "docs_out": 246,
+    "docs_in": 251,
+    "docs_out": 248,
     "docs_dropped": [
       {
         "slug": "fhwa-hif16010",
@@ -121,48 +107,64 @@
         "dictionary_ratio": 0.649
       },
       {
+        "slug": "usace-em-1110-2-1304-2021",
+        "rule": "min_words",
+        "words": 1198,
+        "dictionary_ratio": 0.926
+      },
+      {
         "slug": "fema-nehrp-examples-v3",
         "rule": "min_words",
         "words": 540,
         "dictionary_ratio": 0.937
       }
     ],
-    "paragraphs_in": 752414,
-    "paragraphs_out": 454566,
+    "paragraphs_in": 754809,
+    "paragraphs_out": 456480,
     "paragraphs_dropped": {
-      "alpha_ratio": 203949,
-      "word_length": 42388,
-      "short_lines": 37253,
+      "alpha_ratio": 204253,
+      "word_length": 42419,
+      "short_lines": 37346,
       "reference_list": 6856,
-      "symbol_ratio": 3333,
-      "numbered_lines": 2895
+      "symbol_ratio": 3373,
+      "numbered_lines": 2875
     },
     "tokens_dropped_by_rule": {
-      "alpha_ratio": 5809865,
-      "short_lines": 1316073,
+      "alpha_ratio": 5818961,
+      "short_lines": 1323281,
       "reference_list": 405233,
-      "word_length": 379518,
-      "numbered_lines": 171478,
-      "symbol_ratio": 37447
+      "word_length": 380844,
+      "numbered_lines": 170349,
+      "symbol_ratio": 37700
     },
-    "tokens_in": 31239828,
-    "tokens_out": 21527941,
+    "tokens_in": 31328418,
+    "tokens_out": 21594218,
     "dictionary_ratio_kept": {
       "min": 0.743,
       "median": 0.925
     }
   },
   "dedup": {
-    "docs_in": 246,
+    "docs_in": 248,
     "exact_duplicates": [],
     "docs_out": 246,
-    "paragraphs_in": 454566,
-    "near_dup_paragraphs": 34756,
-    "near_dup_clusters": 16238,
-    "tokens_in": 21527941,
-    "tokens_after_exact": 21527941,
-    "tokens_out": 20576566,
-    "token_reduction": 0.0442,
+    "paragraphs_in": 456480,
+    "near_dup_paragraphs": 34827,
+    "near_dup_clusters": 16295,
+    "docs_dropped_short": [
+      {
+        "slug": "fema-p-2192",
+        "words": 1906
+      },
+      {
+        "slug": "fema-p-1024-ra1",
+        "words": 44
+      }
+    ],
+    "tokens_in": 21594218,
+    "tokens_after_exact": 21594218,
+    "tokens_out": 20637997,
+    "token_reduction": 0.0443,
     "top_duplicated": [
       {
         "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.17-917-47",
@@ -229,8 +231,8 @@
       {
         "text": "DEPARTMENT OF THE ARMY U.S. Army Corps of Engineers",
         "first_in": "usace-em-1110-2-6053",
-        "copies_removed": 72,
-        "docs_with_copy": 57
+        "copies_removed": 74,
+        "docs_with_copy": 59
       },
       {
         "text": "The Federal Highway Administration (FHWA) provides high-quality information to serve Government, industry, and the public in a manner that promotes public understanding. Standards and policies are used to ensure and maximize the quality, objectivity, utility, and integrity of its information. FHWA p",
@@ -241,8 +243,8 @@
       {
         "text": "Approved for public release; distribution is",
         "first_in": "usace-em-1110-2-501",
-        "copies_removed": 36,
-        "docs_with_copy": 37
+        "copies_removed": 38,
+        "docs_with_copy": 39
       },
       {
         "text": "Any opinions, findings, conclusions, or recommendations expressed in this publication do not necessarily reflect the views of the Applied Technology Council (ATC), the Department of Homeland Security (DHS), or the Federal Emergency Management Agency (FEMA). Additionally, neither ATC, DHS, FEMA, nor ",
@@ -281,8 +283,8 @@
         "docs_with_copy": 23
       },
       {
-        "text": "2. Government Accession No. 3. Recipient’s Catalog No.",
-        "first_in": "fhwa-nhi-23-024",
+        "text": "ASCE American Society of Civil Engineers",
+        "first_in": "usace-em-1110-2-2104",
         "copies_removed": 21,
         "docs_with_copy": 22
       }
@@ -300,8 +302,8 @@
     "by_publisher": {
       "FEMA": {
         "train": {
-          "docs": 46,
-          "tokens": 4672696
+          "docs": 44,
+          "tokens": 4669258
         },
         "val": {
           "docs": 2,
@@ -340,8 +342,8 @@
       },
       "USACE": {
         "train": {
-          "docs": 97,
-          "tokens": 9193324
+          "docs": 99,
+          "tokens": 9258193
         },
         "val": {
           "docs": 5,
@@ -351,7 +353,7 @@
     },
     "train": {
       "docs": 234,
-      "tokens": 19359801
+      "tokens": 19421232
     },
     "val": {
       "docs": 12,
@@ -371,23 +373,23 @@
       "usace-em-1110-2-2610-final-18mar2025",
       "usace-em-1110-2-3506"
     ],
-    "val_token_frac": 0.059,
+    "val_token_frac": 0.0589,
     "eval_docs_in_train": 52,
     "publishers_without_val": [],
     "seq_len": 4096,
     "packed_seqs": {
-      "train": 4726,
+      "train": 4741,
       "val": 296
     },
     "steps_per_epoch_at_1M_tokens": 18.5
   },
   "replay": {
     "source": "HuggingFaceFW/fineweb-edu sample-10BT (stream order)",
-    "target_tokens": 1935980,
-    "docs": 1779,
-    "tokens": 1937321,
-    "packed_seqs": 473,
-    "packed_seqs_train_plus_replay": 5199
+    "target_tokens": 1942123,
+    "docs": 1780,
+    "tokens": 1944824,
+    "packed_seqs": 475,
+    "packed_seqs_train_plus_replay": 5216
   },
   "tokenizer": {
     "term_counts": {
@@ -397,7 +399,7 @@
     },
     "base": {
       "model": "mistralai/Ministral-3-8B-Base-2512",
-      "corpus_tokens": 20574313,
+      "corpus_tokens": 20635744,
       "fertility": {
         "corpus": 1.44,
         "fineweb_edu": 1.338
@@ -570,7 +572,7 @@
     },
     "instruct": {
       "model": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
-      "corpus_tokens": 20574313,
+      "corpus_tokens": 20635744,
       "fertility": {
         "corpus": 1.44,
         "fineweb_edu": 1.338
@@ -759,19 +761,19 @@
       "vertical",
       "structural",
       "wall",
-      "analysis",
       "loads",
-      "AASHTO",
+      "analysis",
       "bridge",
+      "AASHTO",
       "should",
       "earthquake",
-      "Equation",
       "requirements",
+      "Equation",
       "water",
       "building",
       "deck",
-      "SEI",
       "lateral",
+      "SEI",
       "walls",
       "construction",
       "diaphragm",
@@ -786,8 +788,8 @@
       "model",
       "maximum",
       "LRFD",
-      "flow",
       "values",
+      "flow",
       "moment",
       "stress",
       "performance",

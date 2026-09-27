@@ -6,16 +6,8 @@ was dropped) and prints the corpus card tables (markdown) for notes/decisions.md
 in the card comes from stats.json, which is committed next to the scripts that produced it.
 """
 
-import json
-
-from common import STATS, read_jsonl, read_sources, write_sources
-
-
-def table(header: list[str], rows: list[list]) -> str:
-    fmt = [f"{x:,}" if isinstance(x, int) else str(x) for r in rows for x in r]
-    cells = [fmt[i : i + len(header)] for i in range(0, len(fmt), len(header))]
-    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
-    return "\n".join(lines + ["| " + " | ".join(r) + " |" for r in cells])
+from common import read_jsonl, read_sources, read_stats, table, write_sources
+from tokenizer_coverage import tables as tokenizer_tables
 
 
 def main() -> None:
@@ -25,7 +17,7 @@ def main() -> None:
         r["tokens"] = tokens.get(r["slug"], 0)
     write_sources(rows)
 
-    s = json.loads(STATS.read_text())
+    s = read_stats()
     ex, fi, de, pii, sp, rp, tk = (
         s[k] for k in ("extract", "filter", "dedup", "pii", "split", "replay", "tokenizer")
     )
@@ -104,7 +96,7 @@ def main() -> None:
                     f"{1 - de['tokens_after_exact'] / de['tokens_in']:.1%}",
                 ],
                 [
-                    "near dedup",
+                    "near dedup (+ stubs under 2,000 words)",
                     de["docs_out"],
                     de["tokens_out"],
                     f"{1 - de['tokens_out'] / de['tokens_after_exact']:.1%}",
@@ -141,10 +133,12 @@ def main() -> None:
 
     print("\n**Deduplication** (dedup.py)\n")
     exact = "; ".join(f"{a} = {b}" for a, b in de["exact_duplicates"]) or "none"
+    stubs = ", ".join(f"{x['slug']} ({x['words']:,} words)" for x in de["docs_dropped_short"])
     print(
         f"Exact duplicate documents: {exact}. Near-duplicate paragraphs: "
         f"{de['near_dup_paragraphs']:,} of {de['paragraphs_in']:,}; tokens "
-        f"{de['tokens_in']:,} -> {de['tokens_out']:,} ({de['token_reduction']:.1%}).\n"
+        f"{de['tokens_in']:,} -> {de['tokens_out']:,} ({de['token_reduction']:.1%}). "
+        f"Dropped as under 2,000 words once duplicates were removed: {stubs or 'none'}.\n"
     )
     for title, key in (
         ("Most-duplicated across documents", "top_cross_document"),
@@ -162,30 +156,7 @@ def main() -> None:
         "\n**Tokenizer fit** (tokenizer_coverage.py, full report in "
         "`data/processed/tokenizer_coverage.md`; tokens per whitespace word)\n"
     )
-    roles = [r for r in ("base", "instruct") if r in tk]
-    rows = [
-        ["corpus tokens"] + [tk[r]["corpus_tokens"] for r in roles],
-        ["fertility: domain corpus"] + [tk[r]["fertility"]["corpus"] for r in roles],
-        ["fertility: FineWeb-Edu (~1M tokens)"]
-        + [tk[r]["fertility"]["fineweb_edu"] for r in roles],
-    ]
-    rows += [
-        [f"fertility: {k} terms ({tk['term_counts'][k]})"]
-        + [tk[r]["term_fertility"][k] for r in roles]
-        for k in tk["term_counts"]
-    ]
-    rows.append(
-        ["term words with 4+ tokens"]
-        + [f"{tk[r]['words_4plus_tokens']} / {tk[r]['term_words']}" for r in roles]
-    )
-    print(table([""] + [tk[r]["model"] for r in roles], rows))
-    print(f"\nBase and Instruct encode identically: {tk['base_instruct_identical']}.\n")
-    b = tk[roles[0]]
-    print(table(["designation", "tokens"], [[p, n] for p, n in b["probes"].items()]))
-    print(
-        "\nWorst-fragmented term words: "
-        + ", ".join(f"{x['word']} ({x['tokens']})" for x in b["worst_fragmented"][:25])
-    )
+    print(tokenizer_tables(tk))
 
     print("\n**Split and packing** (split.py)\n")
     rows = [

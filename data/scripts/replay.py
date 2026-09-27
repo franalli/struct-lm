@@ -9,6 +9,7 @@ general-English comparison sample.
 import argparse
 import os
 import sys
+import traceback
 
 from common import BASE, load_tokenizer, read_jsonl, update_stats, write_jsonl
 from datasets import load_dataset
@@ -28,12 +29,12 @@ def main() -> None:
     stream = load_dataset("HuggingFaceFW/fineweb-edu", "sample-10BT", split="train", streaming=True)
 
     rows, tokens = [], 0
-    examples = iter(stream)
-    while tokens < target:
-        ex = next(examples)
+    for ex in stream:
         n = len(encode(ex["text"]))
         rows.append({"id": ex["id"], "url": ex["url"], "text": ex["text"], "n_tokens": n})
         tokens += n
+        if tokens >= target:
+            break
     write_jsonl(args.out, rows)
 
     update_stats(
@@ -54,9 +55,16 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
     # Leaving the stream early leaves a parquet read-ahead task in pyarrow's thread pool; at
     # C-level exit the pool's destructor waits for it, but it needs the (finalized) interpreter
-    # to read via fsspec, so a normal exit deadlocks. Everything is written and flushed by now.
+    # to read via fsspec, so a normal exit deadlocks. Exit without the C-level teardown, on
+    # failure too (with status 1), once output and tracebacks are flushed.
+    code = 0
+    try:
+        main()
+    except Exception:  # noqa: BLE001  any failure must still take the os._exit path below
+        traceback.print_exc()
+        code = 1
     sys.stdout.flush()
-    os._exit(0)
+    sys.stderr.flush()
+    os._exit(code)

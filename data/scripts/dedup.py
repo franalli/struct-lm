@@ -9,7 +9,9 @@ Near: MinHash LSH over paragraphs (5-word shingles, 128 permutations, Jaccard >=
 documents and within them. USACE manuals share boilerplate paragraphs (distribution
 statements, purpose sections, definitions) and FHWA manuals repeat AASHTO clauses verbatim;
 paragraph level removes those while keeping the rest of each document. Paragraphs under 5 words
-have no shingle and are left alone.
+have no shingle and are left alone. A document left under MIN_WORDS (2,000) words is dropped, as
+filter.py does before dedup (a later edition can shrink to a stub), and its paragraphs are taken
+back out of the index so later copies of them survive.
 
 The seed (eval) documents come first in sources.csv, and this runs before split.py, so no
 near-duplicate paragraph can end up in both train and val.
@@ -18,9 +20,8 @@ near-duplicate paragraph can end up in both train and val.
 import argparse
 import hashlib
 import re
-from collections import Counter
 
-from common import BASE, load_tokenizer, read_jsonl, update_stats, write_jsonl
+from common import BASE, MIN_WORDS, load_tokenizer, read_jsonl, update_stats, write_jsonl
 from datasketch import MinHash, MinHashLSH
 from tqdm import tqdm
 
@@ -31,8 +32,9 @@ def words(text: str) -> list[str]:
     return WORD.findall(text.lower())
 
 
-def minhash(ws: list[str], n: int, num_perm: int) -> MinHash:
-    m = MinHash(num_perm=num_perm)
+def minhash(ws: list[str], n: int, template: MinHash) -> MinHash:
+    # reuse the template's permutations: building 128 of them per paragraph dominated the runtime
+    m = MinHash(len(template), permutations=template.permutations, scheme=template.scheme)
     m.update_batch([" ".join(ws[i : i + n]).encode() for i in range(len(ws) - n + 1)])
     return m
 
@@ -61,46 +63,57 @@ def main() -> None:
             unique.append(d)
 
     lsh = MinHashLSH(threshold=args.threshold, num_perm=args.num_perm)
+    template = MinHash(num_perm=args.num_perm)
     origin: dict[str, tuple[str, str]] = {}  # lsh key -> (slug, paragraph) of the kept copy
-    removed: Counter[str] = Counter()  # lsh key -> copies removed
-    copy_docs: dict[str, set[str]] = {}
-    n_paras = n_near = 0
-    out = []
+    clusters: dict[str, dict] = {}  # lsh key -> cluster, created at its first removed copy
+    n_paras = 0
+    out, stubs = [], []
     for di, d in enumerate(tqdm(unique, desc="near-dup")):
-        kept = []
+        kept, inserted = [], []
         for pi, para in enumerate(d["text"].split("\n\n")):
             n_paras += 1
             ws = words(para)
             if len(ws) < args.ngram:
                 kept.append(para)
                 continue
-            m = minhash(ws, args.ngram, args.num_perm)
+            m = minhash(ws, args.ngram, template)
             if match := lsh.query(m):
                 key = min(match)  # keys sort in corpus order: the earliest kept copy
-                removed[key] += 1
-                copy_docs.setdefault(key, {origin[key][0]}).add(d["slug"])
-                n_near += 1
+                slug, text = origin[key]
+                c = clusters.setdefault(
+                    key, {"text": text, "first_in": slug, "copies_removed": 0, "docs": {slug}}
+                )
+                c["copies_removed"] += 1
+                c["docs"].add(d["slug"])
                 continue
             key = f"{di:05d}:{pi:06d}"
             lsh.insert(key, m)
             origin[key] = (d["slug"], para)
+            inserted.append(key)
             kept.append(para)
-        if kept:
-            text = "\n\n".join(kept)
-            out.append({**d, "text": text, "n_tokens": len(encode(text))})
+        text = "\n\n".join(kept)
+        if len(text.split()) < MIN_WORDS:
+            stubs.append({"slug": d["slug"], "words": len(text.split())})
+            for key in inserted:  # this document won't be kept, so it can't be the first copy
+                lsh.remove(key)
+                clusters.pop(key, None)  # copies removed from this same document only
+            continue
+        out.append({**d, "text": text, "n_tokens": len(encode(text))})
     write_jsonl(args.docs, out)
 
-    def cluster(k: str) -> dict:
-        return {
-            "text": origin[k][1],
-            "first_in": origin[k][0],
-            "copies_removed": removed[k],
-            "docs_with_copy": len(copy_docs[k]),
-            "docs": sorted(copy_docs[k]),
+    # most copies first; ties keep first-removal order
+    clusters = [
+        {
+            "text": c["text"],
+            "first_in": c["first_in"],
+            "copies_removed": c["copies_removed"],
+            "docs_with_copy": len(c["docs"]),
+            "docs": sorted(c["docs"]),
         }
-
-    clusters = [cluster(k) for k, _ in removed.most_common()]
+        for c in sorted(clusters.values(), key=lambda c: -c["copies_removed"])
+    ]
     write_jsonl(args.clusters, clusters)
+    n_near = sum(c["copies_removed"] for c in clusters)
 
     def short(c: dict) -> dict:
         return {k: (v[:300] if k == "text" else v) for k, v in c.items() if k != "docs"}
@@ -121,6 +134,7 @@ def main() -> None:
             "paragraphs_in": n_paras,
             "near_dup_paragraphs": n_near,
             "near_dup_clusters": len(clusters),
+            "docs_dropped_short": stubs,  # under MIN_WORDS words once duplicates were removed
             "tokens_in": tokens_in,
             "tokens_after_exact": tokens_exact,
             "tokens_out": tokens_out,
@@ -130,6 +144,7 @@ def main() -> None:
         },
     )
     print(f"exact duplicates (dropped, kept): {exact}")
+    print(f"dropped as under {MIN_WORDS:,} words after dedup: {stubs}")
     print(f"near-dup paragraphs: {n_near:,} of {n_paras:,} in {len(clusters):,} clusters")
     print(
         f"tokens {tokens_in:,} -> {tokens_exact:,} (exact) -> {tokens_out:,} (near) "

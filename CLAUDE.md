@@ -15,6 +15,8 @@ Current baselines: `results/table.md`.
   load it first: `set -a; . ./.env; set +a`. Never print key values.
 - Modal: volume `struct-lm` (mounted at `/vol`, results under `/vol/results`), secrets
   `huggingface` and `mistral`.
+- Git: never create or check out a new branch unless the user says to. Commit on the current
+  branch (`main`) when asked.
 
 | Role | Model | Run name |
 |---|---|---|
