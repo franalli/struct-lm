@@ -1,5 +1,8 @@
 # struct-lm
 
+> Independent project, using only public documents, open weights and open-source tools. Forge is
+> described from Mistral AI's public announcement.
+
 Domain adaptation of an open base LLM
 ([`mistralai/Ministral-3-8B-Base-2512`](https://huggingface.co/mistralai/Ministral-3-8B-Base-2512))
 to structural and civil engineering through **CPT → SFT → DPO → GRPO**, with every stage
@@ -8,6 +11,91 @@ measured on the same KPI tasks and general-capability regression suite, then qua
 
 > This README is the write-up. Numbers live in [`results/table.md`](results/table.md);
 > the reasoning behind every choice lives in [`notes/decisions.md`](notes/decisions.md).
+
+## The problem
+
+Engineering organisations sit on decades of internal documents: design manuals, inspection
+procedures, worked calculation examples, test reports. A general-purpose LLM has seen little of
+it. Asked about those documents, it misses the specific values, clauses and vocabulary, invents
+plausible answers, and can't point to the page it relied on. Retrieval helps with lookup, but it
+doesn't teach the model the domain's language, and it doesn't change what the model does when the
+answer isn't in front of it.
+
+Mistral AI's Forge platform, as publicly announced, addresses this by training open-weight models
+further on a client's own data across the whole lifecycle: continued pre-training on raw
+proprietary text, synthetic data, SFT and preference optimisation, reinforcement learning, and
+LoRA where lighter adaptation is enough, all measured against evals tied to the client's KPIs.
+The default path starts from an existing checkpoint, not from scratch.
+
+**This repo runs that lifecycle once, end to end, at roughly 1% scale.** Public-domain US federal
+structural-engineering documents stand in for a client's private corpus: 52 manuals, reports and
+design examples from FHWA, FEMA, NIST, USACE and NASA (6.2M tokens, 19,337 page-anchored chunks).
+US federal works carry no licensing risk; copyrighted standards such as ASCE 7 and the AISC manual
+are deliberately excluded. The starting checkpoint is Ministral 3 8B Base, from the same model
+generation such engagements start from.
+
+The two kinds of training do different jobs:
+
+- **Continued pre-training (CPT)** on raw domain text (next-token loss) teaches knowledge and
+  vocabulary. Its risk is forgetting general capability, which is managed by replaying general
+  text and keeping the learning rate low.
+- **Fine-tuning (SFT → DPO → GRPO)** on a few thousand curated examples teaches behaviour: answer
+  from the passages given, cite them, decline when the answer isn't there, and get verifiable
+  calculations right.
+
+The goal is not a great model. It is a clean experiment with honest numbers and decisions that can
+be defended, measured before and after every stage.
+
+### How success is measured
+
+The eval harness was built before any training, so it couldn't be fitted to a model. The same six
+measurements run after every stage, with the base model and the off-the-shelf instruct model as
+the first two rows.
+
+| # | What it measures | Task | Metrics |
+|---|---|---|---|
+| 1 | Closed-book domain knowledge | 140 questions with exact or numeric answers from the corpus | `qa_acc` |
+| 2 | Answering from given passages, with citations | 131 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
+| 3 | Domain vocabulary | 303 terms to define in one sentence | `vocab_recall` |
+| 4 | Declining when the answer isn't there | 87 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
+| 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot | `mmlu`, `gsm8k`, `hellaswag` |
+| 6 | Serving cost | vLLM at 1, 8 and 32 concurrent requests | time to first token, inter-token latency, throughput |
+
+Every task item was hand-reviewed. Tasks 2–4 are graded by a pinned judge (Mistral Large 3,
+temperature 0, cached verdicts), with anything a rule can decide (missing citations, empty answers,
+the exact refusal phrase) decided by rule first.
+
+### Where it starts
+
+Row zero, from [`results/table.md`](results/table.md) (27 September 2026):
+
+- **The base model** finds the right answer in the passages 76% of the time but cites correctly only
+  6% of the time, and answers 92% of unanswerable questions with something invented.
+- **The instruct model** has the behaviour (69% of answers correct and backed by their citations,
+  99% of unanswerable questions declined), but it knows no more of the domain closed-book: 12%
+  against the base model's 17%.
+- **Closed-book domain accuracy is low for both.** That is the knowledge gap CPT is meant to close,
+  while SFT and DPO bring citation and refusal behaviour up to the instruct model's level or beyond,
+  and the general-capability columns stay flat.
+
+### Scope
+
+This is the same pipeline shape as a production engagement at roughly 1% scale. It leaves out the
+two parts that make the real thing hard: distributed full-parameter training on billions of
+tokens, and enterprise data readiness and governance.
+
+| | This repo | Production engagement |
+|---|---|---|
+| Base model | Ministral 3 8B, open weights | tens to hundreds of billions of parameters, dense or MoE |
+| Corpus | 6.2M tokens of clean public PDFs | billions of tokens: documents, code, databases, images; messy |
+| Continued pre-training | LoRA on one GPU, hours | full-parameter, multi-node, days to weeks, replay mix, annealing |
+| Post-training | a few thousand SFT examples, ~1k DPO pairs, a small GRPO run | 10k–100k+ examples reviewed with domain experts, RL with distillation |
+| Evaluation | six-measurement harness plus regression suite | the same idea, built with domain experts, with audit lineage |
+| Infrastructure | rented GPUs (Modal), open-source stack | isolated environments, data residency, versioned datasets and runs |
+
+What transfers: the stages and their order, the failure modes, the eval design, and the recurring
+decisions (how much general text to replay, LoRA versus full-parameter training, how far to trust a
+judge). What doesn't: the engineering difficulty at scale.
 
 ## Pipeline
 
@@ -140,7 +228,7 @@ checkpoints/  adapters and merged weights (gitignored)
 ## Write-up
 
 ### 1. Goal and KPIs
-_What the model must do, and the task-level metrics in `eval/tasks/` that define success._
+See [The problem](#the-problem) and [How success is measured](#how-success-is-measured) above.
 
 ### 2. Data
 _Sources and licenses, extraction backend, filter reject rates by rule (`filter.py` prints
