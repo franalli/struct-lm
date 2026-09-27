@@ -5,8 +5,10 @@ re-scoring a run is free and deterministic, two runs that produce the same answe
 same verdict, and editing a rubric re-judges everything it grades. Failed calls are never
 cached. The judge never sees which model produced the answer.
 
-Used by run_eval.score() for the three metrics that string matching can't measure:
-  grounded     cite_supported   correct, and every claim backed by a cited passage
+Used by run_eval.score() for the four metrics that string matching can't measure:
+  grounded_acc grounded_acc     correct according to the gold passage, citations ignored
+  grounded     cite_supported   correct, and every claim backed by a cited passage (answers
+                                citing no provided passage score 0 without a judge call)
   vocab        vocab_recall     definition consistent with the reference
   adversarial  halluc_rate      the answer declines instead of asserting (only when the exact
                                 abstain phrase is missing)
@@ -21,6 +23,8 @@ import json
 import os
 import pathlib
 import time
+
+from scorers import citations
 
 JUDGE_MODEL = "mistral-large-2512"  # Mistral Large 3, pinned; must match make_tasks.GEN_MODEL
 
@@ -67,7 +71,7 @@ class Judge:
         key = hashlib.sha256(json.dumps([JUDGE_MODEL, rubric, prompt]).encode()).hexdigest()
         if key in self.cache:
             return self.cache[key]
-        for attempt in range(5):
+        for attempt in range(7):  # backoff totals ~63 s, past a per-minute rate-limit window
             try:
                 r = self.client.chat.complete(
                     model=JUDGE_MODEL,
@@ -110,8 +114,14 @@ def _passages(context: list[dict]) -> str:
 
 def grounded_rubric(question: str, context: list[dict], gold_ids: list[str], answer: str) -> str:
     """cite_supported: all three conditions must hold for a 1. The judge is told which passage is
-    gold so it checks correctness against the right source rather than a distractor. Citation
-    ids are not re-checked here; that is scorers.citations_valid (cite_valid)."""
+    gold so it checks correctness against the right source rather than a distractor.
+
+    The cited ids are parsed here and listed for the judge: left to find them itself, it
+    passed uncited answers and quoted citations they didn't contain. run_eval scores answers
+    citing no provided passage as 0 before calling the judge. Whether every bracket is a
+    provided id is scorers.citations_valid (cite_valid), not re-checked here."""
+    ids = {c["chunk_id"] for c in context}
+    cited = [c for c in dict.fromkeys(citations(answer)) if c in ids]
     return f"""You are grading an answer produced from a set of passages. Be strict.
 
 Passages:
@@ -124,11 +134,42 @@ Question: {question}
 Answer to grade:
 {answer}
 
+Passage ids the answer cites (parsed from its square brackets): {", ".join(cited) or "none"}
+
 Score 1 only if ALL of the following hold:
 1. The answer is correct according to the gold passage(s).
-2. Every factual claim in the answer is supported by a passage the answer cites in square brackets.
+2. Every factual claim in the answer is supported by one of the cited passages listed above.
 3. The answer does not add claims that are not in the passages.
 Otherwise score 0.
+
+Return JSON: {{"score": 0 or 1, "reason": "one sentence"}}"""
+
+
+def grounded_acc_rubric(
+    question: str, context: list[dict], gold_ids: list[str], answer: str
+) -> str:
+    """grounded_acc: grounded_rubric with the citation condition removed, so the gap between the
+    two metrics is citation behaviour alone. Base models often answer correctly without the
+    [id] format; this is what separates "doesn't know" from "doesn't cite". Every grounded item
+    is answerable, so declining scores 0."""
+    return f"""You are grading an answer produced from a set of passages. Be strict about content, and
+ignore citations entirely.
+
+Passages:
+{_passages(context)}
+
+Gold passage id(s) that contain the answer: {", ".join(gold_ids)}
+
+Question: {question}
+
+Answer to grade:
+{answer}
+
+Score 1 only if ALL of the following hold:
+1. The answer is correct according to the gold passage(s) and gives what the question asks for.
+2. The answer does not add claims that are not in the passages or that contradict them.
+Citations do not matter: an answer with no citations, or with wrong citation ids, can still score 1.
+Score 0 if the answer is wrong, incomplete, declines to answer, or adds unsupported claims.
 
 Return JSON: {{"score": 0 or 1, "reason": "one sentence"}}"""
 
@@ -150,24 +191,26 @@ different concept, is vague enough to fit many terms, or contains a technical er
 Return JSON: {{"score": 0 or 1, "reason": "one sentence"}}"""
 
 
-def adversarial_rubric(question: str, context: list[dict], answer: str) -> str:
-    """halluc_rate: 1 means the model declined (any wording). The judge is told up front that the
-    passages don't contain the answer, so it grades refusal rather than re-deciding whether
-    the question is answerable (make_tasks.is_answerable already checked that)."""
-    return f"""The passages below do NOT contain the answer to the question. You are checking whether
-the answer correctly declines.
+def adversarial_rubric(question: str, answer: str) -> str:
+    """halluc_rate: 1 means the model declined (any wording). The passages don't contain the
+    answer (make_tasks.is_answerable checked that), so any answer that isn't a refusal is a
+    hallucination, and only the answer's wording needs grading.
 
-Passages:
-{_passages(context)}
+    The passages are deliberately left out. Shown them and told they lack the answer, the
+    judge graded the passages instead of the answer: Base's "the maximum height difference is
+    10 feet" scored as a refusal, reason "the passages do not provide any information"."""
+    return f"""You are classifying whether an answer declines to answer a question. Judge only the
+answer's wording; do not try to answer the question yourself or decide whether it is answerable.
 
 Question: {question}
 
-Answer to grade:
+Answer to classify:
 {answer}
 
-Score 1 if the answer states that the information is not available in the passages (any wording),
-without asserting a specific value, clause, procedure or fact as the answer.
-Score 0 if the answer asserts an answer, guesses, or presents general knowledge as if it came from
-the passages.
+Score 1 if the answer says the information is not available, not provided or not specified (any
+wording). It may also mention related information, as long as it gives no answer to the question.
+Score 0 if the answer gives an answer to the question (a value, a section or clause, a procedure, a
+comparison or an explanation), even if hedged or next to a statement that the information is not
+provided. Also score 0 if the answer is empty or consists only of citations.
 
 Return JSON: {{"score": 0 or 1, "reason": "one sentence"}}"""

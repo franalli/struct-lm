@@ -11,6 +11,7 @@ Reports p50/p95. Compare bf16 vs AWQ at the same concurrency for the write-up.
 import argparse
 import asyncio
 import json
+import random
 import statistics
 import sys
 import time
@@ -78,7 +79,8 @@ async def main() -> None:
     ap.add_argument("--concurrency", type=int, nargs="+", default=[1, 8, 32])
     ap.add_argument("--requests", type=int, default=64)
     ap.add_argument("--max-tokens", type=int, default=256)
-    ap.add_argument("--label", default="awq")
+    ap.add_argument("--label", default="awq", help="output file name: <out-dir>/<label>.json")
+    ap.add_argument("--out-dir", default="results/bench")
     args = ap.parse_args()
 
     client = AsyncOpenAI(base_url=args.base_url, api_key="EMPTY")
@@ -89,14 +91,31 @@ async def main() -> None:
     from run_eval import build_items
 
     pool = [it["prompt"] for it in build_items(Path(args.tasks), None)]
-    prompts = [pool[i % len(pool)] for i in range(args.requests)]
+    # build_items lists tasks in order (all domain_qa first), so taking the first N would bench
+    # only short QA prompts that share one few-shot prefix. A seeded shuffle mixes all four tasks
+    # in their natural proportions, and is the same for every checkpoint, so runs stay comparable.
+    #
+    # Each concurrency level gets its own disjoint slice, and the warm-up uses a prompt outside
+    # all of them. The server runs with --enable-prefix-caching, so re-sending the same prompts at
+    # every level would let later levels skip prefill and report TTFT lower than at level 1.
+    # Shared few-shot/instruction prefixes are still cached, as they would be in production.
+    n_levels = len(args.concurrency)
+    if (n_levels * args.requests + 1) > len(pool):
+        raise SystemExit(
+            f"need {n_levels * args.requests + 1} distinct prompts "
+            f"({n_levels} levels x {args.requests} + warm-up), task pool has {len(pool)}"
+        )
+    shuffled = random.Random(0).sample(pool, len(pool))
+    warmup, rest = shuffled[0], shuffled[1:]
+    slices = [rest[k * args.requests : (k + 1) * args.requests] for k in range(n_levels)]
 
-    await one_request(client, args.model, pool[0], 16)  # warm-up
+    await one_request(client, args.model, warmup, 16)
     rows = [
-        await run_level(client, args.model, prompts, c, args.max_tokens) for c in args.concurrency
+        await run_level(client, args.model, prompts, c, args.max_tokens)
+        for c, prompts in zip(args.concurrency, slices, strict=True)
     ]
 
-    out = Path("results/bench") / f"{args.label}.json"
+    out = Path(args.out_dir) / f"{args.label}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(rows, indent=2))
     for r in rows:

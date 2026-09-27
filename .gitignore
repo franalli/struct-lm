@@ -17,9 +17,10 @@ wandb/
 *.ckpt
 *.gguf
 
-# Eval outputs: nothing under results/ is ignored. runs/<run>/ (generations + scores),
+# Eval outputs: results/ is committed. runs/<run>/ (generations + scores),
 # judge_cache.jsonl and lm_eval/ let anyone `run_eval.py --rescore --lm-eval-dir results/lm_eval`
-# with no GPU or API key; bench/ holds the latency summaries.
+# with no GPU or API key; bench/ holds the latency summaries. Smoke runs are throwaway.
+results/runs/smoke/
 
 # Python
 __pycache__/

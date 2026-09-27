@@ -73,31 +73,30 @@ GROUNDED_INSTRUCTIONS = (
     "If the passages do not contain the answer, reply exactly: Not in the provided passages."
 )
 
-# One worked example (synthetic, not from the corpus) so base models learn the format.
-# It has a relevant passage and an irrelevant one, and cites only the relevant one, to show that
-# citations should be selective. Its ids ("example-a:...") never appear in a real context, so a
-# model that copies them fails scorers.citations_valid.
-GROUNDED_EXAMPLE = """[example-a:p3:c0]
-For usual load conditions the minimum factor of safety against sliding is 1.5. For unusual load conditions it is 1.3.
-
-[example-b:p9:c1]
-Concrete cover for reinforcement in hydraulic structures exposed to water shall be at least 4 inches.
-
-Question: What sliding factor of safety applies under unusual load conditions?
-Answer: A minimum factor of safety of 1.3 against sliding applies for unusual load conditions [example-a:p3:c0]."""
+# A one-line format example, with no passages of its own. The earlier version was a full worked
+# example (two synthetic passages plus a Question/Answer), and it made Ministral 3 8B Instruct refuse
+# nearly everything: 130/131 grounded answered "Not in the provided passages." (Mistral's API gave
+# the same refusals, so it was the prompt, not the serving path). Without the fake passages the
+# model answers and still declines unanswerable questions (API test on items not used for the
+# first test: 12/12 grounded answered, 10/10 adversarial declined), while base models still see the citation
+# format. The id "doc-a:p3:c0" never appears in a real context, so a model that copies it fails
+# scorers.citations_valid.
+GROUNDED_FORMAT = (
+    'Example of the answer format (unrelated to the passages below): "For unusual load conditions '
+    'the minimum factor of safety against sliding is 1.3 [doc-a:p3:c0]."'
+)
 
 
 def grounded_prompt(question: str, context: list[dict]) -> str:
-    """Instructions, the worked example, the item's passages as "[chunk_id]\\ntext" blocks, then
-    the question and an open "Answer:".
+    """Instructions, the one-line format example, the item's passages as "[chunk_id]\\ntext"
+    blocks, then the question and an open "Answer:".
 
     `context` is the item's list of {chunk_id, text}: 4 passages for grounded (gold, two
     neighbours from the same document, one distractor from another document, shuffled by
     make_tasks.py), 3 for adversarial (none of which contains the answer)."""
     passages = "\n\n".join(f"[{c['chunk_id']}]\n{c['text']}" for c in context)
     return (
-        f"{GROUNDED_INSTRUCTIONS}\n\n{GROUNDED_EXAMPLE}\n\n"
-        f"{passages}\n\nQuestion: {question}\nAnswer:"
+        f"{GROUNDED_INSTRUCTIONS}\n{GROUNDED_FORMAT}\n\n{passages}\n\nQuestion: {question}\nAnswer:"
     )
 
 
@@ -114,6 +113,15 @@ GEN = {
     "vocab": {"max_tokens": 80, "stop": ["\n"]},
     "grounded": {"max_tokens": 300, "stop": ["\n\nQuestion:", "\n\n["]},
     "adversarial": {"max_tokens": 200, "stop": ["\n\nQuestion:", "\n\n["]},
+}
+
+# Overrides for chat models (run_eval --chat) on the one-line tasks. Ministral 3 Instruct opens
+# with a header echoing the prompt's labels ("**Term: x**\n**Definition:** ..."), so the "\n" stop
+# ended 273/303 vocab answers before the definition. For chat the stop is dropped, the budget
+# covers the header, and run_eval keeps the first line with content (scorers.answer_line).
+CHAT_GEN = {
+    "domain_qa": {"max_tokens": 64, "stop": []},
+    "vocab": {"max_tokens": 112, "stop": []},
 }
 
 # Lowercased form of the abstain sentence in GROUNDED_INSTRUCTIONS; scorers.abstained() checks

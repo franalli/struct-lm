@@ -25,6 +25,35 @@ _ARTICLES = re.compile(r"\b(the|a|an)\b")
 _PUNCT = re.compile(r"[^\w\s.%/-]")
 
 
+# A passage-id citation such as [fhwa-nhi-15-047:p30:c0] (or a copied format example, [doc:p3:c0]).
+_CHUNK_CITE = re.compile(r"\[[^\[\]]*:p\d+:c\d+[^\[\]]*\]")
+# A leading "Definition:" / "Answer:" label, with any markdown around it.
+_LABEL = re.compile(r"^\W*(definition|answer)\s*:\W*", re.IGNORECASE)
+
+
+def substance(text: str) -> str:
+    """The answer with passage-id citations and markdown emphasis removed. Empty means the model
+    said nothing: run_eval scores that by rule, because the judge, shown an empty or
+    citation-only answer, sometimes graded it as correct or as a refusal."""
+    return _CHUNK_CITE.sub("", text).replace("*", "").replace("#", "").strip()
+
+
+def answer_line(text: str) -> str:
+    """First line that carries an answer, for chat models on the one-line tasks. Skips an echoed
+    "Term: x" header and short intros ending in a colon ("Here's a precise definition:"), and
+    strips a leading "Definition:" label and surrounding markdown. "" if no line qualifies."""
+    for line in text.strip().splitlines():
+        s = line.strip()
+        if (
+            not s
+            or re.match(r"^\W*term\s*:", s, re.IGNORECASE)
+            or (s.endswith(":") and len(s) < 80)
+        ):
+            continue
+        return _LABEL.sub("", s).strip("* ").strip()
+    return ""
+
+
 def first_line(text: str) -> str:
     """The answer is the first non-empty line. Base models often continue past it (a new "Q:",
     an explanation); GEN stops at "\\n" for domain_qa, and this is the second guard."""

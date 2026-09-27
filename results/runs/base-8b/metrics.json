@@ -1,0 +1,19 @@
+{
+  "qa_acc": 0.1714,
+  "grounded_acc": 0.7557,
+  "cite_valid": 0.0992,
+  "cite_supported": 0.0611,
+  "vocab_recall": 0.7228,
+  "halluc_rate": 0.9195,
+  "n": {
+    "domain_qa": 140,
+    "grounded": 131,
+    "vocab": 303,
+    "adversarial": 87
+  },
+  "mmlu": 0.7683,
+  "gsm8k": 0.7945,
+  "hellaswag": 0.8006,
+  "model": "mistralai/Ministral-3-8B-Base-2512",
+  "chat": false
+}

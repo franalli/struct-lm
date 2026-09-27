@@ -34,13 +34,14 @@ import sys
 # Import the sibling modules (prompts, scorers, judge) whether this runs from the repo root, from
 # eval/, or as /root/eval/run_eval.py inside the Modal container.
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from prompts import ABSTAIN_PHRASE, GEN, grounded_prompt, qa_prompt, vocab_prompt
-from scorers import abstained, citations_valid, qa_correct
+from prompts import ABSTAIN_PHRASE, CHAT_GEN, GEN, grounded_prompt, qa_prompt, vocab_prompt
+from scorers import abstained, answer_line, citations, citations_valid, qa_correct, substance
 
 # Task order: files are read, generated and scored in this order.
 TASKS = ["domain_qa", "grounded", "vocab", "adversarial"]
-# Columns of results/table.md, in order. The first five are the KPIs computed in score():
+# Columns of results/table.md, in order. The first six are the KPIs computed in score():
 #   qa_acc          domain_qa: fraction answered correctly (exact or numeric match)
+#   grounded_acc    grounded: fraction the judge finds correct, citations ignored
 #   cite_valid      grounded: fraction whose citations are all provided ids (rule-based)
 #   cite_supported  grounded: fraction the judge finds correct AND supported by cited passages
 #   vocab_recall    vocab: fraction of definitions the judge accepts
@@ -48,6 +49,7 @@ TASKS = ["domain_qa", "grounded", "vocab", "adversarial"]
 # The last three come from lm-eval via merge_lm_eval(), and go blank if it isn't given.
 COLUMNS = [
     "qa_acc",
+    "grounded_acc",
     "cite_valid",
     "cite_supported",
     "vocab_recall",
@@ -128,7 +130,8 @@ def generate(
         batch = [it for it in items if it["task"] == task]
         if not batch:
             continue
-        params = SamplingParams(temperature=0.0, seed=0, **GEN[task])
+        gen = {**GEN[task], **CHAT_GEN.get(task, {})} if chat else GEN[task]
+        params = SamplingParams(temperature=0.0, seed=0, **gen)
         if chat:
             convs = [[{"role": "user", "content": it["prompt"]}] for it in batch]
             outs = llm.chat(convs, params, use_tqdm=False)
@@ -137,6 +140,8 @@ def generate(
         # vLLM returns outputs in input order, so zip lines them back up with their items.
         for it, o in zip(batch, outs):
             it["output"] = o.outputs[0].text
+            if chat and task in CHAT_GEN:  # no "\n" stop was used: keep the answer line only
+                it["raw_output"], it["output"] = it["output"], answer_line(it["output"])
         print(f"generated {len(batch):4d} {task}")
 
 
@@ -145,16 +150,16 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
     """Score every item; return (per-item records, aggregate metrics).
 
     `judge` is a judge.Judge or None (--no-judge). Without a judge, the judged metrics
-    (cite_supported, vocab_recall) are left out of metrics entirely rather than reported as 0,
-    and adversarial items count as not abstained unless they use the exact phrase, so
-    halluc_rate is an upper bound in smoke tests.
+    (grounded_acc, cite_supported, vocab_recall) are left out of metrics entirely rather than
+    reported as 0, and adversarial items count as not abstained unless they use the exact
+    phrase, so halluc_rate is an upper bound in smoke tests.
 
     If the judge fails on an item after all retries, that item is left out of its judged
     metric (not counted as 0) and marked "judge_failed" in scored.jsonl; metrics["judge_failed"]
     records how many. Nothing is cached for it, so a later --rescore fills it in.
 
     Each metric is the mean of its bucket: one 0/1 (or bool) entry per scored item."""
-    from judge import adversarial_rubric, grounded_rubric, vocab_rubric
+    from judge import adversarial_rubric, grounded_acc_rubric, grounded_rubric, vocab_rubric
 
     scored, buckets = [], {c: [] for c in COLUMNS}
     n_failed = 0
@@ -167,25 +172,47 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
             )
             buckets["qa_acc"].append(rec["correct"])
         elif it["task"] == "grounded":
-            # Two scores: citation format (rules), then correctness and support (judge).
+            # Three scores: citation format (rules), correctness alone (judge), then
+            # correctness plus support by the cited passages (judge).
             ids = {c["chunk_id"] for c in r["context"]}
             rec["cite_valid"] = citations_valid(out, ids)
             buckets["cite_valid"].append(rec["cite_valid"])
-            if judge:
+            if not substance(out):
+                # Empty or citation-only: nothing to grade. Scored by rule, since the judge
+                # passed some of these.
+                rec["correct"], rec["supported"] = 0, 0
+                rec["acc_reason"] = rec["judge_reason"] = "empty or citation-only answer"
+                buckets["grounded_acc"].append(0)
+                buckets["cite_supported"].append(0)
+            elif judge:
                 # Cached on the full rubric prompt: the same answer to the same item gets the
                 # same verdict across runs.
-                v = judge(
-                    "grounded",
-                    grounded_rubric(r["question"], r["context"], r["gold_chunk_ids"], out),
-                )
+                args = (r["question"], r["context"], r["gold_chunk_ids"], out)
+                v = judge("grounded_acc", grounded_acc_rubric(*args))
+                if v is None:
+                    rec["acc_reason"], n_failed = "judge_failed", n_failed + 1
+                else:
+                    rec["correct"], rec["acc_reason"] = v["score"], v["reason"]
+                    buckets["grounded_acc"].append(v["score"])
+                if not ids.intersection(citations(out)):
+                    # Nothing cited, so nothing can be supported by a citation. Scored by rule:
+                    # the judge passed uncited answers when asked to check this itself.
+                    v = {"score": 0, "reason": "cites no provided passage"}
+                else:
+                    v = judge("grounded", grounded_rubric(*args))
                 if v is None:
                     rec["judge_reason"], n_failed = "judge_failed", n_failed + 1
                 else:
                     rec["supported"], rec["judge_reason"] = v["score"], v["reason"]
                     buckets["cite_supported"].append(v["score"])
         elif it["task"] == "vocab":
-            # Judge-only: definitions vary too much in wording for string matching.
-            if judge:
+            # Judge-only: definitions vary too much in wording for string matching. An output
+            # with no definition line (a bare "**Term: x**" header) is 0 by rule: the judge
+            # passed 193 of those, quoting definitions that weren't there.
+            if not answer_line(out):
+                rec["correct"], rec["judge_reason"] = 0, "no definition in the output"
+                buckets["vocab_recall"].append(0)
+            elif judge:
                 v = judge("vocab", vocab_rubric(r["term"], r["definition"], out))
                 if v is None:
                     rec["judge_reason"], n_failed = "judge_failed", n_failed + 1
@@ -197,8 +224,12 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
             # to the judge, which also accepts paraphrased refusals.
             if abstained(out, ABSTAIN_PHRASE):
                 rec["abstained"], rec["judge_reason"] = 1, "exact abstain phrase"
+            elif not substance(out):
+                # Empty or citation-only is not a refusal. By rule: the judge called 11 of 15
+                # citation-only answers refusals.
+                rec["abstained"], rec["judge_reason"] = 0, "empty or citation-only answer"
             elif judge:
-                v = judge("adversarial", adversarial_rubric(r["question"], r["context"], out))
+                v = judge("adversarial", adversarial_rubric(r["question"], out))
                 if v is None:
                     rec["judge_reason"], n_failed = "judge_failed", n_failed + 1
                 else:
@@ -228,6 +259,14 @@ def merge_lm_eval(metrics: dict, lm_eval_dir: str | None, run_name: str) -> None
     if not lm_eval_dir:
         return
     files = sorted(glob.glob(f"{lm_eval_dir}/{run_name}/**/results*.json", recursive=True))
+    # lm-eval rows are always chat-off (run_lm_eval.sh). A chat-template run, e.g. an old one
+    # pulled back off the Modal volume, is skipped so the newest-file rule can't pick it up.
+    chat_runs = [
+        f for f in files if json.loads(pathlib.Path(f).read_text()).get("fewshot_as_multiturn")
+    ]
+    for f in chat_runs:
+        print(f"skipping chat-template lm-eval results (not comparable): {f}")
+    files = [f for f in files if f not in chat_runs]
     if not files:
         print(f"no lm-eval results under {lm_eval_dir}/{run_name}")
         return
@@ -253,6 +292,10 @@ def append_table(table: pathlib.Path, run_name: str, metrics: dict) -> None:
     header = "| run | " + " | ".join(COLUMNS) + " |\n|" + "---|" * (len(COLUMNS) + 1) + "\n"
     if not table.exists():
         table.write_text(header)
+    elif table.read_text().splitlines()[0] != header.splitlines()[0]:
+        # COLUMNS changed since the table was started; appending would misalign every cell.
+        # metrics.json is already written by then, so stopping here loses nothing.
+        raise SystemExit(f"{table}: header doesn't match COLUMNS; update its header row first")
     cells = [f"{metrics[c]:.3f}" if metrics.get(c) is not None else "" for c in COLUMNS]
     with table.open("a") as f:
         f.write(f"| {run_name} | " + " | ".join(cells) + " |\n")
@@ -285,6 +328,9 @@ def main() -> None:
         "--lm-eval-dir", help="e.g. results/lm_eval; merges <dir>/<run-name>/**/results*.json"
     )
     args = ap.parse_args()
+    if args.model and "instruct" in args.model.lower() and not args.chat:
+        # KPI eval always runs chat checkpoints in chat format (notes/decisions.md).
+        raise SystemExit("an Instruct checkpoint must be evaluated with --chat")
 
     results = pathlib.Path(args.results_dir)
     run_dir = results / "runs" / args.run_name
@@ -314,6 +360,8 @@ def main() -> None:
                     "id": it["id"],
                     "prompt": it["prompt_final"],
                     "output": it["output"],
+                    # chat one-line tasks: the full reply before scorers.answer_line
+                    **({"raw_output": it["raw_output"]} if "raw_output" in it else {}),
                 }
                 for it in items
             ],

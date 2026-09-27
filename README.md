@@ -74,18 +74,20 @@ Generation runs on a Modal H100; scoring (rules + Mistral judge) runs locally, o
 modal run --detach eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 \
   --run-name base-8b --generate-only
 modal run --detach eval/modal_app.py --model mistralai/Ministral-3-8B-Instruct-2512-BF16 \
-  --run-name instruct-8b-chat --chat --generate-only
+  --run-name instruct-8b --chat --generate-only
 
-# 2. Pull results/ off the Modal volume
-modal volume get struct-lm results .
+# 2. Pull the run's outputs off the Modal volume (not results/table.md: it's written locally)
+modal volume get struct-lm results/runs/base-8b results/runs/
+modal volume get struct-lm results/lm_eval/base-8b results/lm_eval/
 
 # 3. Score locally; appends a row to results/table.md
 python eval/run_eval.py --run-name base-8b --rescore --lm-eval-dir results/lm_eval \
   --model mistralai/Ministral-3-8B-Base-2512
 ```
 
-`--chat` wraps prompts in the checkpoint's chat template (and makes lm-eval use
-`--apply_chat_template --fewshot_as_multiturn`); only compare chat rows with chat rows.
+`--chat` wraps the KPI prompts in the checkpoint's chat template; it is required for Instruct and
+later chat checkpoints (SFT/DPO/GRPO), and base models run without it. lm-eval never uses a chat
+template, for any checkpoint, so its columns compare across every row (see notes/decisions.md).
 `--which lm|kpi` runs one half; `--limit 5 --no-judge --which kpi` is a smoke test.
 On a GPU box without Modal, drop `--generate-only` and run `eval/run_eval.py` and
 `eval/run_lm_eval.sh` directly (usage at the top of each file).
@@ -105,6 +107,14 @@ What each KPI task measures:
 uv sync --extra quantize && bash serve/quantize.sh checkpoints/grpo-merged checkpoints/awq
 uv sync --extra serve && bash serve/serve_vllm.sh checkpoints/awq &
 python serve/bench_latency.py --label awq   # → results/bench/awq.json
+```
+
+On Modal, `--which latency` starts `serve_vllm.sh` in the container, waits for it, and runs the
+benchmark (64 KPI prompts, seeded sample across all four tasks; concurrency 1 / 8 / 32):
+
+```bash
+modal run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b
+# → results/bench/base-8b.json on the volume
 ```
 
 Override any config value from the CLI:

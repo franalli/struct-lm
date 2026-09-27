@@ -17,10 +17,14 @@ RUN=${2:?run name required}
 OUT=${3:-results}/lm_eval/$RUN
 # Mistral 3 checkpoints tokenize with Tekken via mistral-common; TOKENIZER_MODE=auto for others.
 TOKENIZER_MODE=${TOKENIZER_MODE:-mistral}
-# CHAT=1 for instruct/chat checkpoints: wrap prompts in the chat template, few-shot as turns.
-# Changes the prompt format, so only compare CHAT=1 rows with other CHAT=1 rows.
-CHAT_ARGS=()
-if [[ ${CHAT:-0} == 1 ]]; then CHAT_ARGS=(--apply_chat_template --fewshot_as_multiturn); fi
+# Never the chat template, for every checkpoint (base, instruct, SFT/DPO/GRPO): plain 5-shot keeps
+# all rows comparable, and lm-eval's chat path renders the template to text and re-encodes it, so
+# Mistral control tokens ("<s>[INST]") reach the model as ordinary text. Chat format is the KPI
+# eval's job (run_eval.py --chat). See notes/decisions.md.
+if [[ ${CHAT:-0} == 1 ]]; then
+  echo "run_lm_eval.sh: CHAT=1 is not supported; lm-eval always runs without the chat template" >&2
+  exit 2
+fi
 mkdir -p "$OUT"
 
 # model_args are passed straight to vllm.LLM:
@@ -34,7 +38,6 @@ lm_eval --model vllm \
   --num_fewshot 5 \
   --batch_size auto \
   --seed 0 \
-  "${CHAT_ARGS[@]}" \
   --output_path "$OUT"
 
 echo "results -> $OUT"

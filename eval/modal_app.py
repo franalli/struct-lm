@@ -1,9 +1,10 @@
 """Run the KPI eval and the lm-eval regression suite on a Modal H100.
 
   modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b
-  modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Instruct-2512 --run-name instruct-8b --chat
+  modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Instruct-2512-BF16 --run-name instruct-8b --chat
   modal run eval/modal_app.py --model mistralai/Mistral-7B-v0.3 --run-name m7b --tokenizer-mode auto
   modal run eval/modal_app.py --model ... --run-name smoke --limit 5 --no-judge --which kpi
+  modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b --which latency
   modal volume get struct-lm results .        # pull results/ back into the repo
 
 To keep judge calls off the GPU clock, generate on Modal with --generate-only, pull results/,
@@ -23,6 +24,8 @@ reading and writing /vol, then commits the volume so the results persist.
 import os
 import subprocess
 import sys
+import time
+import urllib.request
 
 import modal
 
@@ -64,9 +67,10 @@ image = (
     # edits to tasks, prompts or scorers take effect without a rebuild. It also means the run
     # evaluates whatever is in eval/tasks/ right now: don't regenerate tasks between stages.
     .add_local_dir("eval", remote_path="/root/eval")  # tasks, prompts, scorers, judge, run_eval
+    .add_local_dir("serve", remote_path="/root/serve")  # serve_vllm.sh, bench_latency.py
 )
 
-# Settings shared by both GPU functions. 4 h covers a full 8B lm-eval run (MMLU is the long
+# Settings shared by all GPU functions. 4 h covers a full 8B lm-eval run (MMLU is the long
 # pole) with margin; the secrets become environment variables inside the container
 # (HF_TOKEN for gated weights, MISTRAL_API_KEY for the judge).
 COMMON = {
@@ -122,17 +126,72 @@ def kpi_eval(
 
 
 @app.function(**COMMON)
-def lm_eval(model: str, run_name: str, tokenizer_mode: str, chat: bool = False) -> None:
+def lm_eval(model: str, run_name: str, tokenizer_mode: str) -> None:
     """The general-capability regression suite: run_lm_eval.sh, writing
-    /vol/results/lm_eval/<run_name>/. The script takes tokenizer mode and chat as environment
-    variables (TOKENIZER_MODE, CHAT), so they are passed through env rather than as arguments."""
+    /vol/results/lm_eval/<run_name>/. Always without the chat template (see run_lm_eval.sh).
+    The script takes the tokenizer mode as an environment variable, so it goes through env."""
     subprocess.run(
         ["bash", "/root/eval/run_lm_eval.sh", model, run_name, "/vol/results"],
         check=True,
         cwd="/root",
-        env={**os.environ, "TOKENIZER_MODE": tokenizer_mode, "CHAT": "1" if chat else "0"},
+        env={**os.environ, "TOKENIZER_MODE": tokenizer_mode},
     )
     vol.commit()
+
+
+@app.function(**COMMON)
+def latency(model: str, run_name: str, tokenizer_mode: str) -> None:
+    """Serving benchmark: start serve_vllm.sh (the OpenAI-compatible server used in production)
+    in the background, wait until it answers /health, run bench_latency.py against it, and
+    write /vol/results/bench/<run_name>.json (TTFT / ITL / E2E p50-p95 and tok/s per
+    concurrency level). The server is stopped however the benchmark ends.
+
+    The benchmark always goes through the chat endpoint, so there's no `chat` switch: this
+    measures serving speed, not answer quality. MAX_MODEL_LEN is 8192, the same as run_eval.py,
+    so any prompt the KPI eval can send (4 passages plus instructions, plus 256 output tokens)
+    also fits here."""
+    server = subprocess.Popen(
+        ["bash", "/root/serve/serve_vllm.sh", model],
+        cwd="/root",
+        env={**os.environ, "TOKENIZER_MODE": tokenizer_mode, "MAX_MODEL_LEN": "8192"},
+    )
+    try:
+        # Loading 8B weights from the volume and compiling takes a few minutes; a first-time
+        # download takes longer. Fail fast if the server process dies instead of waiting.
+        deadline = time.monotonic() + 30 * 60
+        while True:
+            if server.poll() is not None:
+                raise RuntimeError(f"vLLM server exited with code {server.returncode} before ready")
+            try:
+                with urllib.request.urlopen("http://localhost:8000/health", timeout=5) as r:
+                    if r.status == 200:
+                        break
+            except OSError:  # connection refused / not ready yet (URLError is an OSError)
+                pass
+            if time.monotonic() > deadline:
+                raise TimeoutError("vLLM server not ready after 30 min")
+            time.sleep(5)
+        subprocess.run(
+            [
+                sys.executable,
+                "/root/serve/bench_latency.py",
+                "--label",
+                run_name,
+                "--tasks",
+                "/root/eval/tasks",
+                "--out-dir",
+                "/vol/results/bench",
+            ],
+            check=True,
+            cwd="/root",
+        )
+    finally:
+        server.terminate()
+        server.wait(timeout=120)
+    vol.commit()
+
+
+WHICH = ("lm", "kpi", "both", "latency")
 
 
 @app.local_entrypoint()
@@ -147,15 +206,22 @@ def main(
     tokenizer_mode: str = "mistral",  # "auto" for non-Mistral-3 checkpoints
 ) -> None:
     """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
-    bools -> --chat / --no-chat). `which` picks "lm", "kpi" or "both".
+    bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi) or
+    "latency" (serving benchmark only; it ignores chat, limit, no_judge and generate_only).
 
-    `chat` applies to both halves, so the regression suite and the KPI eval always use the
-    same prompt format for a given run. `limit` 0 means all items (Modal flags can't be None)."""
+    `chat` applies to the KPI eval only: chat checkpoints always run it with their chat
+    template, and lm-eval never uses one (see run_lm_eval.sh). `limit` 0 means all items
+    (Modal flags can't be None)."""
+    if which not in WHICH:  # an unknown value would otherwise match no branch and do nothing
+        raise SystemExit(f"--which must be one of {', '.join(WHICH)}, got {which!r}")
+    if which in ("kpi", "both") and "instruct" in model.lower() and not chat:
+        # Checked here so the mistake fails locally, before a GPU container starts.
+        raise SystemExit("KPI eval of an Instruct checkpoint must use --chat")
     if which in ("lm", "both"):
-        lm_eval.remote(
-            model, run_name, tokenizer_mode, chat
-        )  # first, so kpi_eval can merge its numbers
+        lm_eval.remote(model, run_name, tokenizer_mode)  # first, so kpi_eval can merge its numbers
     if which in ("kpi", "both"):
         kpi_eval.remote(
             model, run_name, chat, limit or None, no_judge, tokenizer_mode, generate_only
         )
+    if which == "latency":
+        latency.remote(model, run_name, tokenizer_mode)

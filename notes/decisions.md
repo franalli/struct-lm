@@ -216,3 +216,73 @@ mission statements) and career-summary bios; both verified to remove only their 
 lists without citation-shaped entries (gr-0523, gr-0577) can't be caught by density without dropping
 good items, so they stay manual rejects.
 Final: domain_qa 140 + 3 few-shot, grounded 131, adversarial 87, vocab 303 = 664 items, all reviewed.
+
+## 2026-09-27: Grounded prompt: format line instead of worked example
+**Why:** the worked example (question, passages, cited answer) made Ministral 3 8B Instruct abstain on
+130/131 answerable grounded items: it treated the example's passages as the ones to use. Confirmed on
+the Mistral API (ministral-8b-2512) before spending GPU time.
+**Change:** prompts.GROUNDED_FORMAT, a one-line format example explicitly marked as unrelated to the
+passages. API spot check: 12/12 grounded answered, 10/10 adversarial declined. Modal generations
+redone (--generate-only). Instruct now: 9/131 grounded abstain, 121 cited; 86/87 adversarial abstain.
+Base: 0/131 abstain but only 25 cite: it answers in prose and drops the [id] format.
+
+## 2026-09-27: grounded_acc split from cite_supported; uncited answers scored by rule
+**Why:** one prompt for both models (no per-model prompt tuning), so Base's lost citation format
+would read as "wrong" under the strict metric. Splitting separates "doesn't know" from "doesn't cite",
+which is the thing SFT is expected to fix.
+**grounded_acc** (new judge rubric): correct per the gold passage and no unsupported claims,
+citations ignored; declining scores 0. Same wording as the strict rubric minus the citation clause,
+so the gap between the two is citation behaviour only.
+**cite_supported fix:** a trial on 8 Base items found the strict judge passing uncited answers (3/5),
+once quoting a citation the answer didn't contain. Now answers citing no provided passage id score 0
+without a judge call, and the rubric lists the parsed cited ids instead of leaving the judge to find
+them. table.md header gained the grounded_acc column; append_table refuses to append under a
+mismatched header.
+
+## 2026-09-27: Adversarial judge grades the answer only (passages removed from its prompt)
+**Why:** Base's first scored run gave halluc_rate 0.058 although it used the abstain phrase on 2/87.
+The judge, shown the passages and told they lack the answer, graded the passages instead of the
+answer: "the maximum height difference is 10 feet", a bare section number and a citation-only
+output all scored as refusals ("the passages do not provide any information ..."). On 14 Base
+items the old rubric was wrong on 11; the new one right on all 14.
+**Change:** adversarial_rubric(question, answer): classify the wording alone. Declining scores 1,
+even when related information is mentioned; any value, clause, procedure, comparison or
+explanation scores 0, as do empty and citation-only outputs. Passages aren't needed: by
+construction they don't contain the answer, so any non-refusal is a hallucination.
+**Also:** judge retries 5 -> 7 (backoff ~63 s): 8 Base verdicts had failed on 429 rate limits.
+**Lesson (three judge fixes today):** give the judge only what the verdict depends on, and decide
+by rule anything a rule can (citation presence, exact abstain phrase) before the judge sees it.
+
+## 2026-09-27: Judge hand-check (40 verdicts); empty-answer guard; chat one-line generation
+**Hand-check** (stratified, half pass / half fail per rubric):
+- grounded_acc: 10/16 clearly right, 2 wrong (both false negatives: an extraction-scrambled
+  subscript read as a mismatch; a claimed omission that wasn't one), 4 debatable (padding, a mild
+  extrapolation, a nitpick, and gr-0060 whose hoop spacing is only in a figure: an item flaw).
+- cite_supported: 10/12 right, 1 wrong (same subscript), 1 right verdict with a wrong reason.
+- The judge errs strict: its misses are false negatives, so accuracy metrics are slight lower bounds.
+**Found by the check, fixed by rule rather than prompt:**
+- Instruct vocab: 273/303 outputs were only "**Term: x**" (the chat model opens with a header and the
+  "\n" stop cut it there), and the judge passed 193 of them, quoting definitions that weren't in the
+  output. Fix: prompts.CHAT_GEN drops the stop for chat on domain_qa/vocab; run_eval keeps the first
+  line with content (scorers.answer_line; raw text kept as raw_output). API check 6/6 extracted.
+  Instruct regenerated (--generate-only). Base generation unchanged.
+- Empty or citation-only answers (Base: 15 adversarial, 2 grounded) are scored 0 by rule
+  (scorers.substance): the judge had called 11 of the 15 refusals. Base halluc_rate 0.793 -> 0.920.
+
+## 2026-09-27: Chat-mode lm-eval is invalid with tokenizer_mode=mistral; Instruct row uses chat-off
+lm-eval 0.4.13 applies the chat template with tokenize=False and re-encodes the string with
+add_special_tokens=False (vllm_causallms.py). mistral-common never parses control tokens from text,
+so "<s>[INST]...[/INST]" reached the model as 18 ordinary tokens (verified locally). The CHAT=1 run
+(12:14 UTC) is set aside in results/lm_eval/_invalid/. The Instruct row uses the chat-off run
+(same format as Base). KPI eval is unaffected: vLLM llm.chat() tokenizes via mistral-common.
+Possible fix, not applied: TOKENIZER_MODE=hf with CHAT=1 (tokenizer.json matches Tekken on 300/300
+corpus chunks and parses control tokens), but the repo's chat_template.jinja prepends Mistral's
+default system prompt, which the KPI chat path doesn't use.
+
+## 2026-09-27: Chat format: always off for lm-eval, always on for the KPI eval (user decision)
+lm-eval (MMLU/GSM8K/HellaSwag) never uses a chat template, for any checkpoint: every row stays
+comparable, and lm-eval's chat path breaks Mistral control tokens (entry above). The KPI eval always
+runs chat checkpoints (Instruct, SFT/DPO/GRPO) with --chat; base models without.
+Enforced in code: run_lm_eval.sh exits on CHAT=1; modal_app's lm_eval takes no chat argument;
+modal_app and run_eval refuse an Instruct checkpoint without --chat; merge_lm_eval skips
+chat-template results files (e.g. an old run pulled back off the volume).
