@@ -287,28 +287,35 @@ Enforced in code: run_lm_eval.sh exits on CHAT=1; modal_app's lm_eval takes no c
 modal_app and run_eval refuse an Instruct checkpoint without --chat; merge_lm_eval skips
 chat-template results files (e.g. an old run pulled back off the volume).
 
-## 2026-09-27: Stage 1 corpus card: 242 documents, 20.0M Tekken tokens
+## 2026-09-27: Stage 1 corpus card: 246 documents, 20.6M Tekken tokens
 **What:** the CPT corpus. `make data` runs download, extract, filter, dedup, pii, split, replay,
 tokenizer_coverage and stats in order. Every number below comes from
 `data/processed/stats.json` via `stats.py`, and `data/sources.csv` records each file's URL,
-sha256, pages and final tokens. Train is 18.8M tokens (230 docs), val 1.2M (12 docs, 6.1%),
+sha256, pages and final tokens. Train is 19.4M tokens (234 docs), val 1.2M (12 docs, 5.9%),
 replay 1.9M FineWeb-Edu tokens. The processed files are not committed; they rebuild from
 sources.csv plus the scripts.
 
-**Sources (Stage 1 expansion, 52 -> 249 rows):**
+**Sources (Stage 1 expansion, 52 -> 251 rows):**
 - USACE Engineer Manuals, every EM 1110-2 (civil works) and EM 1110-1 (general engineering) on the
   live index. EM 1110-3 (22 mobilization manuals from 1984: pavements, water supply) was skipped.
   Akamai returns 403 to every script, so the index pages and PDFs were fetched in Chrome (DevTools
-  MCP). download.py can't refetch them, which is also the case for FEMA.
+  MCP). download.py can't refetch them, which is also the case for fema.gov.
 - FHWA steel and concrete bridge index pages (crawl_index.py).
 - NIST NEHRP briefs 5-12 (Brief 14 is not published) and 15 NEHRP GCR reports (ATC).
-- FEMA: P-58-1/-2, P-1050-2, P-2006, and 35 technical publications from the Building Science
-  earthquake library (brochures, checklists, posters and forms skipped). P-695 and P-751 aren't in
-  FEMA's library; the substitutes are P-795 (P-695's companion methodology) and the 2020 NEHRP
-  Design Examples vols. 2-3.
+- FEMA: P-58-1/-2/-4/-5, P-695, P-751, P-1050-2, P-2006, P-795, NEHRP Design Examples vols. 2-3,
+  and 35 technical publications from the Building Science earthquake library (brochures,
+  checklists, posters and forms skipped).
+- Four FEMA documents aren't fetchable from fema.gov, so they come from other hosts, all
+  scriptable:
+  - P-695: NIST's NEHRP clearinghouse (nehrpsearch.nist.gov); FEMA's copy returns 404.
+  - P-751: WBDG's federal facility criteria library (its public S3 file).
+  - P-58-4 and P-58-5: ATC, which prepared them for FEMA. FEMA serves both truncated (7.2 of 8.0 MB
+    and 3.5 of 13.3 MB against the length their linearisation headers declare, 0 readable pages);
+    ATC's files match those lengths exactly (122 and 196 pages).
 - NASA-STD-5002B and 5019A, so NASA has a non-eval document to hold out.
-- The spec's 20-50M target needed more than the three named index pages. EM 1110-2 yielded
-  8.5M clean tokens, not 15-25M: many manuals are scanned, table-heavy, or PDF portfolios.
+- The spec's 20-50M target needed more than the three named index pages. The EM 1110-2 series
+  alone yielded 8.5M clean tokens, not 15-25M: many manuals are scanned, table-heavy, or PDF
+  portfolios.
 **Excluded for copyright** (`extract.py` flags ©/"copyright"/"all rights reserved" in the first 5
 pages; all 31 were hand-checked, 27 in the final corpus plus the 4 excluded here):
 - FHWA-HIF-19-102: © Lehigh University, all rights reserved.
@@ -317,54 +324,52 @@ pages; all 31 were hand-checked, 27 in the final corpus plus the 4 excluded here
 - NIST GCR 15-917-35/36: © Fire Protection Research Foundation, and off-domain (cooking fires).
 - Photo credits, "figures reproduced with permission" notes, and BSSC's "be alert to patent and
   copyright concerns" boilerplate were kept.
-**Rejected on download:**
-- Three files under 200 KB.
-- FEMA P-58-4 and P-58-5: FEMA serves them truncated (7.2 of 8.0 MB and 3.5 of 13.3 MB against
-  the length their linearisation headers declare), so they have 0 readable pages.
+**Rejected on download:** three files under 200 KB (EM 1110-2-1304, EM 1110-2-2102,
+EM 1110-1-4011).
 
 **Sources and pages** (extract.py; pages under 200 characters dropped, no OCR)
 
 | publisher | docs | pages | kept | dropped: image-only | dropped: blank | tokens extracted | tokens final |
 |---|---|---|---|---|---|---|---|
-| FEMA | 45 | 14,058 | 12,643 | 879 | 536 | 7,582,974 | 4,243,632 |
+| FEMA | 49 | 15,713 | 14,220 | 890 | 603 | 8,492,849 | 4,784,872 |
 | FHWA | 65 | 12,587 | 11,577 | 750 | 260 | 5,834,309 | 3,838,621 |
 | NASA | 4 | 319 | 310 | 7 | 2 | 152,143 | 114,123 |
-| NIST | 28 | 4,595 | 4,432 | 25 | 138 | 2,648,730 | 1,724,316 |
+| NIST | 28 | 4,595 | 4,432 | 25 | 138 | 2,648,730 | 1,724,278 |
 | USACE | 102 | 27,243 | 24,168 | 2,592 | 483 | 14,111,797 | 10,112,419 |
-| **total** | 244 | 58,802 | 53,130 | 4,253 | 1,419 | 30,329,953 | 20,033,111 |
+| **total** | 248 | 60,457 | 54,707 | 4,264 | 1,486 | 31,239,828 | 20,574,313 |
 
-249 documents in sources.csv, 244 accepted (3.14 GB); rejected: usace-em-1110-2-1304-2021 (under 200 KB), usace-em-1110-2-2102 (under 200 KB), usace-em-1110-1-4011 (under 200 KB), fema-p-58-4 (no readable pages (truncated or corrupt file)), fema-p-58-5 (no readable pages (truncated or corrupt file)).
-Header/footer lines removed: 120,491. Likely scanned (>50% of pages dropped): fhwa-sbdh-v03, usace-em-1110-2-1424, usace-em-1110-2-3200, fema-nehrp-examples-v3, fema-p-2192, fema-p-1100-2c.
+251 documents in sources.csv, 248 accepted (3.17 GB); rejected: usace-em-1110-2-1304-2021 (under 200 KB), usace-em-1110-2-2102 (under 200 KB), usace-em-1110-1-4011 (under 200 KB).
+Header/footer lines removed: 122,667. Likely scanned (>50% of pages dropped): fhwa-sbdh-v03, usace-em-1110-2-1424, usace-em-1110-2-3200, fema-nehrp-examples-v3, fema-p-2192, fema-p-1100-2c.
 
 **Token funnel** (Tekken tokens)
 
 | step | docs | tokens | removed |
 |---|---|---|---|
-| extracted | 244 | 30,329,953 |  |
-| quality filter | 242 | 20,913,702 | 31.0% |
-| exact dedup | 242 | 20,913,702 | 0.0% |
-| near dedup | 242 | 20,035,325 | 4.2% |
-| train | 230 | 18,818,589 |  |
-| val | 12 | 1,214,522 | 6.1% of tokens |
-| replay (FineWeb-Edu) | 1,720 | 1,881,859 | 10% of train |
+| extracted | 248 | 31,239,828 |  |
+| quality filter | 246 | 21,527,941 | 31.1% |
+| exact dedup | 246 | 21,527,941 | 0.0% |
+| near dedup | 246 | 20,576,566 | 4.4% |
+| train | 234 | 19,359,801 |  |
+| val | 12 | 1,214,512 | 5.9% of tokens |
+| replay (FineWeb-Edu) | 1,779 | 1,937,321 | 10% of train |
 
 **Quality filter** (filter.py; first failing rule counted)
 
 | rule | paragraphs dropped | tokens dropped |
 |---|---|---|
-| alpha_ratio | 194,178 | 5,611,924 |
-| word_length | 40,409 | 368,395 |
-| short_lines | 35,989 | 1,280,218 |
-| reference_list | 6,812 | 403,568 |
-| symbol_ratio | 3,312 | 37,301 |
-| numbered_lines | 2,819 | 167,048 |
-| **paragraphs in / out** | 725,916 / 441,223 |  |
+| alpha_ratio | 203,949 | 5,809,865 |
+| word_length | 42,388 | 379,518 |
+| short_lines | 37,253 | 1,316,073 |
+| reference_list | 6,856 | 405,233 |
+| symbol_ratio | 3,333 | 37,447 |
+| numbered_lines | 2,895 | 171,478 |
+| **paragraphs in / out** | 752,414 / 454,566 |  |
 
-Documents dropped: fhwa-hif16010 (dictionary, 47,164 words, dictionary 0.649), fema-nehrp-examples-v3 (min_words, 540 words, dictionary 0.937). Dictionary ratio of kept documents: min 0.743, median 0.926.
+Documents dropped: fhwa-hif16010 (dictionary, 47,164 words, dictionary 0.649), fema-nehrp-examples-v3 (min_words, 540 words, dictionary 0.937). Dictionary ratio of kept documents: min 0.743, median 0.925.
 
 **Deduplication** (dedup.py)
 
-Exact duplicate documents: none. Near-duplicate paragraphs: 32,996 of 441,223; tokens 20,913,702 -> 20,035,325 (4.2%).
+Exact duplicate documents: none. Near-duplicate paragraphs: 34,756 of 454,566; tokens 21,527,941 -> 20,576,566 (4.4%).
 
 Most-duplicated across documents:
 
@@ -373,8 +378,8 @@ Most-duplicated across documents:
 | 57 | 72 | DEPARTMENT OF THE ARMY U.S. Army Corps of Engineers |
 | 57 | 56 | The Federal Highway Administration (FHWA) provides high-quality information to serve Gover |
 | 37 | 36 | Approved for public release; distribution is |
+| 30 | 29 | Any opinions, findings, conclusions, or recommendations expressed in this publication do n |
 | 28 | 27 | 8. Performing Organization Report No. |
-| 27 | 26 | Any opinions, findings, conclusions, or recommendations expressed in this publication do n |
 | 25 | 24 | U.S. Department of Commerce |
 | 25 | 24 | Notice This document is disseminated under the sponsorship of the U.S. Department of Trans |
 | 24 | 23 | FOREWORD This handbook covers a full range of topics and design examples intended to provi |
@@ -396,19 +401,19 @@ Most-duplicated by copies:
 | 1 | 136 | Appendix H: Wood Archetype Collapse Results |
 | 2 | 130 | Strength Property ACMR at DR |
 
-**PII** (pii.py): EMAIL 56, PHONE 177, ID 0
+**PII** (pii.py): EMAIL 58, PHONE 180, ID 0
 
 **Tokenizer fit** (tokenizer_coverage.py, full report in `data/processed/tokenizer_coverage.md`; tokens per whitespace word)
 
 |  | mistralai/Ministral-3-8B-Base-2512 | mistralai/Ministral-3-8B-Instruct-2512-BF16 |
 |---|---|---|
-| corpus tokens | 20,033,111 | 20,033,111 |
-| fertility: domain corpus | 1.438 | 1.438 |
+| corpus tokens | 20,574,313 | 20,574,313 |
+| fertility: domain corpus | 1.44 | 1.44 |
 | fertility: FineWeb-Edu (~1M tokens) | 1.338 | 1.338 |
 | fertility: vocab_eval terms (303) | 1.433 | 1.433 |
-| fertility: tfidf_top terms (500) | 1.112 | 1.112 |
+| fertility: tfidf_top terms (500) | 1.116 | 1.116 |
 | fertility: probes terms (18) | 3.207 | 3.207 |
-| term words with 4+ tokens | 34 / 842 | 34 / 842 |
+| term words with 4+ tokens | 34 / 843 | 34 / 843 |
 
 Base and Instruct encode identically: True.
 
@@ -439,19 +444,19 @@ Worst-fragmented term words: 1110-2-2104 (12), SDS/(R/Ie) (6), strong-column/wea
 
 | publisher | train docs | train tokens | val docs | val tokens |
 |---|---|---|---|---|
-| FEMA | 42 | 4,131,446 | 2 | 112,186 |
+| FEMA | 46 | 4,672,696 | 2 | 112,176 |
 | FHWA | 61 | 3,758,566 | 3 | 80,055 |
 | NASA | 3 | 95,445 | 1 | 18,678 |
-| NIST | 27 | 1,639,808 | 1 | 84,508 |
+| NIST | 27 | 1,639,770 | 1 | 84,508 |
 | USACE | 97 | 9,193,324 | 5 | 919,095 |
 
-Val documents: fema-p-1100-2a, fema-p-2018, fhwa-hif17020, fhwa-hif18044, fhwa-hif18047, nasa-std-5002b, nist-gcr-12-917-21, usace-em-1110-1-1804, usace-em-1110-2-1906, usace-em-1110-2-1908, usace-em-1110-2-2610-final-18mar2025, usace-em-1110-2-3506. 52 eval documents held in train. Packed at 4,096: 4,594 train / 296 val sequences (5,054 with replay); 17.9 optimizer steps per epoch at ~1M tokens/step.
+Val documents: fema-p-1100-2a, fema-p-2018, fhwa-hif17020, fhwa-hif18044, fhwa-hif18047, nasa-std-5002b, nist-gcr-12-917-21, usace-em-1110-1-1804, usace-em-1110-2-1906, usace-em-1110-2-1908, usace-em-1110-2-2610-final-18mar2025, usace-em-1110-2-3506. 52 eval documents held in train. Packed at 4,096: 4,726 train / 296 val sequences (5,199 with replay); 18.5 optimizer steps per epoch at ~1M tokens/step.
 
 **Decisions:**
 - **PDF portfolios:** USACE EM 1110-2-1100 (all 6 parts), -1424 and -1701 are a one-page "open in
   Acrobat" cover with the manual as embedded PDFs. They're read through their parts
   (common.pdf_parts): 4,728 pages that were first misread as scanned.
-- **No OCR:** 4,253 image-only pages (7.2%) and 1,419 near-blank pages are dropped, and 6 documents
+- **No OCR:** 4,264 image-only pages (7.1%) and 1,486 near-blank pages are dropped, and 6 documents
   lose most of their pages. OCR is the first lever for more tokens, but scanned 1980s manuals would
   bring OCR noise that the dictionary rule exists to keep out.
 - **Filter tuned from dropped_samples.jsonl:** the literal line-count rules removed 28% of
@@ -460,32 +465,33 @@ Val documents: fema-p-1100-2a, fema-p-2018, fhwa-hif17020, fhwa-hif18044, fhwa-h
   - marker-only lines ("•", "1.") are joined to their item;
   - the line-ratio rules need 3+ lines;
   - short_lines counts words, not lines.
-  alpha_ratio is kept as specified: it's the largest rule (5.6M tokens) and its token-weighted
+  alpha_ratio is kept as specified: it's the largest rule (5.8M tokens) and its token-weighted
   samples are dot-leader TOCs, garbled OCR, XML and equation fragments. The dictionary threshold
   was raised to 0.70 because FHWA-HIF-16-010 (0.649) is half XML object listings, and kept
   documents otherwise score 0.74+.
 - **Paragraph-level near-dedup, not document-level:** exact dedup found no duplicate documents.
-  Paragraph MinHash removes 4.2%: federal boilerplate shared across 20-57 documents (the FHWA
+  Paragraph MinHash removes 4.4%: federal boilerplate shared across 20-57 documents (the FHWA
   quality statement, USACE letterhead, distribution statements, DOT report-documentation fields),
   plus running headers the 30%-of-pages rule misses (per-chapter titles, NIST's "available free of
-  charge" line). Document-level dedup would keep all of that.
+  charge" line), plus the overlap between the 2009 and 2015 NEHRP design examples. Document-level
+  dedup would keep all of that.
 - **Document-level split, eval documents in train:** val perplexity then measures generalisation
   to unseen documents of the same kinds, and the KPI eval measures what CPT absorbed from documents
   it saw. All 52 seed documents are eval sources, so the 12 val documents all come from the
   expansion: max(1, 5%) per publisher, chosen by sha256(slug). Dedup runs before the split, so no
   near-duplicate paragraph sits on both sides.
 - **No vocabulary extension:**
-  - Tekken spends 1.07x more tokens per word on this corpus than on FineWeb-Edu (1.438 vs 1.338).
-  - The top-500 TF-IDF domain terms average 1.11 tokens per word.
-  - Only 34 of 842 term words take 4+ tokens: designations and digit strings (EM 1110-2-2104 is
+  - Tekken spends 1.08x more tokens per word on this corpus than on FineWeb-Edu (1.440 vs 1.338).
+  - The top-500 TF-IDF domain terms average 1.12 tokens per word.
+  - Only 34 of 843 term words take 4+ tokens: designations and digit strings (EM 1110-2-2104 is
     13 tokens because Tekken splits digits by design), parenthesised acronyms, and hyphenated
     compounds.
   - New embeddings trained on 20M tokens would cost more than they save. Base and Instruct encode
     identically.
-- **PII:** three regexes (56 emails, 177 phone/fax numbers, 0 SSN-shaped), all spot-checked as true
+- **PII:** three regexes (58 emails, 180 phone/fax numbers, 0 SSN-shaped), all spot-checked as true
   positives; author names are kept for citations. At Forge scale this is a Presidio-class NER pass
   with client-specific entity lists.
-- **Packing:** 4,594 train sequences of 4,096 (5,054 with replay), about 18 optimizer steps per
+- **Packing:** 4,726 train sequences of 4,096 (5,199 with replay), about 18.5 optimizer steps per
   epoch at a 1M-token batch, so Stage 2's LR schedule needs a short warmup.
 **Revisit if:** CPT val perplexity barely moves (entry below). Check whether the corpus is smaller
 than it looks before adding epochs: OCR on the scanned manuals and the remaining FEMA and FHWA

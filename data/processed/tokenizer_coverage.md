@@ -7,14 +7,14 @@ whitespace word; a term is counted as it appears mid-text: n("the " + term) - n(
 
 | | `mistralai/Ministral-3-8B-Base-2512` | `mistralai/Ministral-3-8B-Instruct-2512-BF16` |
 |---|---|---|
-| corpus tokens | 20,033,111 | 20,033,111 |
-| fertility: domain corpus | 1.438 | 1.438 |
+| corpus tokens | 20,574,313 | 20,574,313 |
+| fertility: domain corpus | 1.44 | 1.44 |
 | fertility: FineWeb-Edu | 1.338 | 1.338 |
-| corpus / FineWeb-Edu | 1.07x | 1.07x |
+| corpus / FineWeb-Edu | 1.08x | 1.08x |
 | fertility: vocab_eval terms (303) | 1.433 | 1.433 |
-| fertility: tfidf_top terms (500) | 1.112 | 1.112 |
+| fertility: tfidf_top terms (500) | 1.116 | 1.116 |
 | fertility: probes terms (18) | 3.207 | 3.207 |
-| term words split into 4+ tokens | 34 / 842 | 34 / 842 |
+| term words split into 4+ tokens | 34 / 843 | 34 / 843 |
 
 Base and Instruct encode identically (corpus sample + every term word): **True**.
 
@@ -47,4 +47,4 @@ Base and Instruct encode identically (corpus sample + every term word): **True**
 
 ## Top corpus terms by TF-IDF against FineWeb-Edu
 
-shear, design, Figure, concrete, seismic, load, ASCE, steel, Section, girder, flange, strength, Table, vertical, wall, bridge, AASHTO, structural, loads, analysis, should, Equation, earthquake, requirements, water, deck, building, construction, lateral, SEI, walls, reinforcement, diaphragm, structures, used, required, Chapter, response, structure, data, model, LRFD, flow, stress, maximum, values, stiffness, girders, loading, wave
+shear, design, Figure, seismic, concrete, load, ASCE, steel, Section, girder, strength, Table, flange, vertical, structural, wall, analysis, loads, AASHTO, bridge, should, earthquake, Equation, requirements, water, building, deck, SEI, lateral, walls, construction, diaphragm, response, structures, reinforcement, Chapter, required, used, structure, data, model, maximum, LRFD, flow, values, moment, stress, performance, stiffness, FEMA

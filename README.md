@@ -28,8 +28,8 @@ LoRA where lighter adaptation is enough, all measured against evals tied to the 
 The default path starts from an existing checkpoint, not from scratch.
 
 **This repo runs that lifecycle once, end to end, at roughly 1% scale.** Public-domain US federal
-structural-engineering documents stand in for a client's private corpus: 242 manuals, reports and
-design examples from USACE, FEMA, FHWA, NIST and NASA (20.0M Tekken tokens after cleaning; the KPI
+structural-engineering documents stand in for a client's private corpus: 246 manuals, reports and
+design examples from USACE, FEMA, FHWA, NIST and NASA (20.6M Tekken tokens after cleaning; the KPI
 eval tasks come from a 52-document seed subset, 19,337 page-anchored chunks).
 US federal works carry no licensing risk; copyrighted standards such as ASCE 7 and the AISC manual
 are deliberately excluded. The starting checkpoint is Ministral 3 8B Base, from the same model

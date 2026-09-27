@@ -1,8 +1,8 @@
 {
   "download": {
-    "sources": 249,
-    "downloaded": 244,
-    "bytes": 3135427388,
+    "sources": 251,
+    "downloaded": 248,
+    "bytes": 3173331592,
     "rejected": [
       {
         "slug": "usace-em-1110-2-1304-2021",
@@ -15,28 +15,20 @@
       {
         "slug": "usace-em-1110-1-4011",
         "reason": "under 200 KB"
-      },
-      {
-        "slug": "fema-p-58-4",
-        "reason": "no readable pages (truncated or corrupt file)"
-      },
-      {
-        "slug": "fema-p-58-5",
-        "reason": "no readable pages (truncated or corrupt file)"
       }
     ],
     "missing": []
   },
   "extract": {
-    "docs": 244,
+    "docs": 248,
     "by_publisher": {
       "FEMA": {
-        "docs": 45,
-        "pages": 14058,
-        "pages_kept": 12643,
-        "dropped_image_only": 879,
-        "dropped_short": 536,
-        "tokens": 7582974
+        "docs": 49,
+        "pages": 15713,
+        "pages_kept": 14220,
+        "dropped_image_only": 890,
+        "dropped_short": 603,
+        "tokens": 8492849
       },
       "FHWA": {
         "docs": 65,
@@ -72,14 +64,14 @@
       }
     },
     "total": {
-      "docs": 244,
-      "pages": 58802,
-      "pages_kept": 53130,
-      "dropped_image_only": 4253,
-      "dropped_short": 1419,
-      "tokens": 30329953
+      "docs": 248,
+      "pages": 60457,
+      "pages_kept": 54707,
+      "dropped_image_only": 4264,
+      "dropped_short": 1486,
+      "tokens": 31239828
     },
-    "boilerplate_lines_removed": 120491,
+    "boilerplate_lines_removed": 122667,
     "likely_scanned": [
       "fhwa-sbdh-v03",
       "usace-em-1110-2-1424",
@@ -119,8 +111,8 @@
     ]
   },
   "filter": {
-    "docs_in": 244,
-    "docs_out": 242,
+    "docs_in": 248,
+    "docs_out": 246,
     "docs_dropped": [
       {
         "slug": "fhwa-hif16010",
@@ -135,42 +127,42 @@
         "dictionary_ratio": 0.937
       }
     ],
-    "paragraphs_in": 725916,
-    "paragraphs_out": 441223,
+    "paragraphs_in": 752414,
+    "paragraphs_out": 454566,
     "paragraphs_dropped": {
-      "alpha_ratio": 194178,
-      "word_length": 40409,
-      "short_lines": 35989,
-      "reference_list": 6812,
-      "symbol_ratio": 3312,
-      "numbered_lines": 2819
+      "alpha_ratio": 203949,
+      "word_length": 42388,
+      "short_lines": 37253,
+      "reference_list": 6856,
+      "symbol_ratio": 3333,
+      "numbered_lines": 2895
     },
     "tokens_dropped_by_rule": {
-      "alpha_ratio": 5611924,
-      "short_lines": 1280218,
-      "reference_list": 403568,
-      "word_length": 368395,
-      "numbered_lines": 167048,
-      "symbol_ratio": 37301
+      "alpha_ratio": 5809865,
+      "short_lines": 1316073,
+      "reference_list": 405233,
+      "word_length": 379518,
+      "numbered_lines": 171478,
+      "symbol_ratio": 37447
     },
-    "tokens_in": 30329953,
-    "tokens_out": 20913702,
+    "tokens_in": 31239828,
+    "tokens_out": 21527941,
     "dictionary_ratio_kept": {
       "min": 0.743,
-      "median": 0.926
+      "median": 0.925
     }
   },
   "dedup": {
-    "docs_in": 242,
+    "docs_in": 246,
     "exact_duplicates": [],
-    "docs_out": 242,
-    "paragraphs_in": 441223,
-    "near_dup_paragraphs": 32996,
-    "near_dup_clusters": 15142,
-    "tokens_in": 20913702,
-    "tokens_after_exact": 20913702,
-    "tokens_out": 20035325,
-    "token_reduction": 0.042,
+    "docs_out": 246,
+    "paragraphs_in": 454566,
+    "near_dup_paragraphs": 34756,
+    "near_dup_clusters": 16238,
+    "tokens_in": 21527941,
+    "tokens_after_exact": 21527941,
+    "tokens_out": 20576566,
+    "token_reduction": 0.0442,
     "top_duplicated": [
       {
         "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.17-917-47",
@@ -253,16 +245,16 @@
         "docs_with_copy": 37
       },
       {
+        "text": "Any opinions, findings, conclusions, or recommendations expressed in this publication do not necessarily reflect the views of the Applied Technology Council (ATC), the Department of Homeland Security (DHS), or the Federal Emergency Management Agency (FEMA). Additionally, neither ATC, DHS, FEMA, nor ",
+        "first_in": "fema-p-155",
+        "copies_removed": 29,
+        "docs_with_copy": 30
+      },
+      {
         "text": "8. Performing Organization Report No.",
         "first_in": "fhwa-nhi-23-024",
         "copies_removed": 27,
         "docs_with_copy": 28
-      },
-      {
-        "text": "Any opinions, findings, conclusions, or recommendations expressed in this publication do not necessarily reflect the views of the Applied Technology Council (ATC), the Department of Homeland Security (DHS), or the Federal Emergency Management Agency (FEMA). Additionally, neither ATC, DHS, FEMA, nor ",
-        "first_in": "fema-p-155",
-        "copies_removed": 26,
-        "docs_with_copy": 27
       },
       {
         "text": "U.S. Department of Commerce",
@@ -297,10 +289,10 @@
     ]
   },
   "pii": {
-    "docs": 242,
+    "docs": 246,
     "replacements": {
-      "EMAIL": 56,
-      "PHONE": 177,
+      "EMAIL": 58,
+      "PHONE": 180,
       "ID": 0
     }
   },
@@ -308,12 +300,12 @@
     "by_publisher": {
       "FEMA": {
         "train": {
-          "docs": 42,
-          "tokens": 4131446
+          "docs": 46,
+          "tokens": 4672696
         },
         "val": {
           "docs": 2,
-          "tokens": 112186
+          "tokens": 112176
         }
       },
       "FHWA": {
@@ -339,7 +331,7 @@
       "NIST": {
         "train": {
           "docs": 27,
-          "tokens": 1639808
+          "tokens": 1639770
         },
         "val": {
           "docs": 1,
@@ -358,12 +350,12 @@
       }
     },
     "train": {
-      "docs": 230,
-      "tokens": 18818589
+      "docs": 234,
+      "tokens": 19359801
     },
     "val": {
       "docs": 12,
-      "tokens": 1214522
+      "tokens": 1214512
     },
     "val_docs": [
       "fema-p-1100-2a",
@@ -379,23 +371,23 @@
       "usace-em-1110-2-2610-final-18mar2025",
       "usace-em-1110-2-3506"
     ],
-    "val_token_frac": 0.0606,
+    "val_token_frac": 0.059,
     "eval_docs_in_train": 52,
     "publishers_without_val": [],
     "seq_len": 4096,
     "packed_seqs": {
-      "train": 4594,
+      "train": 4726,
       "val": 296
     },
-    "steps_per_epoch_at_1M_tokens": 17.9
+    "steps_per_epoch_at_1M_tokens": 18.5
   },
   "replay": {
     "source": "HuggingFaceFW/fineweb-edu sample-10BT (stream order)",
-    "target_tokens": 1881858,
-    "docs": 1720,
-    "tokens": 1881859,
-    "packed_seqs": 459,
-    "packed_seqs_train_plus_replay": 5054
+    "target_tokens": 1935980,
+    "docs": 1779,
+    "tokens": 1937321,
+    "packed_seqs": 473,
+    "packed_seqs_train_plus_replay": 5199
   },
   "tokenizer": {
     "term_counts": {
@@ -405,14 +397,14 @@
     },
     "base": {
       "model": "mistralai/Ministral-3-8B-Base-2512",
-      "corpus_tokens": 20033111,
+      "corpus_tokens": 20574313,
       "fertility": {
-        "corpus": 1.438,
+        "corpus": 1.44,
         "fineweb_edu": 1.338
       },
       "term_fertility": {
         "vocab_eval": 1.433,
-        "tfidf_top": 1.112,
+        "tfidf_top": 1.116,
         "probes": 3.207
       },
       "probes": {
@@ -436,7 +428,7 @@
         "Charpy V-notch": 5
       },
       "words_4plus_tokens": 34,
-      "term_words": 842,
+      "term_words": 843,
       "worst_fragmented": [
         {
           "word": "1110-2-2104",
@@ -578,14 +570,14 @@
     },
     "instruct": {
       "model": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
-      "corpus_tokens": 20033111,
+      "corpus_tokens": 20574313,
       "fertility": {
-        "corpus": 1.438,
+        "corpus": 1.44,
         "fineweb_edu": 1.338
       },
       "term_fertility": {
         "vocab_eval": 1.433,
-        "tfidf_top": 1.112,
+        "tfidf_top": 1.116,
         "probes": 3.207
       },
       "probes": {
@@ -609,7 +601,7 @@
         "Charpy V-notch": 5
       },
       "words_4plus_tokens": 34,
-      "term_words": 842,
+      "term_words": 843,
       "worst_fragmented": [
         {
           "word": "1110-2-2104",
@@ -754,53 +746,53 @@
       "shear",
       "design",
       "Figure",
-      "concrete",
       "seismic",
+      "concrete",
       "load",
       "ASCE",
       "steel",
       "Section",
       "girder",
-      "flange",
       "strength",
       "Table",
+      "flange",
       "vertical",
-      "wall",
-      "bridge",
-      "AASHTO",
       "structural",
-      "loads",
+      "wall",
       "analysis",
+      "loads",
+      "AASHTO",
+      "bridge",
       "should",
-      "Equation",
       "earthquake",
+      "Equation",
       "requirements",
       "water",
-      "deck",
       "building",
-      "construction",
-      "lateral",
+      "deck",
       "SEI",
+      "lateral",
       "walls",
-      "reinforcement",
+      "construction",
       "diaphragm",
-      "structures",
-      "used",
-      "required",
-      "Chapter",
       "response",
+      "structures",
+      "reinforcement",
+      "Chapter",
+      "required",
+      "used",
       "structure",
       "data",
       "model",
+      "maximum",
       "LRFD",
       "flow",
-      "stress",
-      "maximum",
       "values",
+      "moment",
+      "stress",
+      "performance",
       "stiffness",
-      "girders",
-      "loading",
-      "wave"
+      "FEMA"
     ]
   }
 }
