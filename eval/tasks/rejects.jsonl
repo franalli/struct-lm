@@ -1,0 +1,164 @@
+{"task": "domain_qa", "match": "compression under full load", "reason": "worked-example value (0.6f'c for one girder)", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "static tensile strength of concrete", "reason": "worked-example material table", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "fillet weld capacity in FEMA P-1051", "reason": "one example's electrode choice", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "linear-elastic analysis of concrete dams", "reason": "one example's software (GDAP)", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "global nodal locations", "reason": "general FE knowledge", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "orientation of local axes", "reason": "general FE knowledge", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "maximum direction of horizontal response", "reason": "general knowledge (5% damping)", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "cross-laminated timber shear wall", "reason": "document's own chapter numbering", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "top flange of precast channel beams", "reason": "answer does not match question", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "three-span segmental bridges", "reason": "one example's illustration", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "anchorage force per anchor", "reason": "worked-example value", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "great earthquakes", "reason": "hallucinated: 8 is a period in seconds, not a magnitude", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "nominal axial strength Pn1", "reason": "general knowledge (0.85 f'c)", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "resistance factor for bracing", "reason": "one formula's factor, underspecified", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "plastic hinge length formula", "reason": "hallucinated from a PyMuPDF-garbled equation", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "unit weight of concrete in kcf", "reason": "underspecified", "reviewed": "2026-09-27 hand-check"}
+{"task": "domain_qa", "match": "What material fills post-tensioning ducts after tendon stressing per FHWA-NHI-15-047?", "reason": "general knowledge (grout fills PT ducts)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which USACE EM document governs the computation of earth pressures for serviceability cases?", "reason": "answer doesn't match question (EM 1110-2-2100 covers earthquake pressures, not serviceability)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO LRFD article governs flexural resistance equations for concrete-filled circular tubes?", "reason": "framing mismatch: passage gives noncomposite-tube equations", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FEMA P-2082-1, what term represents the displacement amplification factor in Eq. (12.8-16)?", "reason": "symbol answer / equation number", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the default superelevation percentage considered in AASHTO LRFD for balancing centrifugal force effects on highway bridges?", "reason": "worked-example value (5% superelevation in a figure)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the stress limit for compression under permanent load in AASHTO LRFD for prestressed concrete girders?", "reason": "worked-example value (limit for one girder's f'c)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which ACI standard governs lateral reinforcement requirements when compression reinforcement is used in members controlled by compression per USACE EM 1110-2-2104?", "reason": "trivially guessable (ACI 318)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO LRFD section governs the design checks for reinforcement sustaining tensile stresses induced by bearing compression?", "reason": "two answers, from a design-example flowchart", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In USACE EM 1110-2-2104, what equation determines the balanced eccentricity ratio for members with both tension and compression reinforcement?", "reason": "document's own equation number", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FHWA NHI-15-047, what feature is used between the approach roadway and bridge abutments to improve rideability?", "reason": "general knowledge (approach slabs)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the design return period for the MDE ground motion at Olmsted Locks and Dam per USACE EM 1110-2-6053?", "reason": "case-study detail (Olmsted)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the dynamic load allowance term used in AASHTO LRFD live load effect calculations for bridge decks?", "reason": "general knowledge ('impact')", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which USGS web tool is recommended in FEMA P-1050-1 for determining more detailed seismic design values?", "reason": "unverifiable: source text garbled", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the pile type used in the Olmsted Locks and Dam foundation as specified in USACE EM 1110-2-6053?", "reason": "case-study detail (Olmsted H-piles)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FEMA P-1050-1, what is the diaphragm design acceleration coefficient at the structure base called?", "reason": "symbol answer (Cp0)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FHWA-NHI-15-047 weld line calculations, what effective throat thickness is assigned to simplify welds as lines?", "reason": "unit-convention trivia", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FEMA P-1050-1, what is the defined threshold value used as a floor for the target spectra envelope relative to the MCER spectrum?", "reason": "duplicate of the 75% MCER floor item", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which material property replaces Young's modulus in plane strain fracture mechanics per FHWA steel bridge fatigue and fracture guidance?", "reason": "general fracture-mechanics knowledge", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the fatigue threshold constant (ΔF)TH for Category B in welded joints joining components of built-up members, as specified in FHWA-NHI-23-024?", "reason": "wrong: Category B threshold is 16 ksi in the cited table, not 12", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What method did R. W. Clough coin in 1960 for structural analysis?", "reason": "general history (Clough coined FEM)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO article defines the web bend buckling resistance for I-section members?", "reason": "conflicting duplicate of the web bend-buckling article item", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the maximum structural height in feet for a structure with no irregularities to use the Equivalent Lateral Force procedure in FEMA P-1050 for Seismic Design Categories D, E, or F?", "reason": "duplicate of the 160 ft ELF limit item", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "For which type of cross-sections does the shear center coincide with the centroid according to FHWA-NHI-15-047?", "reason": "general knowledge (shear center of doubly-symmetric sections)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FHWA-NHI-15-044, what term replaces βb in stiffness equations when accounting for skew?", "reason": "symbol answer (βbskew)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In what year were the 2003 NEHRP Provisions published?", "reason": "citation-year trivia", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What was the year of the Silver Bridge collapse mentioned in FHWA steel bridge corrosion guidance?", "reason": "general history (Silver Bridge 1967)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the minimum number of NLRHA cases required by FEMA P-1051 to establish amplification factors for accidental mass eccentricity?", "reason": "misframed: 'three NLRHA cases' is the example's choice, not a required minimum", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the AWS definition of GMAW in FHWA-HIF-19-088?", "reason": "unscoreable: full AWS definition as answer", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What constant represents the warping constant for a tub girder cross-section in FHWA lateral-torsional buckling equations?", "reason": "symbol answer (Cw)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In USACE EM 1110-2-2100, what variable represents the number of wedges in a sliding failure mechanism?", "reason": "symbol answer (N)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What fatigue category applies to base metal in angle or tee section members connected with high-strength bolted slip-critical connections, per FHWA-NHI-23-024?", "reason": "answer ('Condition 2.1') doesn't give the fatigue category asked for", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which FHWA article governs the use of refined analysis for curved steel bridges under exceptional loadings?", "reason": "mislabeled: AASHTO article asked as 'FHWA article'", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FEMA P-1050-1, what type of utility connections are required to accommodate differential movement between an isolated building and the ground?", "reason": "answer given away by the question ('flexible' connections)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO LRFD article provides the shrinkage strain equation for concrete in highway bridge superstructures?", "reason": "equation id given as article number", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the specified minimum yield strength of the highest-strength steel listed in FHWA-NHI-16-016 for bridge applications?", "reason": "near-duplicate of the A514 100 ksi item", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the minimum number of steps in FEMA P-1050 ground motion record selection?", "reason": "misframed 'minimum number of steps' from an illustration", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which HEC document governs hydraulic analysis for estimating scour depths at bridges?", "reason": "two valid answers (HEC-18 and HEC-20)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In NIST GCR 16-917-42, what modeling method is recommended for diaphragms with large openings or irregularities?", "reason": "guessable (finite element models)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "In FEMA P-1050-1, what additional moat clearance percentage is required for steel ordinary concentrically braced frames on isolation systems to achieve acceptable collapse risk?", "reason": "ambiguous: passage says 15-20% larger isolator displacement", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What effective slenderness ratio replaces (Kℓ/rs) for single-angle compression members in AASHTO LRFD Article 6.9.4.4?", "reason": "notation answer ((Kl/r)eff)", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO specification provides design guidance for vessel impact on bridge substructures?", "reason": "unscoreable long document title", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "What is the maximum slenderness ratio (D/t) allowed for noncomposite circular concrete-filled tubes in AASHTO 2014?", "reason": "wrong: 8.8 is the coefficient of E/Fy, not the D/t limit", "reviewed": "2026-09-27 full review"}
+{"task": "domain_qa", "match": "Which AASHTO LRFD article specifies conditions for using the one-third rule equation in straight-girder bridges with normal or slightly skewed supports?", "reason": "passage cites two articles (6.10.6.2.2 and 6.10.6.2.3)", "reviewed": "2026-09-27 full review"}
+{"task": "adversarial", "match": "Which AASHTO LRFD Bridge Design Specifications section governs the spacing of transverse stiffeners for webs under construction loads?", "reason": "answerable: passage cites Article 6.10.3.3 for stiffened-web panels during construction", "reviewed": "2026-09-27 full review"}
+{"task": "grounded", "match": "What is the maximum allowable percentage difference between 1D and 2D composite dead load moments for exterior girders, and why does this discrepancy occur?", "reason": "misframed: asks for an 'allowable' difference; the passage only reports observed differences", "reviewed": "2026-09-27 full review"}
+{"task": "grounded", "match": "What must be ensured for deformed bar reinforcement to qualify as High Deformability Elements (HDE)?", "reason": "not answerable from gold: says 'provided certain conditions are met' without listing them", "reviewed": "2026-09-27 full review"}
+{"task": "grounded", "match": "What is the correct procedure for applying and factoring the self-weight load of a pier shaft in a large deflection non-linear analysis?", "reason": "answer (self-weight as a gravity acceleration) is only in a non-gold passage", "reviewed": "2026-09-27 full review"}
+{"task": "grounded", "match": "What are the key essential variables that must be included in a PAUT scan plan to comply with the Code requirements?", "reason": "not answerable from gold: essential variables are only referenced (D1.5 Table K.2), not listed", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "curvature parameter Z", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "lateral load resisting system", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "MRSA (Modal Response Spectrum Analysis)", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "HL-93 loading", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "stirrup", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Cross Frames/Diaphragms", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "spread footing foundations", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "seismic interstory drift", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Fatigue load combination", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "seismic isolation", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "longitudinal stiffener", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "complete joint penetration (CJP) weld", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Seismic Design Category", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "line-girder analysis", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "diaphragm", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "cross-frame", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "site classification", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "transverse stiffener", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "modal response analysis procedure", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "integral abutment", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "St. Venant torsional shear flow", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "multi-directional loading", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "reduced beam section", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "MRSA procedure", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "HL-93 vehicular live load", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "transverse reinforcement", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "inflection point", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Service II Limit State", "reason": "duplicate / near-duplicate of another term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "flexural capacity", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "eccentricity", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "fatigue cycles", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "mesh density", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "composite action", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "anchor points", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "flange plate", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "longitudinal strain", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "yield strength", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "main girders", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "anchorage", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "axial load capacity", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "spectral response periods", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "wearing surface", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "ductility", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "design truck", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "post-tensioning", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "bearing areas", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "displacement-based design", "reason": "definition specific to one passage's context, would mark a correct general definition wrong", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "girder-bridge superstructures", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "girder moments", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "midthickness flange flexural stress", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "unfactored moments", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "cross-frame detailing practices", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "shear wall deflection", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "diaphragm design force levels", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "OSD construction", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "critical unfactored negative live load plus impact vertical bending moment", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "slender column moment magnification effects", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "horizontal chord force", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "diaphragm design force procedure", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "web moment", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "horizontal force resultant", "reason": "compositional phrase, not a lexicalized term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "OBE ground motions", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "web slenderness", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "MCER (Maximum Considered Earthquake Response)", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Short Column", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Spandrel", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "bottom flange plate", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "effective depth for shear", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Rpo", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "strain hardening range", "reason": "wrong definition", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "SMF", "reason": "conflicting narrow definitions (SMF defined as steel-only here, RC-only elsewhere)", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "special moment frame", "reason": "conflicting narrow definitions (SMF defined as steel-only here, RC-only elsewhere)", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "retrofit", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "instrumentation", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "stress ratio", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "cross-sectional area", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "lateral deflection", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "seismic assessment", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "standard holes", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "reduction factor", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Nonlinear Demand Parameters", "reason": "generic or vague term", "reviewed": "2026-09-27 full review"}
+{"task": "vocab", "match": "Vcr", "reason": "symbol, not a term", "reviewed": "2026-09-27 full review"}
+{"task": "adversarial", "match": "What is the maximum torsional amplification factor permitted for a building with an L/B ratio of 3?", "reason": "answerable by inference: passage gives Ax maximum 3.0 for both L/B=1 and L/B=4", "reviewed": "2026-09-27 supplementary review"}
+{"task": "adversarial", "match": "What is the maximum lateral bending moment the splice plates can withstand before local buckling occurs under compression?", "reason": "near-duplicate of adv-0026 (splice-plate lateral bending before buckling, same page p173)", "reviewed": "2026-09-27 supplementary review"}
+{"task": "adversarial", "match": "How does the reduction in nominal compressive resistance due to initial out-of-straightness compare between a column governed by flexural buckling and one governed by torsional buckling, all else being equal?", "reason": "partly answerable: passage states the same Pn equation covers flexural and torsional buckling", "reviewed": "2026-09-27 supplementary review"}
+{"task": "adversarial", "match": "How does the difference in spectral acceleration between the ELF design spectrum and the multi-period design spectrum for Site Class D compare to the same difference for Site Class E when considering a magnitude 6.0 earthquake instead of the M7.0 event shown in the figures?", "reason": "answerable: passage says smaller-magnitude events show greater similarity between the spectra", "reviewed": "2026-09-27 supplementary review"}
+{"task": "adversarial", "match": "How is the distribution of the scaled modal base shear forces across the height of the structure determined when the MRSA results require scaling to meet the 85 percent ELF base shear requirement?", "reason": "answerable by inference: the response spectrum is scaled, so every modal force scales by the same factor", "reviewed": "2026-09-27 supplementary review"}
+{"task": "adversarial", "match": "How is the tie bar spacing adjusted when the steel plate thickness in a C-PSW/CF system varies along the height of the wall?", "reason": "answerable by inference: spacing follows from the S/tp limit the passage gives", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the purpose of dividing the bending moment diagram ordinates by EI at each section during the analysis of a statically indeterminate structure?", "reason": "not answerable from gold: asks the purpose of M/EI; the passage only lists the step", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What procedural change was implemented for bridge inspections following the discovery of the fracture in the Delaware River-Turnpike Toll Bridge?", "reason": "not answerable from gold: describes the fracture, not the procedural change asked about", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the rationale for using a multiple presence factor of 1.20 when computing the live load moment for one lane loaded in bridge deck design?", "reason": "not answerable from gold: asks the rationale for m=1.20; the passage only applies it", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the minimum required factor of safety for sliding stability under the 50-percent drain efficiency condition, and what does this imply for the structure's design?", "reason": "not answerable from gold: the required sliding FS value isn't stated", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What regulatory requirement governs the inspection and evaluation of bridge elements in the United States?", "reason": "gold passage is a reference list (below the reference-density threshold)", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the purpose of including tip boxes in the steel girder bridge design example, and how do they relate to the AASHTO LRFD specifications?", "reason": "meta question about the document itself (tip boxes), from its abstract", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the basis for the vertical seismic load coefficient value of 0.2S_DS in seismic design provisions?", "reason": "not answerable from gold: the basis for 0.2SDS isn't stated", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the purpose of determining the natural period of oscillation (sloshing), Tc, of the convective component in the seismic design of liquid storage tanks?", "reason": "not answerable from gold: asks the purpose of Tc; the passage only lists the step", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the rationale for selecting W21x44 steel sections as typical members for the side elevations in this composite steel and concrete building example?", "reason": "not answerable from gold: garbled elevation drawing, no rationale for member sizes", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the required procedure for handling existing pressure pipes that cannot be relocated over a new levee?", "reason": "not answerable from gold: no procedure for pipes that can't be relocated", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the minimum requirement for concrete cover over reinforcement bars to prevent early deterioration, and what are the potential consequences of not meeting it?", "reason": "not answerable from gold: no minimum cover value stated", "reviewed": "2026-09-27 supplementary review"}
+{"task": "grounded", "match": "What is the required procedure for applying a polymer concrete wearing surface on an orthotropic steel-plate bridge deck?", "reason": "gold passage is a reference list (below the reference-density threshold)", "reviewed": "2026-09-27 supplementary review"}

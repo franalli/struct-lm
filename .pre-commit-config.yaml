@@ -1,0 +1,40 @@
+# Install once: `uv run --extra dev pre-commit install`. Run on everything: `pre-commit run -a`.
+# Generated data (eval/tasks/*.jsonl, results/**) is excluded from the text fixers so hooks never
+# rewrite artifacts that other scripts produced and hash/rescore against.
+exclude: ^(data/(raw|interim|processed|packed)/|results/)
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.jsonl$
+      - id: end-of-file-fixer
+        exclude: \.jsonl$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+        exclude: ^uv\.lock$
+      - id: detect-private-key
+      - id: forbid-new-submodules
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.19
+    hooks:
+      # Fails if pyproject.toml changed without re-locking.
+      - id: uv-lock
+        args: [--check]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck

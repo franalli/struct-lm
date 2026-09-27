@@ -1,0 +1,54 @@
+# Data: raw sources are re-fetched with data/scripts/download.py
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/manifest.json
+data/interim/
+data/processed/
+data/packed/
+
+# Training artifacts
+checkpoints/
+outputs/
+wandb/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+
+# Eval outputs: nothing under results/ is ignored. runs/<run>/ (generations + scores),
+# judge_cache.jsonl and lm_eval/ let anyone `run_eval.py --rescore --lm-eval-dir results/lm_eval`
+# with no GPU or API key; bench/ holds the latency summaries.
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Secrets (keep a template as .env.example)
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.remember/
+.claude/settings.local.json
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.log
+nohup.out
+
+# make_tasks LLM call cache
+eval/.cache/

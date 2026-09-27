@@ -1,0 +1,161 @@
+"""Run the KPI eval and the lm-eval regression suite on a Modal H100.
+
+  modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b
+  modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Instruct-2512 --run-name instruct-8b --chat
+  modal run eval/modal_app.py --model mistralai/Mistral-7B-v0.3 --run-name m7b --tokenizer-mode auto
+  modal run eval/modal_app.py --model ... --run-name smoke --limit 5 --no-judge --which kpi
+  modal volume get struct-lm results .        # pull results/ back into the repo
+
+To keep judge calls off the GPU clock, generate on Modal with --generate-only, pull results/,
+then score everything locally: python eval/run_eval.py --run-name <r> --rescore
+--lm-eval-dir results/lm_eval
+
+Secrets expected in Modal: `huggingface` (HF_TOKEN) and `mistral` (MISTRAL_API_KEY).
+The volume `struct-lm` holds the HF cache (so the weights download once), results,
+and later the checkpoints.
+
+How it fits together: `modal run` executes main() on your machine. main() calls the two GPU
+functions with .remote(), which blocks until each finishes in its own container. Each container
+runs the same scripts you would run by hand (run_lm_eval.sh, run_eval.py) as subprocesses,
+reading and writing /vol, then commits the volume so the results persist.
+"""
+
+import os
+import subprocess
+import sys
+
+import modal
+
+app = modal.App("struct-lm-eval")
+# Persistent storage shared by every run, mounted at /vol in both functions:
+#   /vol/hf       Hugging Face cache (HF_HOME below): each checkpoint downloads once
+#   /vol/results  same layout as the repo's results/, pulled with `modal volume get`
+vol = modal.Volume.from_name("struct-lm", create_if_missing=True)
+
+# The container image, built once and cached by Modal until this definition changes. Changing
+# a pin here triggers a rebuild on the next `modal run`.
+image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .pip_install(
+        "vllm==0.29.0",
+        # 5.17 renamed PixtralRotaryEmbedding -> PixtralVisionRotaryEmbedding; vLLM 0.29/0.30
+        # still import the old name, so Ministral 3 (Pixtral vision tower) fails to load.
+        "transformers>=5.10.4,<5.17",
+        "mistral-common>=1.8.6",  # Tekken tokenizer for tokenizer_mode="mistral"
+        "mistralai>=2.0",  # judge.py imports mistralai.client (2.x layout)
+        "mistral_inference",  # needs xformers CUDA kernels, so it lives here, not on the Mac
+        "lm_eval[vllm]>=0.4.13",  # handles vLLM's MistralTokenizer (tokenizer_mode=mistral)
+    )
+    .env(
+        {
+            "HF_HOME": "/vol/hf",
+            # huggingface_hub 1.x (required by transformers 5) dropped hf_transfer for Xet
+            "HF_XET_HIGH_PERFORMANCE": "1",
+            # vLLM workers must be spawned, not forked: forking a process that has already
+            # initialised CUDA fails.
+            "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
+            # FlashInfer JIT-compiles its top-k/top-p sampler with nvcc, which debian_slim lacks
+            # (engine dies in warmup: "Could not find nvcc"). Use vLLM's PyTorch sampler instead;
+            # eval decoding is greedy, so outputs are unaffected.
+            "VLLM_USE_FLASHINFER_SAMPLER": "0",
+        }
+    )
+    # Your local eval/ directory, copied in at every launch rather than baked into the image, so
+    # edits to tasks, prompts or scorers take effect without a rebuild. It also means the run
+    # evaluates whatever is in eval/tasks/ right now: don't regenerate tasks between stages.
+    .add_local_dir("eval", remote_path="/root/eval")  # tasks, prompts, scorers, judge, run_eval
+)
+
+# Settings shared by both GPU functions. 4 h covers a full 8B lm-eval run (MMLU is the long
+# pole) with margin; the secrets become environment variables inside the container
+# (HF_TOKEN for gated weights, MISTRAL_API_KEY for the judge).
+COMMON = {
+    "image": image,
+    "gpu": "H100",
+    "timeout": 4 * 3600,
+    "volumes": {"/vol": vol},
+    "secrets": [modal.Secret.from_name("huggingface"), modal.Secret.from_name("mistral")],
+}
+
+
+@app.function(**COMMON)
+def kpi_eval(
+    model: str,
+    run_name: str,
+    chat: bool,
+    limit: int | None,
+    no_judge: bool,
+    tokenizer_mode: str,
+    generate_only: bool = False,
+) -> None:
+    """The domain KPI eval: run_eval.py with container paths. Arguments map 1:1 to its flags.
+
+    Writes /vol/results/runs/<run_name>/ and, unless generate_only, a row in
+    /vol/results/table.md. --lm-eval-dir points at lm_eval()'s output, so if that ran first
+    under the same run_name, its MMLU / GSM8K / HellaSwag numbers land in the same row."""
+    cmd = [
+        sys.executable,
+        "/root/eval/run_eval.py",
+        "--model",
+        model,
+        "--run-name",
+        run_name,
+        "--tasks-dir",
+        "/root/eval/tasks",
+        "--results-dir",
+        "/vol/results",
+        "--lm-eval-dir",
+        "/vol/results/lm_eval",
+        "--tokenizer-mode",
+        tokenizer_mode,
+    ]
+    if chat:
+        cmd.append("--chat")
+    if limit:
+        cmd += ["--limit", str(limit)]
+    if no_judge:
+        cmd.append("--no-judge")
+    if generate_only:
+        cmd.append("--generate-only")
+    subprocess.run(cmd, check=True, cwd="/root")  # check=True: a failed eval fails the Modal call
+    vol.commit()  # persist results; without this, writes to /vol are lost when the container exits
+
+
+@app.function(**COMMON)
+def lm_eval(model: str, run_name: str, tokenizer_mode: str, chat: bool = False) -> None:
+    """The general-capability regression suite: run_lm_eval.sh, writing
+    /vol/results/lm_eval/<run_name>/. The script takes tokenizer mode and chat as environment
+    variables (TOKENIZER_MODE, CHAT), so they are passed through env rather than as arguments."""
+    subprocess.run(
+        ["bash", "/root/eval/run_lm_eval.sh", model, run_name, "/vol/results"],
+        check=True,
+        cwd="/root",
+        env={**os.environ, "TOKENIZER_MODE": tokenizer_mode, "CHAT": "1" if chat else "0"},
+    )
+    vol.commit()
+
+
+@app.local_entrypoint()
+def main(
+    model: str,
+    run_name: str,
+    chat: bool = False,
+    limit: int = 0,
+    no_judge: bool = False,
+    generate_only: bool = False,
+    which: str = "both",
+    tokenizer_mode: str = "mistral",  # "auto" for non-Mistral-3 checkpoints
+) -> None:
+    """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
+    bools -> --chat / --no-chat). `which` picks "lm", "kpi" or "both".
+
+    `chat` applies to both halves, so the regression suite and the KPI eval always use the
+    same prompt format for a given run. `limit` 0 means all items (Modal flags can't be None)."""
+    if which in ("lm", "both"):
+        lm_eval.remote(
+            model, run_name, tokenizer_mode, chat
+        )  # first, so kpi_eval can merge its numbers
+    if which in ("kpi", "both"):
+        kpi_eval.remote(
+            model, run_name, chat, limit or None, no_judge, tokenizer_mode, generate_only
+        )

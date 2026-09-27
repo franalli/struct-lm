@@ -1,0 +1,67 @@
+[project]
+name = "struct-lm"
+version = "0.1.0"
+description = "Domain adaptation of an open LLM: CPT -> SFT -> DPO -> GRPO, with KPI evals and served latency."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "requests>=2.32",       # data/scripts/download.py
+    "pymupdf>=1.24",        # data/scripts/extract.py
+    # <5.17: 5.17 renamed PixtralRotaryEmbedding, which vLLM 0.29/0.30 still import (Ministral 3)
+    "transformers>=5.10.4,<5.17",  # AutoTokenizer fallback for non-Mistral-3 checkpoints
+    "mistralai>=2.0",       # eval/judge.py (Mistral Large judge)
+    "modal>=1.0",           # eval/modal_app.py (remote GPU runs)
+    # xformers has no macOS wheel and won't build with Apple clang; it's a CUDA-only path anyway,
+    # so it installs on Linux/Modal and is skipped on the Mac.
+    "mistral-inference>=1.6; sys_platform == 'linux'",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "orjson>=3.10",
+    "mistral-common>=1.12.0",
+]
+
+[project.optional-dependencies]
+data = [
+    "fasttext-wheel>=0.9.2",
+    "datasketch>=1.6",
+    "datasets>=3.0",
+]
+train = [
+    "torch>=2.6",
+    "transformers>=4.56",
+    "datasets>=3.0",
+    "accelerate>=1.4",
+    "peft>=0.15",
+    "trl>=0.21",
+    "wandb>=0.19",
+]
+eval = [
+    "openai>=1.60",
+    "lm-eval[vllm]>=0.4.8",
+]
+serve = [
+    "vllm>=0.29",
+    "openai>=1.60",
+]
+# AWQ (serve/quantize.sh). llmcompressor pins compressed-tensors versions that vLLM 0.29
+# rejects, so it lives in its own env: `uv sync --extra quantize`, then serve from `--extra serve`.
+quantize = ["llmcompressor>=0.14"]
+dev = ["ruff>=0.9", "pytest>=8.0", "pre-commit>=4.0"]
+
+# Scripts repo, not an importable package: install only the dependencies.
+[tool.setuptools]
+packages = []
+
+[tool.uv]
+conflicts = [
+    [{ extra = "quantize" }, { extra = "serve" }],
+    [{ extra = "quantize" }, { extra = "eval" }],
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"

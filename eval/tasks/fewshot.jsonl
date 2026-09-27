@@ -1,0 +1,3 @@
+{"question": "In FEMA P-2012, what is the maximum interstory drift percentage defining non-simulated collapse for 8-story concrete walls?", "answer": "5%", "answer_type": "numeric", "source_chunk": "fema-p-2012:p128:c0"}
+{"question": "What is the axle spacing of the AASHTO LRFD fatigue design truck between rear axles?", "answer": "9000 mm", "answer_type": "numeric", "source_chunk": "fhwa-if-12-027:p258:c1"}
+{"question": "In AASHTO LRFD Article 4.6.2.1.6, where is the design location for negative moment in a typical steel girder bridge taken?", "answer": "one-quarter flange width", "answer_type": "exact", "source_chunk": "fhwa-sbdh-v17:p10:c0"}
