@@ -1,0 +1,806 @@
+{
+  "download": {
+    "sources": 249,
+    "downloaded": 244,
+    "bytes": 3135427388,
+    "rejected": [
+      {
+        "slug": "usace-em-1110-2-1304-2021",
+        "reason": "under 200 KB"
+      },
+      {
+        "slug": "usace-em-1110-2-2102",
+        "reason": "under 200 KB"
+      },
+      {
+        "slug": "usace-em-1110-1-4011",
+        "reason": "under 200 KB"
+      },
+      {
+        "slug": "fema-p-58-4",
+        "reason": "no readable pages (truncated or corrupt file)"
+      },
+      {
+        "slug": "fema-p-58-5",
+        "reason": "no readable pages (truncated or corrupt file)"
+      }
+    ],
+    "missing": []
+  },
+  "extract": {
+    "docs": 244,
+    "by_publisher": {
+      "FEMA": {
+        "docs": 45,
+        "pages": 14058,
+        "pages_kept": 12643,
+        "dropped_image_only": 879,
+        "dropped_short": 536,
+        "tokens": 7582974
+      },
+      "FHWA": {
+        "docs": 65,
+        "pages": 12587,
+        "pages_kept": 11577,
+        "dropped_image_only": 750,
+        "dropped_short": 260,
+        "tokens": 5834309
+      },
+      "NASA": {
+        "docs": 4,
+        "pages": 319,
+        "pages_kept": 310,
+        "dropped_image_only": 7,
+        "dropped_short": 2,
+        "tokens": 152143
+      },
+      "NIST": {
+        "docs": 28,
+        "pages": 4595,
+        "pages_kept": 4432,
+        "dropped_image_only": 25,
+        "dropped_short": 138,
+        "tokens": 2648730
+      },
+      "USACE": {
+        "docs": 102,
+        "pages": 27243,
+        "pages_kept": 24168,
+        "dropped_image_only": 2592,
+        "dropped_short": 483,
+        "tokens": 14111797
+      }
+    },
+    "total": {
+      "docs": 244,
+      "pages": 58802,
+      "pages_kept": 53130,
+      "dropped_image_only": 4253,
+      "dropped_short": 1419,
+      "tokens": 30329953
+    },
+    "boilerplate_lines_removed": 120491,
+    "likely_scanned": [
+      "fhwa-sbdh-v03",
+      "usace-em-1110-2-1424",
+      "usace-em-1110-2-3200",
+      "fema-nehrp-examples-v3",
+      "fema-p-2192",
+      "fema-p-1100-2c"
+    ],
+    "copyright_flags": [
+      "nist-gcr-16-917-40",
+      "nist-gcr-16-917-41",
+      "nist-gcr-16-917-42",
+      "nist-gcr-17-917-47",
+      "fema-p-1050-1",
+      "fema-p-1051",
+      "fema-p-2082-1",
+      "fhwa-hif19063",
+      "nist-gcr-14-917-31",
+      "nist-gcr-14-917-32",
+      "nist-gcr-15-917-34",
+      "nist-gcr-16-917-38",
+      "fema-p-1050-2",
+      "fhwa-hif22031",
+      "fema-p-58-6",
+      "fema-p-2055",
+      "fema-nehrp-2000-commentary",
+      "nist-gcr-16-917-39",
+      "nist-gcr-17-917-44",
+      "nist-gcr-17-917-45",
+      "nist-gcr-18-917-43",
+      "nist-gcr-22-917-50",
+      "nist-gcr-22-917-51",
+      "nist-gcr-12-917-21",
+      "nist-gcr-17-917-46v1",
+      "nist-gcr-17-917-46v2",
+      "nist-gcr-17-917-46v3"
+    ]
+  },
+  "filter": {
+    "docs_in": 244,
+    "docs_out": 242,
+    "docs_dropped": [
+      {
+        "slug": "fhwa-hif16010",
+        "rule": "dictionary",
+        "words": 47164,
+        "dictionary_ratio": 0.649
+      },
+      {
+        "slug": "fema-nehrp-examples-v3",
+        "rule": "min_words",
+        "words": 540,
+        "dictionary_ratio": 0.937
+      }
+    ],
+    "paragraphs_in": 725916,
+    "paragraphs_out": 441223,
+    "paragraphs_dropped": {
+      "alpha_ratio": 194178,
+      "word_length": 40409,
+      "short_lines": 35989,
+      "reference_list": 6812,
+      "symbol_ratio": 3312,
+      "numbered_lines": 2819
+    },
+    "tokens_dropped_by_rule": {
+      "alpha_ratio": 5611924,
+      "short_lines": 1280218,
+      "reference_list": 403568,
+      "word_length": 368395,
+      "numbered_lines": 167048,
+      "symbol_ratio": 37301
+    },
+    "tokens_in": 30329953,
+    "tokens_out": 20913702,
+    "dictionary_ratio_kept": {
+      "min": 0.743,
+      "median": 0.926
+    }
+  },
+  "dedup": {
+    "docs_in": 242,
+    "exact_duplicates": [],
+    "docs_out": 242,
+    "paragraphs_in": 441223,
+    "near_dup_paragraphs": 32996,
+    "near_dup_clusters": 15142,
+    "tokens_in": 20913702,
+    "tokens_after_exact": 20913702,
+    "tokens_out": 20035325,
+    "token_reduction": 0.042,
+    "top_duplicated": [
+      {
+        "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.17-917-47",
+        "first_in": "nist-gcr-17-917-47",
+        "copies_removed": 1212,
+        "docs_with_copy": 6
+      },
+      {
+        "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.22-917-50",
+        "first_in": "nist-gcr-22-917-50",
+        "copies_removed": 484,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.18-917-43",
+        "first_in": "nist-gcr-18-917-43",
+        "copies_removed": 299,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "FEMA P-1051, NEHRP Recommended Provisions: Design Examples",
+        "first_in": "fema-p-1051",
+        "copies_removed": 239,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "FEMA P-1051, NEHRP Recommended Seismic Provisions: Design Examples",
+        "first_in": "fema-p-1051",
+        "copies_removed": 203,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "This publication is available free of charge from: https://doi.org/10.6028/NIST.GCR.22-917-51",
+        "first_in": "nist-gcr-22-917-51",
+        "copies_removed": 202,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "Chapter 7: Materials, Material Deficiencies, and Inspection Methods",
+        "first_in": "fhwa-nhi-23-024",
+        "copies_removed": 164,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "1 Aug 08 (Change 2)",
+        "first_in": "usace-em-1110-2-1100-part-03",
+        "copies_removed": 144,
+        "docs_with_copy": 3
+      },
+      {
+        "text": "Appendix H: Wood Archetype Collapse Results",
+        "first_in": "fema-p-2343-v2",
+        "copies_removed": 136,
+        "docs_with_copy": 1
+      },
+      {
+        "text": "Strength Property ACMR at DR",
+        "first_in": "fema-p-2343-v1",
+        "copies_removed": 130,
+        "docs_with_copy": 2
+      }
+    ],
+    "top_cross_document": [
+      {
+        "text": "DEPARTMENT OF THE ARMY U.S. Army Corps of Engineers",
+        "first_in": "usace-em-1110-2-6053",
+        "copies_removed": 72,
+        "docs_with_copy": 57
+      },
+      {
+        "text": "The Federal Highway Administration (FHWA) provides high-quality information to serve Government, industry, and the public in a manner that promotes public understanding. Standards and policies are used to ensure and maximize the quality, objectivity, utility, and integrity of its information. FHWA p",
+        "first_in": "fhwa-nhi-23-024",
+        "copies_removed": 56,
+        "docs_with_copy": 57
+      },
+      {
+        "text": "Approved for public release; distribution is",
+        "first_in": "usace-em-1110-2-501",
+        "copies_removed": 36,
+        "docs_with_copy": 37
+      },
+      {
+        "text": "8. Performing Organization Report No.",
+        "first_in": "fhwa-nhi-23-024",
+        "copies_removed": 27,
+        "docs_with_copy": 28
+      },
+      {
+        "text": "Any opinions, findings, conclusions, or recommendations expressed in this publication do not necessarily reflect the views of the Applied Technology Council (ATC), the Department of Homeland Security (DHS), or the Federal Emergency Management Agency (FEMA). Additionally, neither ATC, DHS, FEMA, nor ",
+        "first_in": "fema-p-155",
+        "copies_removed": 26,
+        "docs_with_copy": 27
+      },
+      {
+        "text": "U.S. Department of Commerce",
+        "first_in": "nist-gcr-16-917-40",
+        "copies_removed": 24,
+        "docs_with_copy": 25
+      },
+      {
+        "text": "Notice This document is disseminated under the sponsorship of the U.S. Department of Transportation in the interest of information exchange. The U.S. Government assumes no liability for use of the information contained in this document. This report does not constitute a standard, specification, or r",
+        "first_in": "fhwa-sbdh-v01",
+        "copies_removed": 24,
+        "docs_with_copy": 25
+      },
+      {
+        "text": "FOREWORD This handbook covers a full range of topics and design examples intended to provide bridge engineers with the information needed to make knowledgeable decisions regarding the selection, design, fabrication, and construction of steel bridges. Upon completion of the latest update, the handboo",
+        "first_in": "fhwa-sbdh-v01",
+        "copies_removed": 23,
+        "docs_with_copy": 24
+      },
+      {
+        "text": "Form DOT F 1700.7 (8-72) Reproduction of completed pages authorized",
+        "first_in": "fhwa-sbdh-v01",
+        "copies_removed": 22,
+        "docs_with_copy": 23
+      },
+      {
+        "text": "2. Government Accession No. 3. Recipient’s Catalog No.",
+        "first_in": "fhwa-nhi-23-024",
+        "copies_removed": 21,
+        "docs_with_copy": 22
+      }
+    ]
+  },
+  "pii": {
+    "docs": 242,
+    "replacements": {
+      "EMAIL": 56,
+      "PHONE": 177,
+      "ID": 0
+    }
+  },
+  "split": {
+    "by_publisher": {
+      "FEMA": {
+        "train": {
+          "docs": 42,
+          "tokens": 4131446
+        },
+        "val": {
+          "docs": 2,
+          "tokens": 112186
+        }
+      },
+      "FHWA": {
+        "train": {
+          "docs": 61,
+          "tokens": 3758566
+        },
+        "val": {
+          "docs": 3,
+          "tokens": 80055
+        }
+      },
+      "NASA": {
+        "train": {
+          "docs": 3,
+          "tokens": 95445
+        },
+        "val": {
+          "docs": 1,
+          "tokens": 18678
+        }
+      },
+      "NIST": {
+        "train": {
+          "docs": 27,
+          "tokens": 1639808
+        },
+        "val": {
+          "docs": 1,
+          "tokens": 84508
+        }
+      },
+      "USACE": {
+        "train": {
+          "docs": 97,
+          "tokens": 9193324
+        },
+        "val": {
+          "docs": 5,
+          "tokens": 919095
+        }
+      }
+    },
+    "train": {
+      "docs": 230,
+      "tokens": 18818589
+    },
+    "val": {
+      "docs": 12,
+      "tokens": 1214522
+    },
+    "val_docs": [
+      "fema-p-1100-2a",
+      "fema-p-2018",
+      "fhwa-hif17020",
+      "fhwa-hif18044",
+      "fhwa-hif18047",
+      "nasa-std-5002b",
+      "nist-gcr-12-917-21",
+      "usace-em-1110-1-1804",
+      "usace-em-1110-2-1906",
+      "usace-em-1110-2-1908",
+      "usace-em-1110-2-2610-final-18mar2025",
+      "usace-em-1110-2-3506"
+    ],
+    "val_token_frac": 0.0606,
+    "eval_docs_in_train": 52,
+    "publishers_without_val": [],
+    "seq_len": 4096,
+    "packed_seqs": {
+      "train": 4594,
+      "val": 296
+    },
+    "steps_per_epoch_at_1M_tokens": 17.9
+  },
+  "replay": {
+    "source": "HuggingFaceFW/fineweb-edu sample-10BT (stream order)",
+    "target_tokens": 1881858,
+    "docs": 1720,
+    "tokens": 1881859,
+    "packed_seqs": 459,
+    "packed_seqs_train_plus_replay": 5054
+  },
+  "tokenizer": {
+    "term_counts": {
+      "vocab_eval": 303,
+      "tfidf_top": 500,
+      "probes": 18
+    },
+    "base": {
+      "model": "mistralai/Ministral-3-8B-Base-2512",
+      "corpus_tokens": 20033111,
+      "fertility": {
+        "corpus": 1.438,
+        "fineweb_edu": 1.338
+      },
+      "term_fertility": {
+        "vocab_eval": 1.433,
+        "tfidf_top": 1.112,
+        "probes": 3.207
+      },
+      "probes": {
+        "ASCE 7-22": 7,
+        "ASCE 7-16": 7,
+        "EM 1110-2-2104": 13,
+        "NEHRP": 3,
+        "AASHTO LRFD": 7,
+        "kip-ft": 4,
+        "ksi": 1,
+        "ASTM A709": 6,
+        "A709 Grade 50W": 9,
+        "HPS 70W": 6,
+        "f'c": 3,
+        "P-delta": 3,
+        "Cs = SDS/(R/Ie)": 8,
+        "orthotropic": 2,
+        "electroslag": 3,
+        "austenitic": 3,
+        "martensitic": 3,
+        "Charpy V-notch": 5
+      },
+      "words_4plus_tokens": 34,
+      "term_words": 842,
+      "worst_fragmented": [
+        {
+          "word": "1110-2-2104",
+          "tokens": 12
+        },
+        {
+          "word": "SDS/(R/Ie)",
+          "tokens": 6
+        },
+        {
+          "word": "strong-column/weak-beam",
+          "tokens": 6
+        },
+        {
+          "word": "(f’c)",
+          "tokens": 5
+        },
+        {
+          "word": "7-16",
+          "tokens": 5
+        },
+        {
+          "word": "7-22",
+          "tokens": 5
+        },
+        {
+          "word": "sub-diaphragm",
+          "tokens": 5
+        },
+        {
+          "word": "(CIF)",
+          "tokens": 4
+        },
+        {
+          "word": "(EDO)",
+          "tokens": 4
+        },
+        {
+          "word": "(LFRS)",
+          "tokens": 4
+        },
+        {
+          "word": "(RBS)",
+          "tokens": 4
+        },
+        {
+          "word": "(Ωv)",
+          "tokens": 4
+        },
+        {
+          "word": "100",
+          "tokens": 4
+        },
+        {
+          "word": "50W",
+          "tokens": 4
+        },
+        {
+          "word": "70W",
+          "tokens": 4
+        },
+        {
+          "word": "A709",
+          "tokens": 4
+        },
+        {
+          "word": "AASHTO",
+          "tokens": 4
+        },
+        {
+          "word": "Diaphragm",
+          "tokens": 4
+        },
+        {
+          "word": "Earthquake)",
+          "tokens": 4
+        },
+        {
+          "word": "HL-93",
+          "tokens": 4
+        },
+        {
+          "word": "I-girder",
+          "tokens": 4
+        },
+        {
+          "word": "No-decompression",
+          "tokens": 4
+        },
+        {
+          "word": "Timoshenko",
+          "tokens": 4
+        },
+        {
+          "word": "capacity-demand-diagram",
+          "tokens": 4
+        },
+        {
+          "word": "contraflexure",
+          "tokens": 4
+        },
+        {
+          "word": "high-deformability",
+          "tokens": 4
+        },
+        {
+          "word": "kip-ft",
+          "tokens": 4
+        },
+        {
+          "word": "lateral-torsional",
+          "tokens": 4
+        },
+        {
+          "word": "nonprismatic",
+          "tokens": 4
+        },
+        {
+          "word": "percent-30",
+          "tokens": 4
+        },
+        {
+          "word": "semi-integral",
+          "tokens": 4
+        },
+        {
+          "word": "shear-buckling",
+          "tokens": 4
+        },
+        {
+          "word": "web-plumbness",
+          "tokens": 4
+        },
+        {
+          "word": "wind-restraint",
+          "tokens": 4
+        }
+      ]
+    },
+    "instruct": {
+      "model": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+      "corpus_tokens": 20033111,
+      "fertility": {
+        "corpus": 1.438,
+        "fineweb_edu": 1.338
+      },
+      "term_fertility": {
+        "vocab_eval": 1.433,
+        "tfidf_top": 1.112,
+        "probes": 3.207
+      },
+      "probes": {
+        "ASCE 7-22": 7,
+        "ASCE 7-16": 7,
+        "EM 1110-2-2104": 13,
+        "NEHRP": 3,
+        "AASHTO LRFD": 7,
+        "kip-ft": 4,
+        "ksi": 1,
+        "ASTM A709": 6,
+        "A709 Grade 50W": 9,
+        "HPS 70W": 6,
+        "f'c": 3,
+        "P-delta": 3,
+        "Cs = SDS/(R/Ie)": 8,
+        "orthotropic": 2,
+        "electroslag": 3,
+        "austenitic": 3,
+        "martensitic": 3,
+        "Charpy V-notch": 5
+      },
+      "words_4plus_tokens": 34,
+      "term_words": 842,
+      "worst_fragmented": [
+        {
+          "word": "1110-2-2104",
+          "tokens": 12
+        },
+        {
+          "word": "SDS/(R/Ie)",
+          "tokens": 6
+        },
+        {
+          "word": "strong-column/weak-beam",
+          "tokens": 6
+        },
+        {
+          "word": "(f’c)",
+          "tokens": 5
+        },
+        {
+          "word": "7-16",
+          "tokens": 5
+        },
+        {
+          "word": "7-22",
+          "tokens": 5
+        },
+        {
+          "word": "sub-diaphragm",
+          "tokens": 5
+        },
+        {
+          "word": "(CIF)",
+          "tokens": 4
+        },
+        {
+          "word": "(EDO)",
+          "tokens": 4
+        },
+        {
+          "word": "(LFRS)",
+          "tokens": 4
+        },
+        {
+          "word": "(RBS)",
+          "tokens": 4
+        },
+        {
+          "word": "(Ωv)",
+          "tokens": 4
+        },
+        {
+          "word": "100",
+          "tokens": 4
+        },
+        {
+          "word": "50W",
+          "tokens": 4
+        },
+        {
+          "word": "70W",
+          "tokens": 4
+        },
+        {
+          "word": "A709",
+          "tokens": 4
+        },
+        {
+          "word": "AASHTO",
+          "tokens": 4
+        },
+        {
+          "word": "Diaphragm",
+          "tokens": 4
+        },
+        {
+          "word": "Earthquake)",
+          "tokens": 4
+        },
+        {
+          "word": "HL-93",
+          "tokens": 4
+        },
+        {
+          "word": "I-girder",
+          "tokens": 4
+        },
+        {
+          "word": "No-decompression",
+          "tokens": 4
+        },
+        {
+          "word": "Timoshenko",
+          "tokens": 4
+        },
+        {
+          "word": "capacity-demand-diagram",
+          "tokens": 4
+        },
+        {
+          "word": "contraflexure",
+          "tokens": 4
+        },
+        {
+          "word": "high-deformability",
+          "tokens": 4
+        },
+        {
+          "word": "kip-ft",
+          "tokens": 4
+        },
+        {
+          "word": "lateral-torsional",
+          "tokens": 4
+        },
+        {
+          "word": "nonprismatic",
+          "tokens": 4
+        },
+        {
+          "word": "percent-30",
+          "tokens": 4
+        },
+        {
+          "word": "semi-integral",
+          "tokens": 4
+        },
+        {
+          "word": "shear-buckling",
+          "tokens": 4
+        },
+        {
+          "word": "web-plumbness",
+          "tokens": 4
+        },
+        {
+          "word": "wind-restraint",
+          "tokens": 4
+        }
+      ]
+    },
+    "base_instruct_identical": true,
+    "tfidf_top_terms": [
+      "shear",
+      "design",
+      "Figure",
+      "concrete",
+      "seismic",
+      "load",
+      "ASCE",
+      "steel",
+      "Section",
+      "girder",
+      "flange",
+      "strength",
+      "Table",
+      "vertical",
+      "wall",
+      "bridge",
+      "AASHTO",
+      "structural",
+      "loads",
+      "analysis",
+      "should",
+      "Equation",
+      "earthquake",
+      "requirements",
+      "water",
+      "deck",
+      "building",
+      "construction",
+      "lateral",
+      "SEI",
+      "walls",
+      "reinforcement",
+      "diaphragm",
+      "structures",
+      "used",
+      "required",
+      "Chapter",
+      "response",
+      "structure",
+      "data",
+      "model",
+      "LRFD",
+      "flow",
+      "stress",
+      "maximum",
+      "values",
+      "stiffness",
+      "girders",
+      "loading",
+      "wave"
+    ]
+  }
+}

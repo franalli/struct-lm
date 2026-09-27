@@ -1,30 +1,17 @@
 # End-to-end pipeline. Each target is resumable; outputs land in data/, checkpoints/, results/.
-PY ?= python
+PY ?= .venv/bin/python
 BASE ?= mistralai/Ministral-3-8B-Base-2512
 SEQ_LEN ?= 4096
 
 .PHONY: data train eval serve all
 
 # --- data -------------------------------------------------------------------
-data: data/packed/cpt
-
-data/raw/manifest.json: data/scripts/sources.csv
-	$(PY) data/scripts/download.py --sources $< --out data/raw
-
-data/processed/chunks.jsonl: data/raw/manifest.json
-	$(PY) data/scripts/extract.py --raw data/raw --out $@
-
-data/interim/filtered.jsonl: data/processed/chunks.jsonl
-	$(PY) data/scripts/filter.py --in $< --out $@ --lang en
-
-data/processed/dedup.jsonl: data/interim/filtered.jsonl
-	$(PY) data/scripts/dedup.py --in $< --out $@ --threshold 0.8
-
-coverage: data/processed/dedup.jsonl
-	$(PY) data/scripts/tokenizer_coverage.py --in $< --tokenizers $(BASE)
-
-data/packed/cpt: data/processed/dedup.jsonl
-	$(PY) data/scripts/pack.py --in $< --out $@ --tokenizer $(BASE) --seq-len $(SEQ_LEN)
+# Stage 1 corpus: data/sources.csv -> data/processed/{docs_raw,docs,train,val,replay}.jsonl + stats.json.
+# Each step reads the previous step's output; run from the repo root with .env loaded (HF_TOKEN).
+# New sources: data/scripts/crawl_index.py <index> --pattern ... --publisher ..., then `make data`.
+DATA_STEPS = download extract filter dedup pii split replay tokenizer_coverage stats
+data:
+	for s in $(DATA_STEPS); do $(PY) data/scripts/$$s.py || exit 1; done
 
 # --- train ------------------------------------------------------------------
 cpt:  ; $(PY) train/cpt.py  --config train/configs/cpt.yaml

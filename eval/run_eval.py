@@ -2,7 +2,7 @@
 
 Usage (on a GPU box, or via eval/modal_app.py):
   python eval/run_eval.py --model mistralai/Ministral-3-8B-Base-2512     --run-name base-8b
-  python eval/run_eval.py --model mistralai/Ministral-3-8B-Instruct-2512 --run-name instruct-8b --chat
+  python eval/run_eval.py --model mistralai/Ministral-3-8B-Instruct-2512-BF16 --run-name instruct-8b --chat
   python eval/run_eval.py --model ... --run-name base-8b --generate-only   # GPU: generations only
   python eval/run_eval.py --run-name base-8b --rescore        # local: all scoring, code + judge, no GPU
   python eval/run_eval.py --model ... --run-name smoke --limit 5 --no-judge   # smoke test

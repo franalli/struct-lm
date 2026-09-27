@@ -1,9 +1,12 @@
-# Data: raw sources are re-fetched with data/scripts/download.py
+# Data: raw PDFs are re-fetched from data/sources.csv (url + sha256) by data/scripts/download.py
 data/raw/*
 !data/raw/.gitkeep
-!data/raw/manifest.json
 data/interim/
-data/processed/
+# processed corpus files are rebuilt by the scripts; stats.json (every count) and
+# tokenizer_coverage.md are committed
+data/processed/*
+!data/processed/stats.json
+!data/processed/tokenizer_coverage.md
 data/packed/
 
 # Training artifacts

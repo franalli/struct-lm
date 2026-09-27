@@ -1,53 +1,196 @@
-"""How well does each candidate tokenizer fit the domain corpus?
+"""How well do the tokenizers of the models we train fit the domain corpus?
 
-Reports fertility (tokens per whitespace word), byte-fallback / UNK rate, and the most
-fragmented domain terms. High fertility on key terms means CPT has more to learn, and
-may justify vocabulary extension; record the verdict in notes/decisions.md.
+Both checkpoints in use, Ministral 3 8B Base and Instruct, each loaded from its own repo via
+mistral-common (Tekken, as vLLM and extract.py load it). Reports:
+  - total corpus tokens (docs.jsonl)
+  - fertility (tokens per whitespace word) on the corpus and on ~1M tokens of FineWeb-Edu
+    (the head of replay.jsonl), i.e. how much more the domain text costs than general English
+  - fertility on domain terms: the vocab eval terms, the top 500 corpus terms by TF-IDF against
+    FineWeb-Edu, and a few designations (ASCE 7-22, EM 1110-2-2104, ...)
+  - every term word that splits into 4+ tokens
+
+Terms are counted as they appear mid-text: n("the " + term) - n("the"). This is the evidence for
+the vocabulary-extension decision in notes/decisions.md.
 """
 
 import argparse
-import json
-import random
+import math
 import re
 from collections import Counter
+from pathlib import Path
 
-from transformers import AutoTokenizer
+from common import BASE, load_tokenizer, read_jsonl, update_stats
 
-WORD = re.compile(r"[A-Za-z][A-Za-z0-9_\-]{3,}")
+MODELS = {
+    "base": BASE,
+    "instruct": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+}
+TERM = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-'][A-Za-z0-9]+)*")
+PROBES = [
+    "ASCE 7-22",
+    "ASCE 7-16",
+    "EM 1110-2-2104",
+    "NEHRP",
+    "AASHTO LRFD",
+    "kip-ft",
+    "ksi",
+    "ASTM A709",
+    "A709 Grade 50W",
+    "HPS 70W",
+    "f'c",
+    "P-delta",
+    "Cs = SDS/(R/Ie)",
+    "orthotropic",
+    "electroslag",
+    "austenitic",
+    "martensitic",
+    "Charpy V-notch",
+]
+FINEWEB_TOKENS = 1_000_000
+
+
+def tfidf_terms(corpus: list[str], reference: list[str], k: int) -> list[str]:
+    """Top-k corpus terms by TF (corpus count) x IDF over the FineWeb-Edu documents."""
+    tf, df, surface = Counter(), Counter(), {}
+    for text in corpus:
+        found = TERM.findall(text)
+        for w in found:
+            surface.setdefault(w.lower(), Counter())[w] += 1
+        tf.update(w.lower() for w in found)
+        df.update({w.lower() for w in found})
+    ref_df = Counter()
+    for text in reference:
+        ref_df.update({w.lower() for w in TERM.findall(text)})
+    n = len(reference)
+    scored = [
+        (c * math.log(n / (1 + ref_df[w])), w)
+        for w, c in tf.items()
+        if c >= 20 and df[w] >= 3 and len(w) >= 3
+    ]
+    return [surface[w].most_common(1)[0][0] for _, w in sorted(scored, reverse=True)[:k]]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in", dest="inp", default="data/processed/dedup.jsonl")
-    ap.add_argument("--tokenizers", nargs="+", required=True)
-    ap.add_argument("--sample", type=int, default=500, help="documents to sample")
-    ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--docs", default="data/processed/docs.jsonl")
+    ap.add_argument("--replay", default="data/processed/replay.jsonl")
+    ap.add_argument("--vocab", default="eval/tasks/vocab.jsonl")
+    ap.add_argument("--n-tfidf", type=int, default=500)
+    ap.add_argument("--report", default="data/processed/tokenizer_coverage.md")
     args = ap.parse_args()
 
-    with open(args.inp) as f:
-        docs = [json.loads(line)["text"] for line in f]
-    random.Random(0).shuffle(docs)
-    docs = docs[: args.sample]
-    vocab = Counter(w for d in docs for w in WORD.findall(d))
+    corpus = [d["text"] for d in read_jsonl(args.docs)]
+    replay = read_jsonl(args.replay)
+    fineweb, n = [], 0
+    for r in replay:
+        if n >= FINEWEB_TOKENS:
+            break
+        fineweb.append(r["text"])
+        n += r["n_tokens"]
 
-    for name in args.tokenizers:
-        tok = AutoTokenizer.from_pretrained(name)
-        n_words = n_tokens = n_unk = 0
-        for d in docs:
-            ids = tok(d, add_special_tokens=False)["input_ids"]
-            n_words += len(d.split())
-            n_tokens += len(ids)
-            if tok.unk_token_id is not None:
-                n_unk += ids.count(tok.unk_token_id)
-        frag = sorted(
-            ((len(tok.tokenize(" " + w)), w) for w, _ in vocab.most_common(2000)), reverse=True
+    term_sets = {
+        "vocab_eval": sorted({r["term"] for r in read_jsonl(args.vocab)}),
+        "tfidf_top": tfidf_terms(corpus, [r["text"] for r in replay], args.n_tfidf),
+        "probes": PROBES,
+    }
+    words = sorted({w for terms in term_sets.values() for t in terms for w in t.split()})
+
+    stats: dict = {"term_counts": {k: len(v) for k, v in term_sets.items()}}
+    encodings = {}
+    for role, name in MODELS.items():
+        encode, _ = load_tokenizer(name)
+
+        def fertility(texts: list[str], encode=encode) -> float:
+            return sum(len(encode(t)) for t in texts) / sum(len(t.split()) for t in texts)
+
+        def n_tok(term: str, encode=encode) -> int:
+            return len(encode("the " + term)) - len(encode("the"))
+
+        per_word = {w: n_tok(w) for w in words}
+        fragmented = sorted(
+            ((n, w) for w, n in per_word.items() if n >= 4), key=lambda x: (-x[0], x[1])
         )
-        print(f"\n== {name}")
-        print(f"fertility   {n_tokens / n_words:.3f} tokens/word")
-        print(f"unk rate    {n_unk / max(1, n_tokens):.5f}")
-        print(f"most fragmented frequent terms (top {args.top}):")
-        for n, w in frag[: args.top]:
-            print(f"  {n:>3}  {w}")
+        stats[role] = {
+            "model": name,
+            "corpus_tokens": sum(len(encode(t)) for t in corpus),
+            "fertility": {
+                "corpus": round(fertility(corpus), 3),
+                "fineweb_edu": round(fertility(fineweb), 3),
+            },
+            "term_fertility": {
+                k: round(sum(map(n_tok, ts)) / sum(len(t.split()) for t in ts), 3)
+                for k, ts in term_sets.items()
+            },
+            "probes": {t: n_tok(t) for t in PROBES},
+            "words_4plus_tokens": len(fragmented),
+            "term_words": len(words),
+            "worst_fragmented": [{"word": w, "tokens": n} for n, w in fragmented[:40]],
+        }
+        encodings[role] = [encode(t) for t in corpus[:20] + words]
+
+    stats["base_instruct_identical"] = encodings["base"] == encodings["instruct"]
+    stats["tfidf_top_terms"] = term_sets["tfidf_top"][:50]
+    update_stats("tokenizer", stats)
+    md = report(stats)
+    Path(args.report).write_text(md)
+    print(md)
+    print(f"-> {args.report}")
+
+
+def report(stats: dict) -> str:
+    """tokenizer_coverage.md: the fertility comparison and the worst-fragmented terms."""
+    b, i = stats["base"], stats["instruct"]
+
+    def row(label: str, get) -> str:
+        return f"| {label} | {get(b)} | {get(i)} |"
+
+    lines = [
+        "# Tokenizer coverage",
+        "",
+        "Generated by `data/scripts/tokenizer_coverage.py` from `data/processed/docs.jsonl` (the clean",
+        "corpus) and the head of `replay.jsonl` (~1M tokens of FineWeb-Edu). Both checkpoints in use,",
+        "loaded from their own repos via mistral-common (Tekken, 131k vocabulary). Fertility is tokens per",
+        'whitespace word; a term is counted as it appears mid-text: n("the " + term) - n("the").',
+        "",
+        f"| | `{b['model']}` | `{i['model']}` |",
+        "|---|---|---|",
+        row("corpus tokens", lambda s: f"{s['corpus_tokens']:,}"),
+        row("fertility: domain corpus", lambda s: s["fertility"]["corpus"]),
+        row("fertility: FineWeb-Edu", lambda s: s["fertility"]["fineweb_edu"]),
+        row(
+            "corpus / FineWeb-Edu",
+            lambda s: f"{s['fertility']['corpus'] / s['fertility']['fineweb_edu']:.2f}x",
+        ),
+    ]
+    for k, n in stats["term_counts"].items():
+        lines.append(row(f"fertility: {k} terms ({n})", lambda s, k=k: s["term_fertility"][k]))
+    lines += [
+        row(
+            "term words split into 4+ tokens",
+            lambda s: f"{s['words_4plus_tokens']} / {s['term_words']}",
+        ),
+        "",
+        (
+            "Base and Instruct encode identically (corpus sample + every term word): "
+            f"**{stats['base_instruct_identical']}**."
+        ),
+        "",
+        "## Designations",
+        "",
+        "| designation | tokens |",
+        "|---|---|",
+        *[f"| `{t}` | {n} |" for t, n in b["probes"].items()],
+        "",
+        "## Worst-fragmented term words",
+        "",
+        ", ".join(f"`{x['word']}` ({x['tokens']})" for x in b["worst_fragmented"]),
+        "",
+        "## Top corpus terms by TF-IDF against FineWeb-Edu",
+        "",
+        ", ".join(stats["tfidf_top_terms"]),
+        "",
+    ]
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

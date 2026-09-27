@@ -7,7 +7,8 @@ Current baselines: `results/table.md`.
 
 ## Environment
 
-- `uv sync --extra data --extra dev` on the Mac (data prep, task generation, scoring). The GPU work
+- `uv sync --extra data --extra dev` on the Mac (data prep, task generation, scoring; add
+  `--extra train` to keep the local training deps, or sync removes them). The GPU work
   runs on Modal. `quantize` is a separate extra (llmcompressor conflicts with vLLM 0.29).
 - Claude Code's shell has no `python` on PATH: use `.venv/bin/python` (and `.venv/bin/modal`).
 - Keys live in `.env` (gitignored): `MISTRAL_API_KEY`, `HF_TOKEN`. Scripts don't read `.env`, so
@@ -23,15 +24,43 @@ Current baselines: `results/table.md`.
 
 ## Commands
 
-### Corpus and eval tasks (Mac)
+### CPT corpus (Mac; Stage 1)
 
 ```bash
-.venv/bin/python data/scripts/download.py     # data/scripts/sources.csv -> data/raw/ + manifest.json
-.venv/bin/python data/scripts/extract.py      # -> data/processed/chunks.jsonl (<=512 Tekken tokens)
+set -a; . ./.env; set +a                        # HF_TOKEN for the tokenizers and FineWeb-Edu
+make data                                       # all steps below, in order
+.venv/bin/python data/scripts/download.py       # data/sources.csv -> data/raw/<slug>.pdf; writes sha256 + pages back
+.venv/bin/python data/scripts/extract.py        # -> docs_raw.jsonl (header/footer strip, <200-char pages dropped, page offsets)
+.venv/bin/python data/scripts/filter.py         # -> docs.jsonl + dropped_samples.jsonl
+.venv/bin/python data/scripts/dedup.py          # docs.jsonl in place (exact + paragraph MinHash) + duplicates.jsonl
+.venv/bin/python data/scripts/pii.py            # docs.jsonl in place
+.venv/bin/python data/scripts/split.py          # -> train.jsonl / val.jsonl (document-level; eval docs stay in train)
+.venv/bin/python data/scripts/replay.py         # -> replay.jsonl (FineWeb-Edu, 10% of train tokens)
+.venv/bin/python data/scripts/tokenizer_coverage.py  # -> tokenizer_coverage.md (committed)
+.venv/bin/python data/scripts/stats.py           # tokens column in sources.csv + corpus card tables for notes/decisions.md
+```
+
+- All outputs land in `data/processed/`; each step writes its own section of `stats.json`.
+  Committed: `stats.json`, `tokenizer_coverage.md`. `dedup.py` and `pii.py` rewrite `docs.jsonl`
+  in place, so after a change to any step rerun from `filter.py` (or `make data`).
+- Stage 2 reads `train.jsonl`, `val.jsonl` and `replay.jsonl` from the Modal volume:
+  `modal volume put struct-lm data/processed data/processed` (not done in Stage 1).
+- New sources: `crawl_index.py <index url or saved .html> --pattern REGEX --publisher P` appends
+  rows to `data/sources.csv`, or add rows by hand. USACE and FEMA block scripts (Akamai 403): save
+  the index page / PDFs from a browser (Chrome DevTools MCP works) into `data/raw/` (as
+  `<slug>.pdf` or the URL's filename) and rerun `download.py`. Hand-check every `copyright_flags` entry `extract.py` prints (rule 1).
+- Read `dropped_samples.jsonl` after any filter change; the tuning rationale is in `filter.py`.
+
+### Eval tasks (Mac)
+
+```bash
+.venv/bin/python data/scripts/extract.py --chunks   # -> data/processed/chunks.jsonl (eval docs only; frozen)
 set -a; . ./.env; set +a
 .venv/bin/python eval/make_tasks.py           # -> eval/tasks/*.jsonl (Mistral API, disk-cached)
 ```
 
+`chunks.jsonl` is built only from the documents in `eval/tasks/eval_chunk_ids.txt`, so corpus
+expansion can't resample the reviewed tasks; `--chunks` must stay byte-identical (`cmp`).
 After any edit to `make_tasks.py`, rerun it and diff `eval/tasks/` against the reviewed version.
 Byte-identical output needs no re-review; any changed item must be hand-reviewed.
 
@@ -74,9 +103,8 @@ set -a; . ./.env; set +a
   aren't cached, and cached ones are free.
 - Never delete `results/judge_cache.jsonl`. Editing a rubric re-judges everything it grades.
 
-Smoke test: `--which kpi --limit 5 --no-judge`. Don't use `make data` / `make eval`: those targets
-are stale (they go through the unfinished `filter.py`/`dedup.py`, and pass flags `run_eval.py`
-doesn't have).
+Smoke test: `--which kpi --limit 5 --no-judge`. Don't use `make eval`: that target is stale (it
+passes flags `run_eval.py` doesn't have).
 
 ## Decisions (rules to keep)
 
@@ -113,7 +141,8 @@ doesn't have).
 
 ## Known gaps
 
-- CPT data path not built yet: `filter.py` needs `lid.176.bin`; `dedup.py` / `pack.py` not run.
+- `train/cpt.py` still reads a pre-packed `data/packed/cpt`; Stage 2 switches it to
+  `data/processed/{train,val,replay}.jsonl` with TRL packing (`SFTConfig(packing=True, max_length=4096)`).
 - Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/` are false
   positives (`sys.path` imports; vLLM and lm-eval are only installed in the Modal image).
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

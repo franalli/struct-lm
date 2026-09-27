@@ -2,7 +2,6 @@
 
   modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b
   modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Instruct-2512-BF16 --run-name instruct-8b --chat
-  modal run eval/modal_app.py --model mistralai/Mistral-7B-v0.3 --run-name m7b --tokenizer-mode auto
   modal run eval/modal_app.py --model ... --run-name smoke --limit 5 --no-judge --which kpi
   modal run eval/modal_app.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b --which latency
   modal volume get struct-lm results .        # pull results/ back into the repo
