@@ -52,8 +52,8 @@ $M run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-
 
 ### Pull results, then score locally
 
-Pull per run, never all of `results/`: `results/table.md` and `results/judge_cache.jsonl` are local.
-The volume's copy of `table.md` is stale.
+Pull per run, never all of `results/`: `results/table.md` and `results/judge_cache.jsonl` are kept
+locally (a Modal run without `--generate-only` would start its own `table.md` on the volume).
 
 ```bash
 $M volume get --force struct-lm results/runs/<run> results/runs/
