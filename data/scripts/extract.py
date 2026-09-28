@@ -18,7 +18,7 @@ Default: one record per document, the input to the CPT corpus pipeline (filter -
   {"chunk_id": "<slug>:p<page>:c<n>", "doc", "page", "page_label", "chunk", "text", "n_tokens",
    "title", "publisher", "url"}
 
-  Frozen: built only from the documents in eval/tasks/eval_chunk_ids.txt, so corpus expansion
+  Frozen: built only from the documents in eval/tasks/eval_docs.txt, so corpus expansion
   can't change the file make_tasks.py samples from (the eval items are hand-reviewed).
   Chunks never cross a page boundary, so every chunk cites exactly one page. Within a page,
   text blocks are packed greedily up to --max-tokens; an oversized block is split at sentence

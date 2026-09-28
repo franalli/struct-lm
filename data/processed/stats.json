@@ -374,7 +374,7 @@
       "usace-em-1110-2-3506"
     ],
     "val_token_frac": 0.0589,
-    "eval_docs_in_train": 52,
+    "eval_docs_in_train": 234,
     "publishers_without_val": [],
     "seq_len": 4096,
     "packed_seqs": {

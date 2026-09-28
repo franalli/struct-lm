@@ -30,7 +30,8 @@ The default path starts from an existing checkpoint, not from scratch.
 **This repo runs that lifecycle once, end to end, at roughly 1% scale.** Public-domain US federal
 structural-engineering documents stand in for a client's private corpus: 246 manuals, reports and
 design examples from USACE, FEMA, FHWA, NIST and NASA (20.6M Tekken tokens after cleaning; the KPI
-eval tasks come from a 52-document seed subset, 19,337 page-anchored chunks).
+eval tasks are sampled from the 234 training documents, at most 6 source passages per document per
+task, and draw on 152 of them).
 US federal works carry no licensing risk; copyrighted standards such as ASCE 7 and the AISC manual
 are deliberately excluded. The starting checkpoint is Ministral 3 8B Base, from the same model
 generation such engagements start from.
@@ -55,26 +56,31 @@ the first two rows.
 
 | # | What it measures | Task | Metrics |
 |---|---|---|---|
-| 1 | Closed-book domain knowledge | 140 questions with exact or numeric answers from the corpus | `qa_acc` |
-| 2 | Answering from given passages, with citations | 131 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
-| 3 | Domain vocabulary | 303 terms to define in one sentence | `vocab_recall` |
-| 4 | Declining when the answer isn't there | 87 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
+| 1 | Closed-book domain knowledge | 130 questions with exact or numeric answers from the corpus | `qa_acc` |
+| 2 | Answering from given passages, with citations | 108 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
+| 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
+| 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
 | 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot | `mmlu`, `gsm8k`, `hellaswag` |
 | 6 | Serving cost | vLLM at 1, 8 and 32 concurrent requests | time to first token, inter-token latency, throughput |
 
-Every task item was hand-reviewed. Tasks 2–4 are graded by a pinned judge (Mistral Large 3,
+Every task item was reviewed against its source passages before any model was run on it, and 524
+of 1,176 generated items survived. Items were rejected only for defects: a wrong or unsupported
+gold answer, a correct answer the scorer would mark wrong, or a question that tests general
+knowledge or trivia instead of the corpus. None was rejected for being hard. Tasks 2–4 are graded
+by a pinned judge (Mistral Large 3,
 temperature 0, cached verdicts), with anything a rule can decide (missing citations, empty answers,
 the exact refusal phrase) decided by rule first.
 
 ### Where it starts
 
-Row zero, from [`results/table.md`](results/table.md) (27 September 2026):
+Row zero, from [`results/table.md`](results/table.md) (27 September 2026, on the eval set frozen
+that day):
 
-- **The base model** finds the right answer in the passages 76% of the time but cites correctly only
-  6% of the time, and answers 92% of unanswerable questions with something invented.
-- **The instruct model** has the behaviour (69% of answers correct and backed by their citations,
+- **The base model** finds the right answer in the passages 85% of the time but cites correctly only
+  10% of the time, and answers 88% of unanswerable questions with something invented.
+- **The instruct model** has the behaviour (79% of answers correct and backed by their citations,
   99% of unanswerable questions declined), but it knows no more of the domain closed-book: 12%
-  against the base model's 17%.
+  against the base model's 14%.
 - **Closed-book domain accuracy is low for both.** That is the knowledge gap CPT is meant to close,
   while SFT and DPO bring citation and refusal behaviour up to the instruct model's level or beyond,
   and the general-capability columns stay flat.
@@ -137,7 +143,7 @@ its own env: `uv sync --extra quantize`. Modal needs two secrets: `huggingface` 
 ```bash
 set -a; . ./.env; set +a                    # HF_TOKEN (tokenizers, FineWeb-Edu), MISTRAL_API_KEY
 make data                                   # download → extract → filter → dedup → pii → split → replay → tokenizer_coverage → stats
-python data/scripts/extract.py --chunks     # eval input: chunks.jsonl from the 52 eval documents (frozen)
+python data/scripts/extract.py --chunks     # eval input: chunks.jsonl from the pool in eval/tasks/eval_docs.txt (frozen)
 python eval/make_tasks.py                   # eval/tasks/*.jsonl + eval_chunk_ids.txt (Mistral Large 3)
 ```
 
@@ -147,8 +153,8 @@ USACE, fema.gov and ROSA P block scripted downloads (Akamai 403). Those PDFs wer
 browser (Chrome DevTools MCP): save them as `data/raw/<slug>.pdf` (or the URL's filename), then
 re-run `download.py`, which records each file's sha256 and page count in `data/sources.csv`
 (`stats.py` adds each document's final token count).
-`chunks.jsonl` is built only from the eval documents, so adding sources never moves chunk ids;
-never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`.
+`chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt`, so adding
+sources never resamples the eval; never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`.
 
 ### Train
 
@@ -243,6 +249,16 @@ The corpus card in [`notes/decisions.md`](notes/decisions.md) ("Stage 1 corpus c
 number, generated from [`data/processed/stats.json`](data/processed/stats.json) by `stats.py`:
 documents and pages per publisher, pages dropped, paragraphs dropped per filter rule, exact and
 near-duplicate removal, PII replacements, tokenizer fertility, and the train/val split.
+
+#### Replay slice
+
+To limit forgetting, CPT can mix general text back in. `data/processed/replay.jsonl` is 1.9M Tekken
+tokens (10% of train) from FineWeb-Edu, English web text filtered for educational quality, taken as
+raw text from the head of its `sample-10BT` stream. Stage 2 runs CPT with and without it and
+compares domain val perplexity with the MMLU, GSM8K and HellaSwag regression columns. It is ODC-By
+web text, not public domain, so it is rebuilt from Hugging Face rather than committed, and nothing
+in the eval comes from it. Caveats (not a random sample, not decontaminated against the regression
+benchmarks) are in the corpus card.
 
 #### Corpus sources
 

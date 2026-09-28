@@ -4,7 +4,7 @@ Whole documents go to one side, never paragraphs, so val perplexity measures whe
 generalises to unseen documents of the same kind (the KPI eval measures whether it absorbed the
 ones it saw). Per publisher, max(1, round(5% of its documents)) go to val, so every source has a
 held-out document; they are picked by sha256(slug), which is stable across runs. Every document
-an eval item was built from (eval/tasks/eval_chunk_ids.txt) stays in train.
+the eval samples from (eval/tasks/eval_docs.txt) stays in train.
 
 No tokenising or packing here: TRL packs the text at load time (SFTConfig(packing=True,
 max_length=4096)). This reports the packed sequence count at 4,096 tokens (documents

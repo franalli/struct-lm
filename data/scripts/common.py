@@ -137,6 +137,8 @@ def table(header: list[str], rows: list[list]) -> str:
     return "\n".join(lines)
 
 
-def eval_docs(path: str = "eval/tasks/eval_chunk_ids.txt") -> set[str]:
-    """Slugs of every document an eval item was built from (chunk ids are <slug>:p<page>:c<n>)."""
-    return {line.split(":")[0] for line in Path(path).read_text().split()}
+def eval_docs(path: str = "eval/tasks/eval_docs.txt") -> set[str]:
+    """Slugs of the documents the eval samples from: the train documents when the tasks were
+    generated. Pinned in a file, so corpus expansion can't resample the eval, and every one of
+    them stays in train (split.py)."""
+    return set(Path(path).read_text().split())

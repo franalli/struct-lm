@@ -36,7 +36,7 @@ make data                                       # all steps below, in order
 .venv/bin/python data/scripts/filter.py         # -> docs.jsonl + dropped_samples.jsonl
 .venv/bin/python data/scripts/dedup.py          # docs.jsonl in place (exact + paragraph MinHash) + duplicates.jsonl
 .venv/bin/python data/scripts/pii.py            # docs.jsonl in place
-.venv/bin/python data/scripts/split.py          # -> train.jsonl / val.jsonl (document-level; eval docs stay in train)
+.venv/bin/python data/scripts/split.py          # -> train.jsonl / val.jsonl (document-level; eval pool stays in train)
 .venv/bin/python data/scripts/replay.py         # -> replay.jsonl (FineWeb-Edu, 10% of train tokens)
 .venv/bin/python data/scripts/tokenizer_coverage.py  # -> tokenizer_coverage.md (committed)
 .venv/bin/python data/scripts/stats.py           # tokens column in sources.csv + corpus card tables for notes/decisions.md
@@ -56,15 +56,17 @@ make data                                       # all steps below, in order
 ### Eval tasks (Mac)
 
 ```bash
-.venv/bin/python data/scripts/extract.py --chunks   # -> data/processed/chunks.jsonl (eval docs only; frozen)
+.venv/bin/python data/scripts/extract.py --chunks   # -> data/processed/chunks.jsonl (eval pool only; frozen)
 set -a; . ./.env; set +a
 .venv/bin/python eval/make_tasks.py           # -> eval/tasks/*.jsonl (Mistral API, disk-cached)
 ```
 
-`chunks.jsonl` is built only from the documents in `eval/tasks/eval_chunk_ids.txt`, so corpus
-expansion can't resample the reviewed tasks; `--chunks` must stay byte-identical (`cmp`).
+`chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt` (the 234
+train documents when the eval was frozen), so corpus expansion can't resample the reviewed tasks;
+`--chunks` must stay byte-identical (`cmp`). `split.py` keeps every pinned document in train.
+Sampling caps source chunks at `--per-doc 6` per document per task.
 After any edit to `make_tasks.py`, rerun it and diff `eval/tasks/` against the reviewed version.
-Byte-identical output needs no re-review; any changed item must be hand-reviewed.
+Byte-identical output needs no re-review; any changed item must be reviewed (rule 9).
 
 ### Generation, lm-eval, latency (Modal)
 
@@ -134,9 +136,13 @@ passes flags `run_eval.py` doesn't have).
    outputs with no definition line. Give the judge only what the verdict depends on (the
    adversarial rubric sees no passages). After any rubric change, hand-check verdicts against the
    gold text before trusting the numbers.
-9. **Eval tasks** (664 items, all hand-reviewed): filters run post-cap and only remove items;
-   per-task RNG streams; supplementary grounded/adversarial items have ids >= 501; human rejects
-   live in `eval/tasks/rejects.jsonl` (task + match + reason).
+9. **Eval tasks** (524 items + 3 few-shot, every one reviewed; frozen 2026-09-27 before Stage 2,
+   sampled from the 234 train documents pinned in `eval/tasks/eval_docs.txt`): filters run post-cap
+   and only remove items; per-task RNG streams; supplementary grounded/adversarial/domain_qa items
+   have ids >= 501 and are sampled after every other task; rejects live in
+   `eval/tasks/rejects.jsonl` (task + match + reason). Review rejects only for defects (wrong gold,
+   correct answer scored wrong, wrong answer scored right, general knowledge/trivia/one example's
+   value), never for difficulty, and finishes before any model generation.
 10. **Training:** LoRA targets the language model only, with the regex single-quoted in YAML;
     `train/merge.py` copies `tekken.json` and `processor_config.json`. SFT/DPO/GRPO data and chat
     template work are deferred until the user asks.

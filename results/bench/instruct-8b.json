@@ -2,34 +2,34 @@
   {
     "concurrency": 1,
     "requests": 64,
-    "tok_per_s": 140.6,
-    "ttft_p50_ms": 16.0,
-    "ttft_p95_ms": 50.4,
+    "tok_per_s": 138.6,
+    "ttft_p50_ms": 17.7,
+    "ttft_p95_ms": 54.9,
     "itl_p50_ms": 6.6,
     "itl_p95_ms": 6.7,
-    "e2e_p50_ms": 337.0,
-    "e2e_p95_ms": 851.1
+    "e2e_p50_ms": 320.5,
+    "e2e_p95_ms": 1119.0
   },
   {
     "concurrency": 8,
     "requests": 64,
-    "tok_per_s": 712.1,
-    "ttft_p50_ms": 48.0,
-    "ttft_p95_ms": 109.2,
-    "itl_p50_ms": 8.1,
+    "tok_per_s": 677.3,
+    "ttft_p50_ms": 41.5,
+    "ttft_p95_ms": 114.7,
+    "itl_p50_ms": 7.6,
     "itl_p95_ms": 11.2,
-    "e2e_p50_ms": 394.4,
-    "e2e_p95_ms": 1510.7
+    "e2e_p50_ms": 376.6,
+    "e2e_p95_ms": 1663.3
   },
   {
     "concurrency": 32,
     "requests": 64,
-    "tok_per_s": 1196.2,
-    "ttft_p50_ms": 162.9,
-    "ttft_p95_ms": 433.4,
-    "itl_p50_ms": 9.5,
-    "itl_p95_ms": 38.0,
-    "e2e_p50_ms": 515.6,
-    "e2e_p95_ms": 1206.3
+    "tok_per_s": 1144.0,
+    "ttft_p50_ms": 196.7,
+    "ttft_p95_ms": 427.3,
+    "itl_p50_ms": 9.7,
+    "itl_p95_ms": 18.1,
+    "e2e_p50_ms": 542.4,
+    "e2e_p95_ms": 1607.7
   }
 ]

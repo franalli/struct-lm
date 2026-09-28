@@ -1,7 +1,8 @@
-"""Build the four domain eval tasks from the seed corpus with Mistral Large 3 (GEN_MODEL).
+"""Build the four domain eval tasks from the train corpus with Mistral Large 3 (GEN_MODEL).
 
 Usage:  MISTRAL_API_KEY=... python eval/make_tasks.py
-Input:  data/processed/chunks.jsonl (from data/scripts/extract.py)
+Input:  data/processed/chunks.jsonl (from data/scripts/extract.py --chunks: the documents
+        pinned in eval/tasks/eval_docs.txt)
 Output: eval/tasks/
           domain_qa.jsonl     {id, question, answer, answer_type, tolerance, source_chunk}
           grounded.jsonl      {id, question, context:[{chunk_id,text}x4], gold_chunk_ids}
@@ -592,13 +593,23 @@ def main() -> None:
         default=110,
         help="supplementary adversarial chunks, sampled after all tasks",
     )
+    ap.add_argument(
+        "--n-qa-extra",
+        type=int,
+        default=350,  # hand review kept ~27% of verified QA on the 234-document pool
+        help="supplementary domain_qa chunks, sampled after all tasks (ids from 501)",
+    )
+    ap.add_argument(
+        "--per-doc", type=int, default=6, help="max source chunks per document, per task"
+    )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--workers", type=int, default=WORKERS, help="parallel LLM calls")
     ap.add_argument(
         "--only",
         choices=["qa"],
         help="regenerate only domain_qa/fewshot; QA chunks are "
-        "sampled first with the same seed, so the other tasks stay consistent",
+        "sampled first with the same seed, so the other tasks stay consistent "
+        "(supplementary QA items need the full run)",
     )
     args = ap.parse_args()
     WORKERS = args.workers
@@ -628,35 +639,52 @@ def main() -> None:
     used: set[str] = set()
 
     def take(pool: list[dict], n: int, r: random.Random = rng) -> list[dict]:
+        """n unused chunks in random order, at most --per-doc from any one document per call: a
+        1,700-page manual would otherwise supply as many items as dozens of 40-page briefs."""
         pool = [c for c in pool if c["chunk_id"] not in used]
-        picked = r.sample(pool, min(n, len(pool)))
+        r.shuffle(pool)
+        picked: list[dict] = []
+        per: dict[str, int] = {}
+        for c in pool:
+            if per.get(c["doc"], 0) < args.per_doc:
+                picked.append(c)
+                per[c["doc"]] = per.get(c["doc"], 0) + 1
+                if len(picked) == n:
+                    break
         used.update(c["chunk_id"] for c in picked)
         return picked
 
+    text_of = {c["chunk_id"]: c["text"] for c in chunks}
+
+    def build_qa(src: list[dict]) -> list[dict]:
+        """Candidates from src chunks that pass the pre-filters, the blind check and answer
+        verification (see gen_qa), in generation order."""
+        candidates = [i for items in pmap(gen_qa, src) for i in items]
+        n_gen = len(candidates)
+        candidates = [
+            i
+            for i in candidates
+            if not CONTEXT_BOUND.search(i["question"])
+            and not is_trivia(i)
+            and not ungrounded_numbers(i, text_of[i["source_chunk"]])
+            and not is_reference_list(text_of[i["source_chunk"]])
+        ]
+        print(
+            f"  {n_gen} candidates, {n_gen - len(candidates)} dropped by pre-filter "
+            "(context-bound, trivia, list questions, numbers not in passage, reference lists)"
+        )
+        blind = pmap(lambda i: is_standalone(i["question"]), candidates)
+        candidates = [i for i, (ok, _) in zip(candidates, blind) if ok]
+        print(f"  {len(candidates)} pass the blind standalone check, verifying answers...")
+        keep = pmap(lambda i: verify_qa(i, text_of[i["source_chunk"]]), candidates)
+        verified = [i for i, ok in zip(candidates, keep) if ok]
+        print(f"  {len(verified)} pass answer verification")
+        return verified
+
     # 1. domain_qa ------------------------------------------------------------
     qa_chunks = take(with_numbers, args.n_qa_chunks)
-    text_of = {c["chunk_id"]: c["text"] for c in chunks}
     print("generating QA...")
-    candidates = [i for items in pmap(gen_qa, qa_chunks) for i in items]
-    n_gen = len(candidates)
-    candidates = [
-        i
-        for i in candidates
-        if not CONTEXT_BOUND.search(i["question"])
-        and not is_trivia(i)
-        and not ungrounded_numbers(i, text_of[i["source_chunk"]])
-        and not is_reference_list(text_of[i["source_chunk"]])
-    ]
-    print(
-        f"  {n_gen} candidates, {n_gen - len(candidates)} dropped by pre-filter "
-        "(context-bound, trivia, list questions, numbers not in passage, reference lists)"
-    )
-    blind = pmap(lambda i: is_standalone(i["question"]), candidates)
-    candidates = [i for i, (ok, _) in zip(candidates, blind) if ok]
-    print(f"  {len(candidates)} pass the blind standalone check, verifying answers...")
-    keep = pmap(lambda i: verify_qa(i, text_of[i["source_chunk"]]), candidates)
-    qa = [i for i, ok in zip(candidates, keep) if ok]
-    print(f"  {len(qa)} pass answer verification")
+    qa = build_qa(qa_chunks)
     n = len(qa)
     qa = dedup_questions(qa)
     print(f"  {len(qa)} after dedup ({n - len(qa)} near-duplicate facts)")
@@ -762,7 +790,7 @@ def main() -> None:
     print("generating adversarial questions (with unanswerable check)...")
     adversarial = build_adversarial(adv_chunks, 1)
 
-    # 4b. supplementary grounded + adversarial ----------------------------------
+    # 4b. supplementary grounded + adversarial + domain_qa ----------------------
     # Sampled AFTER every task, from their own streams, so enlarging these two sets can't shift
     # any earlier sample (vocab's pool excludes grounded's chunks, so simply raising n_grounded
     # would resample, and silently replace, reviewed vocab items). Ids start at 501 to mark them.
@@ -776,6 +804,18 @@ def main() -> None:
         )
         print(f"generating {len(extra)} supplementary adversarial questions...")
         adversarial += build_adversarial(extra, 501)
+    if args.n_qa_extra:
+        # Same pipeline and same stream rule; dedup runs against the main set (already deduped,
+        # so it keeps all of it), so a supplementary item never repeats a fact asked there.
+        extra = take(with_numbers, args.n_qa_extra, random.Random(f"{args.seed}-qa-extra"))
+        print(f"generating QA from {len(extra)} supplementary chunks...")
+        main_qa = fewshot + qa
+        more = dedup_questions(main_qa + build_qa(extra))[len(main_qa) :]
+        more = apply_rejects(out, "domain_qa", more)
+        for n, i in enumerate(more, 501):
+            i["id"] = f"qa-{n:04d}"
+            i["tolerance"] = 0.02
+        write_jsonl(out / "domain_qa.jsonl", qa + more)
 
     n = len(grounded)
     grounded = [g for g in grounded if not is_nonprose(text_of[g["gold_chunk_ids"][0]])]

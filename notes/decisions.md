@@ -503,6 +503,29 @@ Val documents: fema-p-1100-2a, fema-p-2018, fhwa-hif17020, fhwa-hif18044, fhwa-h
 - **PII:** three regexes (58 emails, 180 phone/fax numbers, 0 SSN-shaped), all spot-checked as true
   positives; author names are kept for citations. At Forge scale this is a Presidio-class NER pass
   with client-specific entity lists.
+- **Replay slice (FineWeb-Edu):** `replay.jsonl` holds 1,780 documents, 1,944,824 Tekken tokens
+  (10% of train; 475 packed sequences).
+  - **Why replay:** CPT on 19M tokens of one narrow domain risks forgetting general ability. Mixing
+    general text back in is the standard mitigation; continual pre-training work typically replays
+    5-25%.
+  - **Why 10%:** it's the ablation's starting point, not a tuned value.
+  - **Why FineWeb-Edu:** English web text kept by an educational-quality classifier, the closest
+    open match to what MMLU, GSM8K and HellaSwag probe. It's stored as raw text and counted in
+    Tekken tokens; pre-tokenised shards (e.g. GPT-2) would be the wrong tokenizer.
+  - **Stage 2 use:** CPT is run with and without replay. Replay earns its place if the regression
+    columns (MMLU, GSM8K, HellaSwag) hold better with it at little cost to domain val perplexity
+    (targets in the entry below). The first ~1M tokens also serve as tokenizer_coverage's
+    general-English baseline.
+  - **Caveats:**
+    - Not a random sample: it's the head of the `sample-10BT` stream, so it's reproducible but
+      drawn from the start of the first shard. If the ablation looks sensitive to the mix, draw a
+      seeded sample across shards instead.
+    - Not decontaminated against the regression benchmarks, and not run through this corpus's
+      filters. A benchmark item in web text would flatter the replay run's lm-eval scores, so check
+      for overlap before crediting replay with a regression-suite gain.
+    - Licence: FineWeb-Edu is ODC-By web text, not public domain. It isn't redistributed here
+      (`replay.jsonl` is gitignored and rebuilt from the Hugging Face stream), and nothing in the
+      eval comes from it.
 - **Packing:** 4,741 train sequences of 4,096 (5,216 with replay), about 18.5 optimizer steps per
   epoch at a 1M-token batch, so Stage 2's LR schedule needs a short warmup.
 **Revisit if:** CPT val perplexity barely moves (entry below). Check whether the corpus is smaller
@@ -516,3 +539,76 @@ source) and base-model perplexity on the same file:
 - **Val barely moved:** undertrained. The LR is too low for LoRA, or the corpus is smaller than
   it looks after dedup. The fix is LR up one step or a second epoch, not a different model.
 - **Val down but train/val gap over ~25%:** memorising. Note it, keep the checkpoint, don't add epochs.
+
+## 2026-09-27: Eval regenerated from the 234 train documents and frozen before Stage 2 (user decision)
+**Context:** the KPI tasks came from the 52 seed documents, 22.7% of train tokens after the Stage 1
+expansion (FHWA 57% of items vs 19% of tokens; USACE 5% vs 48%), and `eval_chunk_ids.txt` reserved
+no chunks from the new documents for the Stage 3 contamination rule. The eval has to be frozen
+before the first training run, because every later row is compared against it; no trained row
+existed yet, so nothing was lost by resampling.
+**Options:** keep the 664 reviewed seed-set items and add a supplement from the new documents, vs
+regenerate from the full train pool with the same seed and filters.
+**Chose:** regenerate (user decision), with these changes:
+- Pool: the 234 train documents, pinned in `eval/tasks/eval_docs.txt`. `extract.py --chunks`
+  (76,582 chunks) and `split.py` read it; train/val came out byte-identical. The pool is a file,
+  not derived from `eval_chunk_ids.txt`, so it can't drift, and every pool document stays in train.
+- `take()` caps source chunks at `--per-doc 6` per document per task (per-task RNG streams kept),
+  so a 1,700-page manual can't supply as many items as dozens of briefs.
+- `--n-qa-extra 350`: supplementary domain_qa sampled after every other task from its own stream,
+  ids from 501, deduped against the main set. Review kept only ~27% of verified QA on this pool.
+**Review:** every generated item (1,176 plus 3 few-shot) was reviewed against its passages before
+any model generation, by review agents working to a written rubric: keep or reject only, reject
+only for a concrete defect (wrong gold, a correct answer the scorer marks wrong, a wrong answer it
+marks right, general knowledge / trivia / one worked example's value), never for difficulty; when
+unsure, keep and flag. The lead re-checked every flagged item and spot-checked keeps: a blind
+30-item QA hand check (17/21 agreement with the agents; the agents were stricter and right on 3),
+10 vocab, and 8 from the most lenient grounded batch (1 miss, a gold cut off before its answer), which
+triggered a second pass over the two lenient grounded batches (0 further misses). Duplicates were
+checked across batches.
+Kept / generated by source publisher:
+
+| task | USACE | FEMA | FHWA | NIST | NASA | all |
+|---|---|---|---|---|---|---|
+| domain_qa (+ few-shot) | 40/240 | 45/151 | 30/102 | 17/56 | 1/3 | 133/552 (24%) |
+| grounded | 34/46 | 26/39 | 30/38 | 17/19 | 1/1 | 108/143 (76%) |
+| vocab | 88/158 | 62/107 | 48/86 | 10/20 | 2/4 | 210/375 (56%) |
+| adversarial | 30/39 | 12/26 | 20/25 | 14/19 | 0/0 | 76/109 (70%) |
+
+QA rejects were mostly scoring-format defects the exact/numeric scorer can't handle fairly (number
+words vs digits, two-unit or range golds, designations scored numerically, abbreviation-only golds,
+edition-suffixed citations), then general knowledge, the document's own numbering and citation
+trivia, worked-example or case-study values, and wrong golds (e.g. an aluminum ASTM given for copper
+fittings, a divisor called an exponent, a page-footer "2"). Grounded rejects: the gold passage
+doesn't hold the full answer (cut off, "why" not stated, only in a neighbour). Adversarial rejects:
+answerable by inference, premise rebutted, non-prose source. Vocab rejects: passage-narrowed or
+wrong references, ambiguous bare words, bare abbreviations, compositional phrases.
+Old rejects still apply. Question-substring rules matched only identical questions (same passage,
+same cached generation: 3 QA, 1 grounded). Three old vocab term rules (post-tensioning, Seismic
+Design Category, seismic isolation) were deleted because their reasons were instance-specific and
+the new definitions are correct.
+**Final:** domain_qa 130 + 3 few-shot, grounded 108, vocab 210, adversarial 76 (524 scored, was
+661), from 152 of the 234 documents; `eval_chunk_ids.txt` 1,570 chunks; rebuild byte-identical;
+`rejects.jsonl` 806 entries.
+
+| task | USACE | FEMA | FHWA | NIST | NASA | documents |
+|---|---|---|---|---|---|---|
+| domain_qa | 40 | 45 | 29 | 15 | 1 | 70 |
+| grounded | 34 | 26 | 30 | 17 | 1 | 72 |
+| vocab | 88 | 62 | 48 | 10 | 2 | 69 |
+| adversarial | 30 | 12 | 20 | 14 | 0 | 58 |
+
+**Evidence:** `eval/tasks/rejects.jsonl` (entries reviewed "2026-09-27 regenerated-set review"),
+`results/table.md` rows base-8b / instruct-8b rescored on this set. lm-eval rows are unchanged
+(independent of the tasks); latency re-run because `bench_latency.py` samples its prompts from them.
+**Revisit if:** the corpus changes before Stage 2 (edit `eval_docs.txt` deliberately, regenerate,
+re-review). USACE is under-represented in domain_qa (31% of items vs 48% of train tokens) because
+its manuals yield fewer scoreable closed-book facts (17% kept vs ~30% elsewhere): report `qa_acc`
+by publisher before reading the aggregate. `exact_match` treats number words and digits as
+different; items that relied on it were rejected rather than changing the scorer mid-baseline.
+**Baselines on this set** (`results/table.md`; the old rows were removed): Base qa_acc 0.139,
+grounded_acc 0.852, cite_valid 0.130, cite_supported 0.102, vocab_recall 0.719, halluc_rate 0.882.
+Instruct 0.115 / 0.898 / 0.833 / 0.787 / 0.786 / 0.013. lm-eval unchanged. A spot check of 10 judge
+verdicts on the new items against their gold text found no wrong verdicts. qa_acc by publisher (Base / Instruct, n): USACE
+0.100 / 0.075 (40), FEMA 0.200 / 0.200 (45), FHWA 0.069 / 0.034 (29), NIST 0.200 / 0.133 (15),
+NASA 0 / 0 (1). The cells hold 0-9 correct answers, too few to rank publishers; CPT deltas per
+publisher are what they are for.
