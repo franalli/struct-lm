@@ -820,6 +820,30 @@ training when they came up; its halfway eval showed domain val perplexity down o
 it doesn't (then the documents' prior exposure is the likelier explanation, worth a per-document
 check of base perplexity against publication date).
 
+## 2026-09-27: Reference model is the previous stage's checkpoint, not the base (user decision)
+**Context:** DPO and GRPO both regularise toward a frozen reference model, and it's easy to read
+"the reference" as the base. It isn't. With LoRA and `ref_model=None`, TRL 0.29.1 uses the policy
+with its adapter disabled as the reference, i.e. the model `model.init_from` loaded, which is the
+previous stage's merged checkpoint.
+**Options:** the previous stage's checkpoint (what LoRA plus merge-between-stages gives for free) vs one
+fixed anchor for every stage (the base or `cpt-8b`, which needs an explicit `ref_model`: a second 8B
+copy in memory).
+**Chose:** the previous stage.
+- **DPO:** reference = the SFT checkpoint (`dpo.yaml` `init_from: checkpoints/sft-merged`). `beta`
+  scales the policy/reference log-ratios, so DPO's implicit KL constraint measures drift from SFT.
+  This also matches the pairs, which are sampled from the SFT model.
+- **GRPO:** reference = the DPO checkpoint (`grpo.yaml` `init_from: checkpoints/dpo-merged`). Its KL
+  term, and the `kl` TRL logs, measure drift from DPO. `grpo.yaml` sets `beta: 0.0` for now, so
+  there is no KL term (TRL doesn't build a reference at all) until beta is raised.
+- A fixed base anchor would penalise the changes the earlier stages were meant to make (DPO anchored
+  to the base would pull back SFT's instruction following).
+**Consequence for the write-up:** each stage's KL (and DPO's reward margins) is drift within that
+stage. It can't be read as distance from the base, and no term constrains cumulative drift from the
+base. Only the same eval (KPI + lm-eval regression) run on every merged checkpoint measures that.
+**Revisit if:** the lm-eval regression accumulates across SFT -> DPO -> GRPO while each stage's own
+KL stays small. Then anchor the late stages to an earlier checkpoint (explicit `ref_model`) and log
+that KL too.
+
 ## 2026-09-27: Stage 2 ablation rules, read against a measured noise floor (pre-registered; user decision)
 **Context:** `cpt-8b` finished: against base-8b, train-slice perplexity -8.3%, domain val -2.3%, general
 val +0.4%, train/val gap 11.2% -> 18.5% (+7.2 points). By the rule above that is the "barely moved"

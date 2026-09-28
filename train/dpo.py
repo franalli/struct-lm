@@ -4,8 +4,9 @@ Data: JSONL of {"prompt": [...messages], "chosen": [...messages], "rejected": [.
 Pairs can come from judge.py scoring N samples of the SFT model (best vs worst), which
 keeps preferences on-policy.
 
-With LoRA, ref_model=None makes TRL use the adapter-disabled base as the frozen
-reference, so no second model copy sits in memory.
+With LoRA, ref_model=None makes TRL use the adapter-disabled model as the frozen
+reference, so no second model copy sits in memory. That is the `init_from` checkpoint
+(the merged SFT model), not the base: beta constrains drift from SFT.
 """
 
 from common import load_model_and_tokenizer, lora_config, parse_config
