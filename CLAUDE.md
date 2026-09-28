@@ -37,7 +37,7 @@ make data                                       # all steps below, in order
 .venv/bin/python data/scripts/dedup.py          # docs.jsonl in place (exact + paragraph MinHash) + duplicates.jsonl
 .venv/bin/python data/scripts/pii.py            # docs.jsonl in place
 .venv/bin/python data/scripts/split.py          # -> train.jsonl / val.jsonl (document-level; eval pool stays in train)
-.venv/bin/python data/scripts/replay.py         # -> replay.jsonl (FineWeb-Edu, 10% of train tokens)
+.venv/bin/python data/scripts/replay.py         # -> replay.jsonl (FineWeb-Edu, 10% of train tokens) + general_val.jsonl (500k, last shard)
 .venv/bin/python data/scripts/tokenizer_coverage.py  # -> tokenizer_coverage.md (committed)
 .venv/bin/python data/scripts/stats.py           # tokens column in sources.csv + corpus card tables for notes/decisions.md
 ```
@@ -45,8 +45,11 @@ make data                                       # all steps below, in order
 - All outputs land in `data/processed/`; each step writes its own section of `stats.json`.
   Committed: `stats.json`, `tokenizer_coverage.md`. `dedup.py` and `pii.py` rewrite `docs.jsonl`
   in place, so after a change to any step rerun from `filter.py` (or `make data`).
-- Stage 2 reads `train.jsonl`, `val.jsonl` and `replay.jsonl` from the Modal volume:
-  `modal volume put struct-lm data/processed data/processed` (not done in Stage 1).
+- Stage 2 reads `train.jsonl`, `val.jsonl`, `replay.jsonl` and `general_val.jsonl` from the Modal
+  volume: `modal volume put --force struct-lm data/processed data/processed` after any data change.
+- `split.py` reports the 150-step rule's batch (`stats.json` split.seqs_per_step: 32 at ~20M
+  tokens, 64 at ~40M); set `gradient_accumulation_steps` in `train/configs/cpt*.yaml` to match
+  (`cpt.py` refuses an epoch outside 120-190 steps).
 - New sources: `crawl_index.py <index url or saved .html> --pattern REGEX --publisher P` appends
   rows to `data/sources.csv`, or add rows by hand. USACE and FEMA block scripts (Akamai 403): save
   the index page / PDFs from a browser (Chrome DevTools MCP works) into `data/raw/` (as
@@ -85,13 +88,18 @@ $M run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-
 
 ### Pull results, then score locally
 
+**Always pull every Modal run's results into the repo as soon as it finishes** (training logs,
+perplexity, lm-eval, KPI generations, latency), score it locally, and write its row to
+`results/table.md`. A result that exists only on the volume doesn't count as collected.
+
 Pull per run, never all of `results/`: `results/table.md` and `results/judge_cache.jsonl` are kept
 locally (a Modal run without `--generate-only` would start its own `table.md` on the volume).
 
 ```bash
-$M volume get --force struct-lm results/runs/<run> results/runs/
+$M volume get --force struct-lm results/runs/<run> results/runs/          # train_log, train_summary, generations
+$M volume get --force struct-lm results/ppl/<run>.json results/ppl/       # Stage 2+: perplexity
 $M volume get --force struct-lm results/lm_eval/<run> results/lm_eval/
-$M volume get --force struct-lm results/bench results/
+$M volume get --force struct-lm results/bench/<run>.json results/bench/
 
 set -a; . ./.env; set +a
 .venv/bin/python eval/run_eval.py --run-name base-8b --rescore --lm-eval-dir results/lm_eval \
@@ -106,9 +114,64 @@ set -a; . ./.env; set +a
 - If the output reports `judge_failed` (Mistral 429s), rerun the same command: failed verdicts
   aren't cached, and cached ones are free.
 - Never delete `results/judge_cache.jsonl`. Editing a rubric re-judges everything it grades.
+- **Then update the README's figures and tables every time new results land:** rerun the stage's
+  report (Stage 2: `train/report.py` -> `results/curves/cpt.png`, `cpt_ppl.png`,
+  `results/train_runs.md`), which overwrites the plots in place and rewrites the README's generated
+  blocks (`<!-- stage2-tables:... -->` in Training, `<!-- results-table:... -->` in Results: never
+  edit inside them by hand). Embed any new figure in the README's write-up and update the prose
+  findings next to it. Every stage shows its train/val loss curves and its headline metric
+  (perplexity for CPT) as plots, not only tables.
 
 Smoke test: `--which kpi --limit 5 --no-judge`. Don't use `make eval`: that target is stale (it
 passes flags `run_eval.py` doesn't have).
+
+### Stage 2: CPT (Modal)
+
+```bash
+M=.venv/bin/modal   # from the repo root; one pipeline.remote() per launch, so --detach is safe
+# smoke tests (20 steps): main, 8B full-parameter (2 GPUs), 2-GPU LoRA scaling
+$M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-cpt --smoke --steps train,merge,ppl
+$M run eval/modal_app.py --which kpi --model /vol/checkpoints/smoke-cpt --run-name smoke-cpt --limit 5 --no-judge --generate-only
+$M run train/modal_train.py --config train/configs/cpt_8b_full.yaml --run-name smoke-8b-full --gpus 2 --smoke --steps train,merge
+$M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-fsdp --gpus 2 --smoke --steps train \
+  --overrides "training.gradient_checkpointing=false training.eval_strategy=no"
+# reference row (base-8b already has lm-eval, KPI generation and latency from Stage 0)
+$M run --detach train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b --steps ppl
+# main run: train, read the curve, then merge + perplexity + eval
+$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b --steps train
+$M run --detach train/modal_train.py --run-name cpt-8b --steps merge,ppl,eval
+# ablations: A replay, B 8B full-parameter (2 GPUs), C 2-GPU LoRA scaling (throughput only)
+$M run --detach train/modal_train.py --config train/configs/cpt_replay10.yaml --run-name cpt-8b-replay10
+$M run --detach train/modal_train.py --config train/configs/cpt_8b_full.yaml --run-name cpt-8b-full --gpus 2
+$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-fsdp2 --gpus 2 --steps train \
+  --overrides "training.gradient_accumulation_steps=4 training.gradient_checkpointing=false training.eval_strategy=no run.stop_at_step=100"
+# pull per run, then score locally (no --chat: every Stage 2 checkpoint is a base model)
+$M volume get --force struct-lm results/runs/<run> results/runs/
+$M volume get --force struct-lm results/ppl/<run>.json results/ppl/
+.venv/bin/python eval/run_eval.py --run-name cpt-8b --rescore --lm-eval-dir results/lm_eval \
+  --ppl-dir results/ppl --model /vol/checkpoints/cpt-8b
+.venv/bin/python train/report.py   # -> results/train_runs.md, results/curves/cpt.png, cpt_ppl.png
+.venv/bin/python eval/ppl_compare.py base-8b cpt-8b   # paired bootstrap CIs, nats and % ppl
+# noise floor and LR-up (decisions.md, ablation rules): same config, one change each
+$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-seed1 --overrides "training.seed=1"
+$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-lr2x --overrides "training.learning_rate=2.0e-4"
+```
+
+- Override values go through YAML: write floats with a dot (`2.0e-4`; PyYAML reads `2e-4` as a
+  string), and `no`/`yes`/`on`/`off` stay strings (`common.parse_config`).
+- A delta between runs counts only beyond the seed floor (`cpt-8b` vs `cpt-8b-seed1`) and, for
+  perplexities, with a 95% document-bootstrap interval excluding 0 (`eval/ppl_compare.py`).
+- `run_lm_eval.sh` passes model_args as JSON with `limit_mm_per_prompt={"image": 0}` (from Stage 2;
+  a merged checkpoint otherwise fails vLLM's dummy-image profiling).
+
+- Steps: `train` (`cpt.py`) -> `merge` (`merge.py` into `/vol/checkpoints/<run>`) -> `ppl`
+  (`eval/perplexity.py`), `eval` (`modal_app.py`'s lm_eval and kpi_eval `--generate-only`) and
+  `latency` in parallel. `latency` is opt-in (`--steps ...,latency`): it measures the architecture
+  and serving setup, not the weights, so it runs per deployed checkpoint, not per ablation (cost). The volume mirrors the repo (cwd `/vol`): `checkpoints/_train/<run>` holds the
+  adapter and trainer checkpoints, and relaunching a run resumes from the newest.
+- Per run on the volume: `results/runs/<run>/train_log.jsonl` (every step) and `train_summary.json`,
+  `results/ppl/<run>.json`, plus the usual lm_eval / runs / bench outputs for evaluated runs.
+- Base rows get perplexity by rescoring them with `--ppl-dir results/ppl` too.
 
 ## Decisions (rules to keep)
 
@@ -119,8 +182,17 @@ passes flags `run_eval.py` doesn't have).
    `run_lm_eval.sh` exits on `CHAT=1`, `modal_app.py` and `run_eval.py` refuse an Instruct model
    without `--chat`, `merge_lm_eval` skips chat-template results files. (lm-eval renders the
    template to text and re-encodes it, so Mistral control tokens arrive as ordinary text.)
-3. **Tokenizer:** Tekken via mistral-common, `tokenizer_mode=mistral` everywhere (vLLM, lm-eval,
-   `extract.py`), and `limit_mm_per_prompt={"image": 0}`.
+3. **Tokenizer and vLLM loading:** Tekken via mistral-common, `tokenizer_mode=mistral` everywhere
+   (vLLM, lm-eval, `extract.py`), `limit_mm_per_prompt={"image": 0}`, and `config_format=hf`
+   (`run_eval.py`, `run_lm_eval.sh`, `serve_vllm.sh`): without it the hub base loads through vLLM's
+   Mistral-native implementation and merged checkpoints through the HF one, which confounds every
+   eval delta between them. Compare Stage 2+ rows against `base-8b-hf` (the base re-saved through
+   `merge.py`: `modal_train.py --model <hub id> --run-name base-8b-hf --steps merge,eval`), not the
+   Stage 0 `base-8b`; `config_format=hf` can't load the hub repo itself (its
+   `consolidated.safetensors`). Every merged config carries `"apply_yarn_scaling": false`
+   (`merge.py`): vLLM 0.29 otherwise applies YaRN attention scaling the model doesn't use (HF path
+   perplexity 7.23 vs 6.89). Check any new serving path with `eval/vllm_ppl.py` against
+   `perplexity.py`'s `ppl_val_slice` before trusting its evals.
 4. **Generation on Modal, judging local:** Modal KPI runs always use `--generate-only`.
 5. **One grounded prompt for all models** (`prompts.GROUNDED_FORMAT`, a one-line format example).
    A worked example with its own passages made Instruct refuse 130/131.
@@ -130,7 +202,9 @@ passes flags `run_eval.py` doesn't have).
 7. **Metrics:** `qa_acc` (rules), `grounded_acc` (judge, correct per gold, citations ignored),
    `cite_valid` (rules), `cite_supported` (judge, correct and backed by cited passages),
    `vocab_recall` (judge), `halluc_rate` (answered an unanswerable question; lower is better),
-   plus `mmlu` / `gsm8k` (strict-match) / `hellaswag` (acc_norm).
+   plus `mmlu` and its four groups / `gsm8k` (strict-match) / `hellaswag` (acc_norm), and from
+   Stage 2 `ppl_train` / `ppl_domain_val` / `ppl_general_val` (`eval/perplexity.py`, lower is
+   better; `ppl_train` is measured on a train slice, for base too).
 8. **Judge:** decide by rule anything a rule can decide, before the judge sees it: empty or
    citation-only answers, answers citing no provided passage, the exact abstain phrase, and vocab
    outputs with no definition line. Give the judge only what the verdict depends on (the
@@ -143,14 +217,27 @@ passes flags `run_eval.py` doesn't have).
    `eval/tasks/rejects.jsonl` (task + match + reason). Review rejects only for defects (wrong gold,
    correct answer scored wrong, wrong answer scored right, general knowledge/trivia/one example's
    value), never for difficulty, and finishes before any model generation.
-10. **Training:** LoRA targets the language model only, with the regex single-quoted in YAML;
-    `train/merge.py` copies `tekken.json` and `processor_config.json`. SFT/DPO/GRPO data and chat
-    template work are deferred until the user asks.
+10. **Training:** LoRA targets the language model only, with the regex single-quoted in YAML (full
+    fine-tuning freezes the vision tower and projector). CPT windows come from `train/packing.py`
+    (BOS + document + EOS as ids, 4,096-token windows), never TRL's packing, which truncates each
+    document and appends EOS as text. Effective batch: the 150-step rule. `train/merge.py` copies
+    the base's non-weight files (never `params.json` / `consolidated.safetensors`) and checks the
+    weight names match the base. SFT/DPO/GRPO data and chat template work are deferred until the
+    user asks.
+11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
+    reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
+    GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
+    from the previous stage, not from the base. Drift from the base shows only in the eval rows.
+    `grpo.yaml` has `beta: 0.0` (no KL term, no reference) until raised.
 
 ## Known gaps
 
-- `train/cpt.py` still reads a pre-packed `data/packed/cpt`; Stage 2 switches it to
-  `data/processed/{train,val,replay}.jsonl` with TRL packing (`SFTConfig(packing=True, max_length=4096)`).
-- Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/` are false
-  positives (`sys.path` imports; vLLM and lm-eval are only installed in the Modal image).
+- Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/`, and about
+  `common` / `packing` / `modal_app` imports in `train/`, are false positives (`sys.path` imports;
+  vLLM and lm-eval are only installed in the Modal image).
+- `train/configs/sft.yaml` and `dpo.yaml` still use `warmup_ratio`, which transformers 5 removed
+  (`warmup_steps` takes a float in [0, 1) as a ratio), and none of sft/dpo/grpo sets `tf32: true`
+  yet (on from Stage 3; Stage 2 runs without it for uniformity); fix both when those stages start.
+- Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
+  modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

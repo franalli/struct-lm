@@ -12,8 +12,15 @@
     "adversarial": 76
   },
   "mmlu": 0.7683,
+  "mmlu_stem": 0.7323,
+  "mmlu_hum": 0.7071,
+  "mmlu_soc": 0.8616,
+  "mmlu_other": 0.8053,
   "gsm8k": 0.7945,
   "hellaswag": 0.8006,
+  "ppl_train": 6.1849,
+  "ppl_domain_val": 6.88,
+  "ppl_general_val": 8.1513,
   "model": "mistralai/Ministral-3-8B-Base-2512",
   "chat": false
 }

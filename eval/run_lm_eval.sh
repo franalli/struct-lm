@@ -27,13 +27,23 @@ if [[ ${CHAT:-0} == 1 ]]; then
 fi
 mkdir -p "$OUT"
 
-# model_args are passed straight to vllm.LLM:
-#   gpu_memory_utilization=0.85  leaves headroom for lm-eval's own tensors next to vLLM's KV cache
-#   max_model_len=4096           the longest 5-shot MMLU prompts fit; a smaller KV cache runs faster
-#   seed=0                       with --seed 0 below, reruns of a checkpoint give identical numbers
+# model_args are passed straight to vllm.LLM, as JSON (lm-eval parses a JSON object whole; its
+# key=value form can't carry the nested dict below):
+#   gpu_memory_utilization 0.85  leaves headroom for lm-eval's own tensors next to vLLM's KV cache
+#   max_model_len 4096           the longest 5-shot MMLU prompts fit; a smaller KV cache runs faster
+#   seed 0                       with --seed 0 below, reruns of a checkpoint give identical numbers
+#   limit_mm_per_prompt image 0  text only (CLAUDE.md rule 3): vLLM then never builds Ministral 3's
+#                                image processor, which fails on merged checkpoints (a dummy-image
+#                                profiling pass: notes/contributions.md). Added 2026-09-27 for
+#                                Stage 2; prompts are text either way, so scores should not move
+#                                (the base-8b row is re-run with it as a check).
+#   config_format hf             the HF implementation for every checkpoint (see run_eval.py): the
+#                                hub base otherwise goes through vLLM's Mistral-native one, which a
+#                                merged checkpoint can't, so their deltas would mix in the path.
 # --batch_size auto lets vLLM schedule requests itself; it is not a fixed batch.
+MODEL_ARGS=$(printf '{"pretrained": "%s", "tokenizer_mode": "%s", "dtype": "bfloat16", "gpu_memory_utilization": 0.85, "max_model_len": 4096, "seed": 0, "limit_mm_per_prompt": {"image": 0}, "config_format": "hf"}' "$MODEL" "$TOKENIZER_MODE")
 lm_eval --model vllm \
-  --model_args "pretrained=$MODEL,tokenizer_mode=$TOKENIZER_MODE,dtype=bfloat16,gpu_memory_utilization=0.85,max_model_len=4096,seed=0" \
+  --model_args "$MODEL_ARGS" \
   --tasks mmlu,gsm8k,hellaswag \
   --num_fewshot 5 \
   --batch_size auto \

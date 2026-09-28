@@ -1,0 +1,9 @@
+{
+  "model": "mistralai/Ministral-3-8B-Base-2512",
+  "config_format": "mistral",
+  "no_yarn_scale": false,
+  "windows": 49,
+  "tokens": 200655,
+  "nats": 1.93063,
+  "ppl_val_slice": 6.8939
+}

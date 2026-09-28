@@ -12,6 +12,10 @@
     "adversarial": 76
   },
   "mmlu": 0.7612,
+  "mmlu_stem": 0.7349,
+  "mmlu_hum": 0.6914,
+  "mmlu_soc": 0.8541,
+  "mmlu_other": 0.8017,
   "gsm8k": 0.8552,
   "hellaswag": 0.8013,
   "model": "mistralai/Ministral-3-8B-Instruct-2512-BF16",

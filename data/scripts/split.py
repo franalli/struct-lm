@@ -6,23 +6,31 @@ ones it saw). Per publisher, max(1, round(5% of its documents)) go to val, so ev
 held-out document; they are picked by sha256(slug), which is stable across runs. Every document
 the eval samples from (eval/tasks/eval_docs.txt) stays in train.
 
-No tokenising or packing here: TRL packs the text at load time (SFTConfig(packing=True,
-max_length=4096)). This reports the packed sequence count at 4,096 tokens (documents
-concatenated with EOS between them, cut into fixed windows) so Stage 2 can size its schedule.
+No tokenising or packing here: train/packing.py packs at load time (each document as
+BOS + tokens + EOS, concatenated, cut into fixed 4,096-token windows, the last partial window
+dropped). This reports that window count, and the effective batch the 150-step rule gives it, so
+Stage 2 can size its schedule: one epoch of about 150 optimizer steps, the batch a power of two
+in sequences (32 at ~20M tokens, 64 at ~40M, 128 at ~80M; notes/decisions.md).
 """
 
 import argparse
 import hashlib
+import math
 from collections import defaultdict
 
 from common import eval_docs, read_jsonl, update_stats, write_jsonl
 
 SEQ_LEN = 4096
-BATCH_TOKENS = 256 * SEQ_LEN  # ~1M-token effective batch
+TARGET_STEPS = 150  # optimizer steps per epoch: enough for LoRA to settle, a sane LR schedule
 
 
 def packed(docs: list[dict]) -> int:
-    return sum(d["n_tokens"] + 1 for d in docs) // SEQ_LEN  # +1: EOS between documents
+    return sum(d["n_tokens"] + 2 for d in docs) // SEQ_LEN  # +2: BOS and EOS around each document
+
+
+def seqs_per_step(n_seqs: int) -> int:
+    """Effective batch in sequences: the power of two closest to one epoch in TARGET_STEPS."""
+    return 2 ** round(math.log2(n_seqs / TARGET_STEPS))
 
 
 def main() -> None:
@@ -76,7 +84,8 @@ def main() -> None:
         "publishers_without_val": no_val,
         "seq_len": SEQ_LEN,
         "packed_seqs": {"train": packed(train), "val": packed(val)},
-        "steps_per_epoch_at_1M_tokens": round(packed(train) * SEQ_LEN / BATCH_TOKENS, 1),
+        "seqs_per_step": seqs_per_step(packed(train)),
+        "steps_per_epoch": math.ceil(packed(train) / seqs_per_step(packed(train))),
     }
     update_stats("split", stats)
     for pub, s in stats["by_publisher"].items():
@@ -89,8 +98,8 @@ def main() -> None:
         f"{len(held)} eval docs held in train"
     )
     print(
-        f"packed at {SEQ_LEN}: {stats['packed_seqs']}; "
-        f"{stats['steps_per_epoch_at_1M_tokens']} optimizer steps/epoch at ~1M tokens/step"
+        f"packed at {SEQ_LEN}: {stats['packed_seqs']}; 150-step rule: "
+        f"{stats['seqs_per_step']} seqs/step, {stats['steps_per_epoch']} optimizer steps/epoch"
     )
     if no_val:
         print(f"WARNING: no held-out document possible for {no_val} (all their docs are eval docs)")

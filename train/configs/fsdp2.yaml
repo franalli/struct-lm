@@ -1,0 +1,25 @@
+# accelerate config for the 2 x H100 FSDP2 runs (train/modal_train.py --gpus 2 launches it):
+#   ablation B, 8B full-parameter: cpt_8b_full.yaml (2 GPUs x 2 x 8 = 32 seqs/step)
+#   ablation C, scaling: cpt.yaml --override training.gradient_accumulation_steps=4
+#     training.gradient_checkpointing=false training.eval_strategy=no run.stop_at_step=100
+#     (2 GPUs x 4 x 4 = the same 32 seqs/step as the 1-GPU run)
+# Mixed precision bf16 computes in bf16 and keeps the sharded weights in their load dtype (fp32
+# for B: the master copy). Notes:
+#   - wrap the text decoder layer by name; the model's _no_split_modules also lists Pixtral layers
+#   - FULL_STATE_DICT: with the FSDP2 default (sharded) Trainer.save_model writes no adapter
+#   - activation checkpointing through FSDP; the Trainer refuses both kinds at once
+#   - cpu_ram_efficient_loading off: it calls tie_weights(), which would tie the 8B's lm_head to
+#     its input embeddings (Mistral3Config defaults tie_word_embeddings to True)
+distributed_type: FSDP
+mixed_precision: bf16
+num_machines: 1
+num_processes: 2
+fsdp_config:
+  fsdp_version: 2
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_transformer_layer_cls_to_wrap: Ministral3DecoderLayer
+  fsdp_reshard_after_forward: true
+  fsdp_state_dict_type: FULL_STATE_DICT
+  fsdp_activation_checkpointing: true
+  fsdp_cpu_ram_efficient_loading: false
+  fsdp_offload_params: false

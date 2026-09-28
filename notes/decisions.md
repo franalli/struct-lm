@@ -612,3 +612,442 @@ verdicts on the new items against their gold text found no wrong verdicts. qa_ac
 0.100 / 0.075 (40), FEMA 0.200 / 0.200 (45), FHWA 0.069 / 0.034 (29), NIST 0.200 / 0.133 (15),
 NASA 0 / 0 (1). The cells hold 0-9 correct answers, too few to rank publishers; CPT deltas per
 publisher are what they are for.
+
+## 2026-09-27: Stage 2 CPT hyperparameters (pre-registered before the main run)
+**Context:** Stage 2 continues pre-training `Ministral-3-8B-Base-2512` on `train.jsonl` (234 documents,
+19.42M Tekken tokens, 4,741 windows of 4,096), one epoch, LoRA, then merges it into an ordinary
+checkpoint. Every number below is fixed before the first run so the result can't tune it.
+**Chose** (`train/configs/cpt.yaml`):
+- **LoRA r=64, alpha=128, dropout 0.05, on q/k/v/o/gate/up/down of the language model.** CPT adds
+  knowledge, and the MLPs are where it goes; attention-only LoRA underperforms for CPT. r=64 gives
+  ~178M trainable parameters (238 modules, 34 layers x 7), alpha = 2r is the usual scale, and 0.05
+  dropout is light regularisation for a single pass. The regex is anchored on `language_model`, so
+  the vision tower stays frozen (rule 10).
+- **LR 1e-4, cosine to zero, 3% warmup (~4 steps), weight decay 0.** LoRA wants roughly 10x full
+  fine-tuning's LR (1e-5, used by ablation B). Warmup is short because the schedule is short.
+  Weight decay on adapters pulls them toward zero, i.e. toward the base, which one epoch doesn't
+  need.
+- **Effective batch: the 150-step rule.** Size the batch for about 150 optimizer steps in the
+  epoch, the least that lets LoRA settle and keeps the schedule sane, as a power of two in
+  sequences: 4,741 windows / 150 = 31.6, so 32 sequences (micro-batch 4 x accumulation 8,
+  131k tokens), 149 steps. At ~40M tokens it becomes 64, at ~80M 128; the step count stays ~150.
+  `split.py` computes it (`stats.json` split.seqs_per_step) and `cpt.py` refuses an epoch outside
+  120-190 steps. This replaces the ~1M-token batch assumed in the Stage 1 packing note (18.5 steps,
+  too few). **Not a second epoch** to restore steps: it would show every token twice, widen the
+  train/val gap and confound the ablations.
+- **bf16 autocast with gradient checkpointing; SDPA, not flash-attn.** Peak estimated at ~60 GB of 80
+  (full-vocab logits at 4 x 4,096 x 131k dominate: ~26 GB across their fp32 copies). Eval batch 4,
+  not the default 8, which would double that. Every window is a full causal sequence, where SDPA
+  already runs its FlashAttention-2 kernel; the flash-attn package only matters for padding-free
+  packing and would need a CUDA build in the image.
+- **Eval every 25 steps on 49 val windows (~200k tokens), spread across `val.jsonl`; save every 50,
+  keep 2; log every step.** Six eval points on a 149-step curve, each ~30 s. A save is ~20 min of
+  training, the most a restart loses (`cpt.py` resumes from the newest checkpoint).
+- **Own packing, not TRL's.** `train/packing.py`: each document as BOS + tokens + EOS (ids), all
+  concatenated in file order, cut into 4,096-token windows, the last partial window dropped; the
+  trainer shuffles windows. TRL's default packing keeps only the first 4,096 tokens of each document
+  (~1M of 19.4M), its raw-text path appends EOS as the string `</s>`, which Tekken encodes as text,
+  and its `max_length` defaults to 1,024 (`notes/contributions.md`). `eval/perplexity.py` uses the
+  same windows, so trainer eval_loss and the perplexity columns agree by construction.
+- **`report_to: none`.** The curve is `results/runs/<run>/train_log.jsonl`, written line by line.
+**Evidence:** packing dry run on the Mac: train 4,741 / val 296 / train+replay 5,217 / general_val
+122 windows, each equal to `sum(n_tokens + 2) // 4096` from the files (tokeniser matches data
+prep's counts); 234 BOS for 234 documents.
+**Revisit if:** val loss plateaus in the first third of the epoch (LoRA capacity: r=128 or full
+fine-tuning), or eval loss rises while train loss falls (LR too high for 149 steps).
+
+## 2026-09-27: Stage 2 decision rule, extended with general perplexity (pre-registered)
+**Context:** the CPT success criteria entry above fixes the domain side. The forgetting side needs a
+bound too, set before the numbers exist.
+**Chose:** per checkpoint, `eval/perplexity.py` reports `ppl_train` (49 windows spread across
+`train.jsonl`: tokens a CPT run saw once; user decision: measured, not the logged training loss,
+so base gets the same number), `ppl_domain_val` (all of `val.jsonl`, and per publisher),
+`ppl_general_val` (`general_val.jsonl`: 500k FineWeb-Edu tokens from the last shard of
+sample-10BT, disjoint from replay) and `ppl_val_slice` (the trainer's eval windows, a merge check).
+CPT worked if, against base-8b:
+- `ppl_domain_val` is down at least 20%;
+- the train/val gap grows by under ~10 points over base's; over ~25 points means memorising. The
+  gap is `ppl_domain_val / ppl_train - 1` on the same slices for both models, and the rule bounds
+  CPT's gap minus base's (user decision): val documents differ from train documents (val is 76%
+  USACE by tokens, train 48%), so base has a gap of its own before any training, and only the
+  growth is what training added;
+- `ppl_general_val` is up less than 3%.
+The corpus is final for Stage 2 at 20.6M tokens (user decision, 2026-09-27): no expansion before
+these runs.
+**Expected shape** (to tell a result from a bug): domain val perplexity down 25-40%; `qa_acc` and
+`vocab_recall` up a modest but clear amount; grounded, citation and hallucination metrics roughly
+flat (SFT's and DPO's job); general perplexity up 2-6% and MMLU down 0.5-2 points without replay,
+roughly flat with it. A row where everything improves, or nothing moves, is the one to distrust.
+20M tokens is the bottom of the 20-50M range; the `qa_acc` gain per token is itself a finding.
+
+## 2026-09-27: Stage 2 ablations: replay, 3B full-parameter, 2-GPU FSDP (pre-registered)
+**Context:** three questions every domain-adaptation engagement has to answer, each run varying one
+thing against the main run (`cpt-8b`).
+**Chose:**
+- **A, `cpt-8b-replay10`** (`cpt_replay10.yaml`): the main config with `replay.jsonl` (10% of train
+  tokens, FineWeb-Edu) mixed into the windows: 5,217 windows, 164 steps at the same 32 sequences
+  per step. Question: how much of `ppl_general_val` / MMLU does replay protect, at what cost in
+  `ppl_domain_val`.
+- **B, `cpt-3b-full`** (`cpt_3b_full.yaml`): full-parameter CPT of `Ministral-3-3B-Base-2512` on the
+  same windows and batch, LR 1e-5, vision tower and projector frozen. The weights are fp32 with bf16
+  autocast: loaded in bf16, the Trainer applies AdamW updates to the bf16 weights directly (no fp32
+  master copy), and a 1e-5 step is below bf16's resolution for most weights, so the model would
+  barely move. 8-bit AdamW (bitsandbytes) keeps the optimizer state small enough for one H100, and
+  micro-batch 2 x 16 because 4 x 8 was estimated at 70-73 GB. Question: heavy adaptation of a small
+  model vs light adaptation of a large one, on domain gain and on forgetting, each measured against
+  its own base: a `base-3b` reference row gets perplexity, lm-eval and the KPI eval (user decision;
+  without it, model size and adaptation are confounded).
+- **C, `cpt-8b-fsdp2`** (`cpt.yaml` + `fsdp2.yaml`): the main config on 2 x H100 with FSDP2, 2 GPUs x
+  micro-batch 4 x accumulation 4 = the same 32 sequences per step, stopped at step 100 by a callback
+  rather than `max_steps`, so the cosine schedule still spans the 149-step epoch and both runs see
+  the same LR at each step. Activation checkpointing through FSDP (the Trainer's is off; it refuses
+  both), `FULL_STATE_DICT` (the FSDP2 default would save no adapter), `cpu_ram_efficient_loading`
+  off (it calls `tie_weights()`, which would tie the 8B's `lm_head` to its embeddings). No eval, no
+  merge: a systems measurement. Question: tokens/s on 1 vs 2 GPUs, and whether the loss curves
+  match (mean relative gap of their 10-step moving averages, steps 10-100; the ranks shard the data
+  differently, so the curves agree statistically, not batch for batch).
+**Evidence:** `results/train_runs.md`, `results/curves/cpt.png` (`train/report.py`) and the table rows,
+after the runs.
+**Revisit if:** B doesn't fit at micro-batch 2 (then paged 8-bit AdamW, or plain Trainer without
+SFTTrainer's token-accuracy copy of the logits).
+
+## 2026-09-27: Numeric precision: bf16 compute, fp32 adapters, TF32 underneath, fp32 merge
+**Context:** bf16 and TF32 are not alternatives; they apply to different operations. bf16 is a
+16-bit storage and compute format (8 exponent bits, fp32's range; 7 mantissa bits). TF32 is not a
+storage format: it is a tensor-core mode for matmuls whose inputs are fp32, which rounds the
+mantissa to 10 bits inside the multiply and returns fp32, several times faster than true fp32. It
+is one flag; nothing in the model changes dtype.
+**Chose** (every LoRA stage: CPT, SFT, DPO, GRPO):
+- **Base weights in bf16, frozen** (`model.dtype: bfloat16`): half fp32's memory, and every forward
+  matmul runs on bf16 tensor cores.
+- **LoRA A and B in fp32, with fp32 AdamW states.** They are the only parameters updated, and each
+  step adds a small number to a small number; in bf16 those updates round to nothing. This is the
+  mixed-precision "fp32 master weights" pattern, applied to the trainable part only. No code needed:
+  every stage goes through a TRL trainer's `get_peft_model`, and PEFT (0.21) upcasts bf16 adapters to
+  fp32 by default (`autocast_adapter_dtype=True`).
+- **bf16 autocast** (`bf16: true`): matmuls and attention in bf16, reductions (softmax, norms, the
+  loss) in fp32. SDPA's FlashAttention-2 kernel needs bf16 or fp16 inputs, so this is also what
+  opens the fast attention path (Stage 2 hyperparameters entry).
+- **TF32 on** (`tf32: true`): it speeds up whatever matmuls still run in fp32 (the LoRA path computed
+  in fp32, ops next to the norms and the loss). It costs nothing and changes nothing else; without
+  it those matmuls take the slow full-fp32 path.
+- **Merge in fp32.** `merge.py` loads the base in fp32, merges, and casts to bf16 once before saving,
+  so W + BA is added exactly and rounded a single time. Merging into a bf16 base (PEFT does
+  `W += delta.to(W.dtype)`) rounds the delta to bf16 and then rounds the sum again. It needs ~34 GB
+  of RAM for the 8B model. A full-parameter output (ablation B) is already fp32, so it gets the same
+  single cast to bf16 on load.
+**Rejected:** fp16 (narrower range, needs loss scaling, no reason for it on an H100); bf16 adapters
+(the updates vanish); fp8 training (a production-scale technique; Ministral's FP8 checkpoints are
+inference artefacts).
+**Full-parameter case (ablation B, 3B):** the one run where the base weights are updated, so they
+are held in fp32 (`dtype: float32`) with bf16 autocast for compute, and 8-bit AdamW
+(`adamw_bnb_8bit`; paged 8-bit AdamW is the fallback if it doesn't fit) keeps the optimizer state on
+one card. The 8B equivalent is ~16 bytes per parameter (fp32 weight 4 + gradient 4 + Adam m and v 8),
+~127 GB for the ~7.9B language model, well past one H100's 80 GB before activations; even 8-bit Adam
+(~10 B/param, ~79 GB) leaves no room for them. That is the memory argument for LoRA that ablation B
+is there to quantify.
+**Status at this entry:** bf16 weights, `bf16: true`, fp32 adapters and the 3B fp32/8-bit config are
+in the code. Still to do: `tf32: true` is set in no training config, and `merge.py` currently merges
+into a bf16 base (`from_pretrained(..., dtype=torch.bfloat16)` before `merge_and_unload()`).
+**Revisit if:** a stage trains adapters outside a TRL trainer (then set the adapter dtype
+explicitly), or the merge moves somewhere with less than ~40 GB of RAM.
+
+## 2026-09-27: Ablation B redesigned: 8B full-parameter on 2 x H100, not 3B (user decision)
+**Context:** the pre-registered B (full-parameter CPT of the 3B against LoRA on the 8B) changed two
+things at once, method and model size, so whichever won, the result couldn't say why. It was set up
+that way only to keep every run on one GPU. Decided before any B run (the 3B only ran a 20-step
+smoke test); this supersedes B in the ablations entry above and the "Full-parameter case (ablation
+B, 3B)" paragraph of the numeric precision entry.
+**Options:** 3B full vs 8B LoRA (confounded; plus a base-3b row to take deltas from) vs 8B full vs 8B
+LoRA (same model, same tokens, only the parameterisation differs).
+**Chose:** `cpt-8b-full` (`train/configs/cpt_8b_full.yaml`, `--gpus 2`): full-parameter CPT of the
+same 8B on the same 4,741 windows and 32 sequences per step (2 GPUs x micro-batch 2 x accumulation
+8, 149 steps), LR 1e-5 cosine, 3% warmup, one epoch, on 2 x H100 with FSDP2 (`fsdp2.yaml`).
+- Memory: the ~8.5B trainable language-model parameters (embeddings and `lm_head` included; vision
+  tower and projector frozen) at 16 bytes each in fp32 AdamW would be ~135 GB before activations,
+  past one H100. Sharded over two: fp32 master weights (~18 GB per GPU) + fp32 gradients (~17 GB) +
+  8-bit AdamW state (~8.5 GB), bf16 compute through FSDP mixed precision, FSDP activation
+  checkpointing, micro-batch 2: ~60-65 GB per GPU estimated, confirmed or refuted by the smoke test.
+- Optimizer: torchao `AdamW8bit` (`optim: adamw_torch_8bit`), not bitsandbytes' paged 8-bit AdamW:
+  FSDP2 shards parameters as DTensors, which torchao's low-bit optimizer states are built for;
+  bitsandbytes 0.50's 8-bit kernels expect plain tensors (its FSDP support covers the FSDP1 state
+  dict). Paged AdamW would only matter under memory pressure.
+- No fused cross-entropy: Liger-Kernel 0.8.3 patches no `mistral3` / `ministral3` model type
+  (`notes/contributions.md`). The full-vocab logits cost ~13 GB per GPU at micro-batch 2, which the
+  estimate includes.
+- No intermediate checkpoints (`save_strategy: "no"`): a full checkpoint is ~35 GB of fp32 weights
+  plus sharded 8-bit optimizer state, for a ~1 h run; the final model is saved with
+  `FULL_STATE_DICT` and merged (cast to bf16 once) like the LoRA runs.
+- Each rank loads the fp32 model on CPU before sharding (`cpu_ram_efficient_loading` off, see C),
+  so the 2-GPU container gets 128 GiB of RAM.
+C stays as it was (the main LoRA config on 2 GPUs, stopped at step 100), and is kept separate from
+B: a full-parameter step costs more compute than a LoRA step, so B's tokens/s is not a clean
+1-vs-2-GPU number (`train/report.py` compares only C with `cpt-8b`, and reports tokens/s per GPU).
+The 3B and the `base-3b` row are dropped.
+**Evidence:** smoke test (`smoke-8b-full`, 20 steps of 8 sequences): 8,489,553,920 trainable
+parameters; peak allocated 60.9 GB per GPU (the caching allocator reaches the 80 GB ceiling and
+frees cache to retry, logged as `expandable_segments ... OOM` warnings; shapes are fixed, so the
+20 steps are the steady state and micro-batch 2 stays); 12,699 tokens/s on 2 GPUs (6,350 per GPU,
+vs 6,028 for LoRA on one), so ~26 min of training for the epoch; torchao AdamW8bit ran under FSDP2;
+the `FULL_STATE_DICT` save merged with weight names equal to the base's. Step-1 loss 1.881 (LR 0)
+equals the LoRA smoke run's 1.878 on the same batch, so the full-parameter model loads intact; eval
+loss rose from base's 1.931 to 1.969 at step 10 and was back to 1.960 at step 20 (a first-steps
+bump; whether the full epoch recovers it is part of what B measures). The result states itself as
+"on the same 8B model and the same tokens, full-parameter CPT gained X on domain perplexity and lost
+Y on MMLU relative to rank-64 LoRA, at Z times the GPU-hours".
+**Revisit if:** the smoke test doesn't fit at micro-batch 2 (then chunked cross-entropy, e.g. Apple's
+model-agnostic cut-cross-entropy, before a smaller micro-batch), or torchao's optimizer fails under
+FSDP2 (then bitsandbytes `paged_adamw_8bit`).
+
+## 2026-09-27: TF32 from Stage 3; fp32 merge in; LR-up variant if CPT under-delivers (user decisions)
+**Context:** the numeric precision entry above left two items to do, and the main CPT run was already
+training when they came up; its halfway eval showed domain val perplexity down only ~2%.
+**Chose:**
+- **TF32 from Stage 3, not in Stage 2.** `cpt-8b` started without `tf32: true`, and A and C must
+  differ from it in one thing only. Under bf16 autocast almost no matmul runs in fp32 (autocast casts
+  matmul inputs to bf16 whatever the parameter dtype), so the effect is negligible either way; the
+  SFT/DPO/GRPO configs get `tf32: true` when those stages start.
+- **Merge in fp32: done** (`train/merge.py`), before any Stage 2 checkpoint was merged, so every
+  Stage 2 row goes through the same merge. It also sets bf16 on every sub-config, which the cast
+  alone leaves at float32 (`notes/contributions.md`).
+- **If `cpt-8b` ends under the pre-registered 20% drop in domain val perplexity**, the rule's own fix
+  is taken, one LR step up (not a second epoch, which would confound the ablations): a
+  `cpt-8b-lr2x` run at 2e-4 joins the ablation batch, proposed with it at the launch gate. The
+  hypothesis it tests against: the corpus is public US federal documents on the open web, very
+  likely in Ministral's pretraining data already, so there is less left to learn than the
+  pre-registered 25-40% assumed (base perplexity is 6.9 on these manuals).
+**Revisit if:** the LR-up run moves domain val perplexity much further (then 1e-4 was simply low), or
+it doesn't (then the documents' prior exposure is the likelier explanation, worth a per-document
+check of base perplexity against publication date).
+
+## 2026-09-27: Stage 2 ablation rules, read against a measured noise floor (pre-registered; user decision)
+**Context:** `cpt-8b` finished: against base-8b, train-slice perplexity -8.3%, domain val -2.3%, general
+val +0.4%, train/val gap 11.2% -> 18.5% (+7.2 points). By the rule above that is the "barely moved"
+branch (under the 20% drop; the gap growth and the general bound are within theirs), so the LR-up
+run is on. Ablation deltas against a -2.3% effect will be tenths of a point to a few points: without
+a measured run-to-run spread nobody can tell them from noise. Written before A and B launched and
+before the LR-up and seed runs finished.
+**Chose:**
+- **Noise floor, `cpt-8b-seed1`:** `cpt.yaml` with `seed: 1` (another LoRA init and data order;
+  `cpt.py` now seeds before building the model, so seeds reproduce from here on). It gets perplexity
+  and lm-eval. The floor for a metric is |seed1 - main| on it.
+- **Reading rule for any two runs:** a difference counts only if it exceeds the seed floor on that
+  metric and, for perplexities, its 95% paired bootstrap interval over documents excludes 0
+  (`eval/ppl_compare.py`; windows are reported too, but a document's windows are correlated). Every
+  delta is reported in nats per token and in % perplexity.
+- **LR-up, `cpt-8b-lr2x`:** continues as the Stage 3 starting point only if its domain-val gain over
+  `cpt-8b` beats the seed floor with `ppl_general_val` still under +3% of base. Otherwise 1e-4 stays.
+- **A, replay:** replay is adopted for Stages 3+ only if `ppl_general_val` or MMLU beats the main run's
+  by more than the seed floor, with domain val within 3% (relative perplexity) of the main run's.
+  Stated in advance: the main run forgot almost nothing (+0.4% general perplexity), so A may be null
+  on both axes. That is the finding ("at 20M tokens and 149 LoRA steps replay has nothing to
+  protect"), written up as such, not re-run at a bigger scale to make it bite.
+- **B, full vs LoRA:** written up on three axes against base-8b: domain gain (domain val perplexity),
+  general loss (`ppl_general_val`, MMLU), GPU-hours. LoRA stays the default unless full's extra
+  domain gain over LoRA beats the seed floor and is larger than its extra general loss. Reference
+  expectation: full gains more and forgets more (Biderman et al. 2024, "LoRA Learns Less and Forgets
+  Less").
+- **C, scaling:** systems only: tokens/s ratio and per-step loss agreement. A 1-GPU FSDP run of the
+  same config (if run) separates the code path from the GPU count.
+**Rejected:** re-splitting val and regenerating the tasks. Val already holds 12 held-out documents from
+all five publishers (1.21M tokens, 5.9%); the eval pool is the 234 train documents, so no val
+document feeds any task; and a new split would invalidate `cpt-8b`, base-8b's perplexity and the
+eval frozen this morning. USACE is 76% of val tokens, so `results/ppl/<run>.json` reports
+perplexity per publisher and per document next to the pooled number.
+**Evidence:** `results/ppl/*.json`, `eval/ppl_compare.py` output, `results/train_runs.md`.
+
+## 2026-09-28: LR-up verdict: 1e-4 stays (pre-registered rule applied)
+**Context:** `cpt-8b` landed in the "barely moved" branch, so `cpt-8b-lr2x` (LR 2e-4, all else equal)
+ran. The rule: it continues only if its domain-val gain over `cpt-8b` beats the seed floor.
+**Result** (`eval/ppl_compare.py cpt-8b cpt-8b-lr2x`, 95% paired bootstrap over documents):
+domain val -0.10% [-0.34, +0.09] (covers 0: no gain, before the seed floor even applies); general
+val +0.44% [+0.37, +0.52] (more forgetting); train slice -4.1% (more memorising; train/val gap
+23.4% vs 18.5%).
+**Chose:** 1e-4 stays the Stage 2 config; ablation A runs at 1e-4. Doubling the LR made the model
+learn the documents it read harder and forget a little more, with nothing extra on unseen documents:
+what the prior-exposure hypothesis predicts, and not what "1e-4 was too cautious" predicts.
+
+## 2026-09-28: Every checkpoint through vLLM's HF path (config_format=hf); base-8b-hf row (user decision)
+**Context:** `cpt-8b` scored MMLU -3.7 and GSM8K -6.7 points against base-8b while its general
+perplexity moved only +0.4%. vLLM's logs showed the two rows came from different model
+implementations: the hub base, which ships Mistral's native `params.json` +
+`consolidated.safetensors` next to the HF files, resolved to `PixtralForConditionalGeneration` (the
+native path, chosen with `tokenizer_mode=mistral`); the merged checkpoint, HF files only, to
+`Mistral3ForConditionalGeneration`. Every vLLM-based delta (lm-eval, KPI, latency) between them mixed
+training with the implementation. Perplexity, computed in transformers, is unaffected.
+**Chose:** `config_format="hf"` in `run_eval.py`, `run_lm_eval.sh` and `serve_vllm.sh`, so every
+checkpoint, base or merged, runs the same HF implementation. The base is re-evaluated through it as
+`base-8b-hf` (lm-eval, KPI, latency), and Stage 2 deltas are read against `base-8b-hf`; the Stage 0
+`base-8b` / `instruct-8b` rows stay as the native-path reference (instruct is re-run the same way
+before Stage 3 compares against it). `base-8b-hf` minus `base-8b` is the path's own effect.
+**How base-8b-hf is built:** `config_format=hf` alone can't load the hub repo: vLLM then reads every
+`*.safetensors` in it, including the native `consolidated.safetensors`, whose `layers.*` keys the HF
+implementation can't map. So the base is re-saved through `merge.py` (`--full` of the base onto
+itself: `modal_train.py --model <hub id> --run-name base-8b-hf --steps merge,eval`) and that directory
+is evaluated: the same files a merged checkpoint has (HF only, config written by the same
+transformers, the base's tokenizer files), so `base-8b-hf` differs from `cpt-8b` in the weights only,
+and it doubles as a check that the merge path itself changes nothing.
+**Also:** `run_lm_eval.sh` now passes `limit_mm_per_prompt={"image": 0}` (rule 3; a merged checkpoint
+otherwise fails vLLM's dummy-image profiling). A base-8b control with it (`base-8b-mm0`, still the
+native path) moved MMLU +0.01, its groups by +/-0.1-0.2, GSM8K strict +0.38 and HellaSwag -0.01
+points: inside the benchmarks' standard errors (MMLU +/-0.34, GSM8K +/-1.1), and not zero, so "reruns
+give identical numbers" holds only for an unchanged vLLM configuration.
+**Also found, then corrected:** I first read the grounded_acc drop (0.852 -> 0.657) as a CPT behaviour
+change (more citations, some citation-only or citing ids no passage has, which rule 8 scores wrong).
+Wrong: `base-8b-hf`, the same base weights through the HF path, scores exactly 0.657 too, with the
+same citation pattern (cite_valid 0.185). The drop is the implementation, not training. (A reading
+taken then, "`cpt-8b` is qa_acc +5.4 points against `base-8b-hf`", compared two runs on the broken
+path and did not survive the YaRN fix below: on the fixed path qa_acc moves +0.8 and +0.0 points
+across two seeds.)
+
+## 2026-09-28: GPU cost cuts for the rest of Stage 2 (user decision)
+**Context:** ~9 H100-hours (~$36 at an assumed $3.95/h, not checked against Modal's billing) spent by
+the end of the main run's evaluation, ~1-1.5 of them on attempts that failed on bugs since fixed;
+A and B still to run.
+**Chose:**
+- **Latency is opt-in** (`modal_train.py --steps ...,latency`), no longer part of `eval`: it measures the
+  architecture and the serving setup, not the weights (`cpt-8b` and base-8b decode at the same 6.6 ms
+  per token), so it is measured once per deployed checkpoint (Stage 6), not per ablation. A and B get
+  perplexity, lm-eval and the KPI eval only. (Stopping seed 1's latency run came too late: it had
+  finished.)
+- **No 1-GPU FSDP control for C.** C's result stands without it: same batches, per-step loss within
+  0.04% (median), 2.23x the tokens/s. That the speed-up is more than 2x is reported as an effect of
+  the FSDP code path (its own bf16 casting and activation checkpointing), not isolated by a run.
+- lm-eval stays for A and B: MMLU is half of each ablation's pre-registered question (forgetting).
+
+## 2026-09-28: Root cause of the vLLM path gap: YaRN attention scaling; merged configs set apply_yarn_scaling=false
+**Context:** the same base weights scored grounded_acc 0.852 through vLLM's Mistral-native path and 0.657
+through its HF path (`base-8b-hf`). Hypothesis: the two configs express YaRN differently. Native
+`params.json`: `yarn: {factor: 16, apply_scale: false}`. HF `config.json`: `rope_type: yarn,
+factor: 16, mscale: 1.0, mscale_all_dim: 1.0`, which transformers resolves to an attention factor of
+1 (the mscale ratio). vLLM 0.29's `get_rope` "yarn" branch keeps only extrapolation_factor,
+attn_factor, beta_fast, beta_slow, apply_yarn_scaling and truncate, so it drops mscale /
+mscale_all_dim, and `YaRNScalingRotaryEmbedding` multiplies cos and sin by `yarn_get_mscale(16)` =
+1.277 (`apply_yarn_scaling` defaults to True): every attention logit scaled by ~1.63.
+**Test** (`eval/vllm_ppl.py`: vLLM prompt-logprob perplexity on the trainer's 49 val windows, 200,655
+tokens; transformers' `ppl_val_slice` is 6.8938):
+
+| path | nats per token | perplexity |
+|---|---|---|
+| vLLM native (`config_format=mistral`) | 1.93063 | 6.8939 |
+| vLLM HF, config as shipped | 1.97772 | 7.2262 (+4.8%) |
+| vLLM HF, `apply_yarn_scaling: false` | 1.93063 | 6.8939 |
+
+**Chose:** `train/merge.py` writes `"apply_yarn_scaling": false` into every merged or re-saved
+checkpoint's `text_config.rope_parameters` (transformers ignores the key, with a notice). With it the
+HF path is the native path to five decimals, so every checkpoint (base re-saved as `base-8b-hf`, all
+merges) is evaluated on the model Mistral defines, through one implementation. The Stage 0 native
+rows were therefore right all along; the HF-path numbers taken before this fix (cpt-8b's first KPI
+and lm-eval, base-8b-hf's and seed 1's first evals) are superseded and re-run.
+**The bug's size on the same base weights** (native path vs the unpatched HF path; lm-eval with the
+same flags, `base-8b-mm0` vs `results/lm_eval/base-8b-hf-unpatched`): MMLU 0.7685 -> 0.7377 (-3.1
+points; humanities -4.2, STEM -3.6, social -2.1, other -1.7), GSM8K strict 0.7983 -> 0.7369 (-6.1),
+HellaSwag 0.8005 -> 0.7956 (-0.5); KPI grounded_acc 0.852 -> 0.657, halluc_rate 0.882 -> 0.947. So
+`cpt-8b`'s first readings (MMLU -3.7, GSM8K -6.7 against native base-8b) were mostly the bug. The
+unpatched outputs are kept in `results/{runs,lm_eval}/*-unpatched/` as the evidence; their interim
+`table.md` rows were removed.
+
+## 2026-09-28: Stage 2 main run verdict on the fixed path, with the measured seed floors
+**Context:** the YaRN fix restored `base-8b-hf` to the native path: MMLU 0.767 vs 0.768, GSM8K 0.793
+vs 0.794, HellaSwag 0.801 vs 0.801, grounded_acc 0.843 vs 0.852 (80 of its 524 KPI outputs differed
+from the native path's at all). `cpt-8b` and `cpt-8b-seed1` were re-merged with the fix and
+re-evaluated; the seed floor is |seed1 - main| per metric (one seed pair: a rough floor).
+**Seed floors:** perplexity: domain val 0.02%, general val 0.23%, train slice 0.25%. lm-eval (points):
+MMLU 0.1 (STEM 0.2, humanities 0.0, social 0.4, other 0.5), GSM8K 0.1, HellaSwag 0.1. KPI (points):
+qa_acc 0.8, grounded_acc 3.7, cite_valid 4.6, cite_supported 3.7, vocab_recall 1.0, halluc_rate 2.6.
+The KPI floors are several points (76-210 items per task): at this eval size a CPT effect on the
+KPIs smaller than ~4 points can't be seen.
+**Verdict against `base-8b-hf`** (`cpt-8b` / `cpt-8b-seed1`):
+- Domain val perplexity -2.33% / -2.35% (document intervals exclude 0; floor 0.02%): real, and far
+  under the pre-registered 20% ("barely moved"; the LR-up fix didn't help, see above).
+- General val perplexity +0.40% / +0.17%: real, small forgetting, well inside the +3% bound.
+- Train/val gap growth +7.2 points (under the 10-point bound).
+- MMLU -0.3 / -0.2 points (floor 0.1): at most a trace of forgetting, below the expected -0.5 to -2;
+  GSM8K -0.8 / -0.7 (floor 0.1, benchmark SE ~1.1); HellaSwag unchanged.
+- KPIs: qa_acc +0.8 / +0.0, vocab_recall +0.5 / -0.5, grounded_acc -1.0 / -4.7, halluc_rate
+  +1.3 / +3.9: all inside the seed floor. No detectable KPI change.
+**Reading:** 20M tokens of LoRA CPT on public federal documents measurably lowers domain perplexity
+and barely touches general ability, but the gain is too small to show up in closed-book QA or the
+other KPIs. Consistent with prior exposure: the model learns the documents it reads (train slice
+-8.3%) with little transfer to unseen ones, and doubling the LR only memorises more.
+
+## 2026-09-28: Ablation B verdict: LoRA stays the default (pre-registered rule applied)
+**Rule:** LoRA stays unless full's extra domain gain over LoRA beats the seed floor and is larger than
+its extra general loss.
+**Result** (`cpt-8b-full`, 8B full-parameter on 2 x H100, same windows and batch as `cpt-8b`; deltas
+vs `base-8b-hf`, LoRA's in brackets as `cpt-8b` / `cpt-8b-seed1`):
+- Domain val perplexity -2.15% [-2.33% / -2.35%]. Full vs LoRA: +0.18%, interval over documents
+  [-0.61, +0.81]: no extra domain gain. (On the trainer's 49-window slice full looked slightly ahead,
+  1.902 vs 1.906 eval loss; the full val set disagrees.)
+- Train slice -22.1% [-8.3% / -8.1%]: it memorises the documents it reads almost 3x harder;
+  train/val gap growth +28.6 points, past the pre-registered ~25-point "memorising" line.
+- General val perplexity +1.19% [+0.40% / +0.17%]; full vs LoRA +0.78% [+0.58, +0.97], past the
+  0.23% floor. MMLU -0.5 [-0.3 / -0.2] (humanities -1.2), GSM8K -3.0 [-0.8 / -0.7], HellaSwag -0.3.
+- KPIs, where LoRA showed nothing: qa_acc +3.1 points, vocab_recall +3.8, grounded_acc +4.6,
+  halluc_rate +2.6 (worse), past the rough single-pair floors (0.8 / 1.0 / 3.7 / 2.6). Every KPI
+  item comes from a training document (the eval pool is in train by design), so this is the
+  memorisation showing: knowledge of the documents read, not transfer to unseen ones.
+- Cost: 0.91 GPU-h on 2 GPUs vs LoRA's 0.95 on one: the FSDP path's per-GPU speed-up (see C)
+  covers the extra compute of full-parameter steps.
+**Chose:** LoRA stays the default. Stated for the write-up: on the same 8B model and tokens,
+full-parameter CPT learned the training documents far better (train perplexity -22% vs -8%, closed-
+book QA +3 points) with no gain on unseen documents and about 3x the forgetting (general perplexity
++1.2% vs +0.4%, GSM8K -3.0 vs -0.8), at the same GPU-hours: "LoRA learns less and forgets less"
+(Biderman et al. 2024). **Revisit if:** Stage 3 needs the in-document knowledge more than general
+ability (the KPI gain is real but small and one seed deep).
+
+## 2026-09-28: Ablation A verdict: replay adopted by the rule, on thin evidence (pre-registered rule applied)
+**Rule:** replay is adopted for Stages 3+ only if `ppl_general_val` or MMLU beats the main run's by more
+than the seed floor, with domain val within 3% of the main run's.
+**Result** (`cpt-8b-replay10`: `cpt.yaml` + 10% FineWeb-Edu, 164 steps, 1.04 GPU-h; vs `base-8b-hf`,
+main run in brackets as `cpt-8b` / `cpt-8b-seed1`):
+- Domain val: identical to the main run (0.00%, interval over documents [-0.04, +0.04]). Replay costs
+  nothing on the domain; final eval loss 1.9059 vs 1.9062.
+- MMLU -0.1 [-0.3 / -0.2]: +0.2 over `cpt-8b` against a 0.1 floor; humanities +0.3 [-0.5 / -0.5];
+  GSM8K -0.2 [-0.8 / -0.7]; HellaSwag -0.1. Replay erases the main run's small dip, consistently in
+  the right direction, but inside the benchmarks' own standard errors (MMLU +/-0.34, GSM8K +/-1.1).
+- `ppl_general_val` -2.24% [+0.40% / +0.17%]. **Not evidence of protection:** general_val is FineWeb-Edu,
+  the replay slice's own distribution (a different shard), so this is in-distribution training. The
+  pre-registered rule should have excluded it for A; that is a flaw of the pre-registration, stated
+  here rather than used.
+- KPIs, a cost the rule didn't anticipate: grounded_acc -6.5 [-1.0 / -4.7], cite_valid -6.4 [+2.8 /
+  -1.8], past the rough floors (3.7 / 4.6); qa_acc +0.0, vocab -0.5. The web text seems to dilute the
+  citation format.
+**Chose:** by the letter of the rule, replay is adopted for Stages 3+ (MMLU beats the main run's by
+more than the floor; domain within 3%). Stated plainly: the evidence is thin (one seed, deltas inside
+benchmark noise), the general-val criterion is void for replay, and the citation KPIs went the other
+way. It is cheap (+10% tokens, zero domain cost), which is what makes adopting it on weak evidence
+acceptable. **Revisit if:** Stage 3's SFT doesn't restore the citation format on a replay-trained
+checkpoint, or a second seed of A doesn't reproduce the MMLU recovery.
+
+## 2026-09-28: Prior-exposure check: inconclusive, no overall recency trend
+**Context:** the working explanation for Stage 2's small domain gain is that the base model already saw
+these public documents in pretraining. If it saw the older ones and not the newer ones, newer
+documents should be harder for it, within a publisher.
+**Test** (`eval/exposure_check.py`, no GPU): base perplexity for 58 documents (the 12 val documents
+exactly; 46 train-slice windows one document fills to >= 90%), 51 of them with a PDF creation year,
+relative to the publisher's median. Spearman(year, relative perplexity) = +0.07, permutation p =
+0.60: no overall trend. By period, median relative perplexity: 1990-2014 -2.5% (n=18), 2015-2019
++2.7% (19), 2020-2023 -4.2% (10), 2024-2026 +6.6% (4). The two newest documents, both val (NASA-STD-
+5002B dated 2026, USACE EM 1110-2-2610 of March 2025), are +15.1% and +10.5% harder than their
+publishers' medians and the 2025 USACE manual gained most under CPT; the other two recent ones are
+ordinary (+2.6%, -1.4%).
+**Reading:** neither confirmed nor refuted. The direction for the newest documents is the one
+exposure predicts, but n=4, PDF creation dates are not always publication dates, and the corpus
+holds almost no post-cutoff documents, so no amount of re-scoring this corpus can settle it (a
+full per-document GPU run would add old documents, not new ones). The alternative, that 20M tokens
+of LoRA CPT is simply too little signal, stays open. **Revisit if:** the corpus gains documents
+published after the base model's release, which would make a clean exposed-vs-unseen comparison.
+
+## 2026-09-28: Latency re-measured on the fixed path; CPT weakened stopping
+**Context:** `results/bench/` for `cpt-8b`, `cpt-8b-seed1` and `base-8b-hf` had been measured before the
+YaRN fix. Re-run for `cpt-8b` and `base-8b-hf` on the fixed checkpoints; seed 1's file deleted (same
+architecture and serving path as `cpt-8b`, so redundant).
+**Result** (concurrency 1, p50; tok/s at concurrency 32): base-8b (native) TTFT 17.7 ms, ITL 6.6 ms,
+E2E 187 ms, 1,922 tok/s; base-8b-hf (fixed) 15.3 / 6.6 / 180 ms / 1,967: parity with the native path
+(the stale run's 427 ms E2E was the broken model writing longer answers). cpt-8b (fixed) 16.5 / 6.9 /
+1,753 ms / 2,166.
+**Finding:** per-token speed is the same, but `cpt-8b` runs to the 256-token cap where the base stops
+after ~28 tokens, on the fixed path too, so it is a CPT effect: the corpus holds one EOS per document
+(234 in 19.4M tokens, ~83k tokens apart), and CPT weakens the model's stopping. SFT's short answers
+should restore it; Stage 3 checks output length.

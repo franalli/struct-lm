@@ -1,0 +1,26 @@
+{
+  "qa_acc": 0.1462,
+  "grounded_acc": 0.7963,
+  "cite_valid": 0.1019,
+  "cite_supported": 0.037,
+  "vocab_recall": 0.7,
+  "halluc_rate": 0.9342,
+  "n": {
+    "domain_qa": 130,
+    "grounded": 108,
+    "vocab": 210,
+    "adversarial": 76
+  },
+  "mmlu": 0.7652,
+  "mmlu_stem": 0.7272,
+  "mmlu_hum": 0.6993,
+  "mmlu_soc": 0.8609,
+  "mmlu_other": 0.8088,
+  "gsm8k": 0.7862,
+  "hellaswag": 0.8,
+  "ppl_train": 5.687,
+  "ppl_domain_val": 6.7184,
+  "ppl_general_val": 8.1651,
+  "model": "/vol/checkpoints/cpt-8b-seed1",
+  "chat": false
+}

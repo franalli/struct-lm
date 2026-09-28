@@ -46,7 +46,9 @@ TASKS = ["domain_qa", "grounded", "vocab", "adversarial"]
 #   cite_supported  grounded: fraction the judge finds correct AND supported by cited passages
 #   vocab_recall    vocab: fraction of definitions the judge accepts
 #   halluc_rate     adversarial: fraction that answered instead of abstaining (lower is better)
-# The last three come from lm-eval via merge_lm_eval(), and go blank if it isn't given.
+# The next seven come from lm-eval via merge_lm_eval() (MMLU overall, then its four groups), and
+# the last three from eval/perplexity.py via merge_ppl() (lower is better); either set goes blank
+# if its directory isn't given or has nothing for the run.
 COLUMNS = [
     "qa_acc",
     "grounded_acc",
@@ -55,9 +57,17 @@ COLUMNS = [
     "vocab_recall",
     "halluc_rate",
     "mmlu",
+    "mmlu_stem",
+    "mmlu_hum",
+    "mmlu_soc",
+    "mmlu_other",
     "gsm8k",
     "hellaswag",
+    "ppl_train",
+    "ppl_domain_val",
+    "ppl_general_val",
 ]
+PPL = ("ppl_train", "ppl_domain_val", "ppl_general_val")
 
 
 def load_jsonl(path: pathlib.Path) -> list[dict]:
@@ -120,6 +130,11 @@ def generate(
         model=model,
         tokenizer_mode=tokenizer_mode,  # "mistral": Tekken via mistral-common, as trained
         limit_mm_per_prompt={"image": 0},  # Ministral 3 is multimodal; don't reserve vision memory
+        # HF-format weights and config for every checkpoint: a hub repo that also ships Mistral's
+        # native params.json + consolidated.safetensors is otherwise loaded through vLLM's native
+        # implementation (PixtralForConditionalGeneration), a merged checkpoint through the HF one
+        # (Mistral3ForConditionalGeneration), and their deltas would mix training with the path
+        config_format="hf",
         dtype="bfloat16",
         tensor_parallel_size=tp,
         max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
@@ -279,11 +294,30 @@ def merge_lm_eval(metrics: dict, lm_eval_dir: str | None, run_name: str) -> None
                 return round(float(r[k]), 4)
         return None
 
-    metrics["mmlu"] = pick("mmlu", "acc,none")  # the group average over the 57 subjects
+    # lm-eval's group numbers: sample-weighted means over the subjects in each group
+    metrics["mmlu"] = pick("mmlu", "acc,none")
+    metrics["mmlu_stem"] = pick("mmlu_stem", "acc,none")
+    metrics["mmlu_hum"] = pick("mmlu_humanities", "acc,none")
+    metrics["mmlu_soc"] = pick("mmlu_social_sciences", "acc,none")
+    metrics["mmlu_other"] = pick("mmlu_other", "acc,none")
     # strict-match needs the "#### <answer>" format; flexible-extract (last number) is the fallback
     metrics["gsm8k"] = pick("gsm8k", "exact_match,strict-match", "exact_match,flexible-extract")
     # acc_norm (length-normalised log-likelihood) is the standard HellaSwag number
     metrics["hellaswag"] = pick("hellaswag", "acc_norm,none", "acc,none")
+
+
+def merge_ppl(metrics: dict, ppl_dir: str | None, run_name: str) -> None:
+    """Pull the perplexity columns out of <ppl_dir>/<run-name>.json (eval/perplexity.py), if
+    present. They live in their own file because --rescore rebuilds metrics.json from scratch."""
+    if not ppl_dir:
+        return
+    path = pathlib.Path(ppl_dir) / f"{run_name}.json"
+    if not path.exists():
+        print(f"no perplexity results at {path}")
+        return
+    res = json.loads(path.read_text())
+    for c in PPL:
+        metrics[c] = res.get(c)
 
 
 def append_table(table: pathlib.Path, run_name: str, metrics: dict) -> None:
@@ -296,7 +330,10 @@ def append_table(table: pathlib.Path, run_name: str, metrics: dict) -> None:
         # COLUMNS changed since the table was started; appending would misalign every cell.
         # metrics.json is already written by then, so stopping here loses nothing.
         raise SystemExit(f"{table}: header doesn't match COLUMNS; update its header row first")
-    cells = [f"{metrics[c]:.3f}" if metrics.get(c) is not None else "" for c in COLUMNS]
+    cells = [
+        "" if metrics.get(c) is None else f"{metrics[c]:.2f}" if c in PPL else f"{metrics[c]:.3f}"
+        for c in COLUMNS
+    ]
     with table.open("a") as f:
         f.write(f"| {run_name} | " + " | ".join(cells) + " |\n")
 
@@ -327,6 +364,7 @@ def main() -> None:
     ap.add_argument(
         "--lm-eval-dir", help="e.g. results/lm_eval; merges <dir>/<run-name>/**/results*.json"
     )
+    ap.add_argument("--ppl-dir", help="e.g. results/ppl; merges <dir>/<run-name>.json")
     args = ap.parse_args()
     if args.model and "instruct" in args.model.lower() and not args.chat:
         # KPI eval always runs chat checkpoints in chat format (notes/decisions.md).
@@ -379,6 +417,7 @@ def main() -> None:
 
     scored, metrics = score(items, judge)
     merge_lm_eval(metrics, args.lm_eval_dir, args.run_name)
+    merge_ppl(metrics, args.ppl_dir, args.run_name)
     # On --rescore, keep the model/chat recorded by the generating run unless given again.
     # A --generate-only run writes no metrics.json, so pass --model/--chat when scoring it.
     prev = (

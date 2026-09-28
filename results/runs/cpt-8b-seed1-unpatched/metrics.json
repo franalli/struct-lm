@@ -1,0 +1,19 @@
+{
+  "qa_acc": 0.1769,
+  "grounded_acc": 0.6389,
+  "cite_valid": 0.2222,
+  "cite_supported": 0.1111,
+  "vocab_recall": 0.6571,
+  "halluc_rate": 0.8684,
+  "n": {
+    "domain_qa": 130,
+    "grounded": 108,
+    "vocab": 210,
+    "adversarial": 76
+  },
+  "ppl_train": 5.687,
+  "ppl_domain_val": 6.7184,
+  "ppl_general_val": 8.1651,
+  "model": "/vol/checkpoints/cpt-8b-seed1",
+  "chat": false
+}

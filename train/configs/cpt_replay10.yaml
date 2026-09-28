@@ -1,0 +1,42 @@
+# Ablation A: the main run (cpt.yaml) with the FineWeb-Edu replay slice mixed in, 10% of the
+# domain tokens on top: 5,217 windows, 164 steps at the same 32 seqs/step. Only data.train and
+# the run names differ from cpt.yaml; the windows are shuffled together by the trainer's sampler.
+model:
+  init_from: mistralai/Ministral-3-8B-Base-2512
+  dtype: bfloat16
+  attn_implementation: sdpa
+
+lora:
+  r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05
+  target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
+
+data:
+  train: [data/processed/train.jsonl, data/processed/replay.jsonl]
+  val: data/processed/val.jsonl
+
+run:
+  results_dir: results
+
+training:
+  output_dir: checkpoints/_train/cpt-8b-replay10
+  run_name: cpt-8b-replay10
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8
+  per_device_eval_batch_size: 4
+  learning_rate: 1.0e-4
+  lr_scheduler_type: cosine
+  warmup_steps: 0.03  # transformers 5: a float in [0, 1) is a ratio of total steps (~4 steps)
+  weight_decay: 0.0
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 1
+  eval_strategy: steps
+  eval_steps: 25
+  save_strategy: steps
+  save_steps: 50
+  save_total_limit: 2
+  report_to: none
+  seed: 42

@@ -1,0 +1,26 @@
+{
+  "qa_acc": 0.1769,
+  "grounded_acc": 0.8889,
+  "cite_valid": 0.1481,
+  "cite_supported": 0.1019,
+  "vocab_recall": 0.7429,
+  "halluc_rate": 0.9211,
+  "n": {
+    "domain_qa": 130,
+    "grounded": 108,
+    "vocab": 210,
+    "adversarial": 76
+  },
+  "mmlu": 0.7622,
+  "mmlu_stem": 0.7291,
+  "mmlu_hum": 0.6916,
+  "mmlu_soc": 0.8596,
+  "mmlu_other": 0.8062,
+  "gsm8k": 0.7627,
+  "hellaswag": 0.7981,
+  "ppl_train": 4.8152,
+  "ppl_domain_val": 6.7321,
+  "ppl_general_val": 8.2481,
+  "model": "/vol/checkpoints/cpt-8b-full",
+  "chat": false
+}

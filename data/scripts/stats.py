@@ -168,7 +168,8 @@ def main() -> None:
         f"\nVal documents: {', '.join(sp['val_docs'])}. {sp['eval_docs_in_train']} eval documents "
         f"held in train. Packed at {sp['seq_len']:,}: {sp['packed_seqs']['train']:,} train / "
         f"{sp['packed_seqs']['val']:,} val sequences ({rp['packed_seqs_train_plus_replay']:,} with "
-        f"replay); {sp['steps_per_epoch_at_1M_tokens']} optimizer steps per epoch at ~1M tokens/step."
+        f"replay); {sp['seqs_per_step']} sequences per optimizer step (150-step rule), "
+        f"{sp['steps_per_epoch']} steps per epoch."
     )
     if sp["publishers_without_val"]:
         print(f"No held-out document for: {', '.join(sp['publishers_without_val'])}.")

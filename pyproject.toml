@@ -44,7 +44,12 @@ serve = [
 # AWQ (serve/quantize.sh). llmcompressor pins compressed-tensors versions that vLLM 0.29
 # rejects, so it lives in its own env: `uv sync --extra quantize`, then serve from `--extra serve`.
 quantize = ["llmcompressor>=0.14"]
-dev = ["ruff>=0.9", "pytest>=8.0", "pre-commit>=4.0"]
+dev = [
+    "ruff>=0.9",
+    "pytest>=8.0",
+    "pre-commit>=4.0",
+    "matplotlib>=3.9",
+]
 
 # Scripts repo, not an importable package: install only the dependencies.
 [tool.setuptools]

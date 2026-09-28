@@ -1,0 +1,26 @@
+{
+  "qa_acc": 0.1462,
+  "grounded_acc": 0.8426,
+  "cite_valid": 0.1204,
+  "cite_supported": 0.0833,
+  "vocab_recall": 0.7048,
+  "halluc_rate": 0.8947,
+  "n": {
+    "domain_qa": 130,
+    "grounded": 108,
+    "vocab": 210,
+    "adversarial": 76
+  },
+  "mmlu": 0.7672,
+  "mmlu_stem": 0.7333,
+  "mmlu_hum": 0.7041,
+  "mmlu_soc": 0.8619,
+  "mmlu_other": 0.8033,
+  "gsm8k": 0.793,
+  "hellaswag": 0.8006,
+  "ppl_train": 6.1849,
+  "ppl_domain_val": 6.88,
+  "ppl_general_val": 8.1513,
+  "model": "/vol/checkpoints/base-8b-hf",
+  "chat": false
+}

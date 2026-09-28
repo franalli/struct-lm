@@ -381,7 +381,8 @@
       "train": 4741,
       "val": 296
     },
-    "steps_per_epoch_at_1M_tokens": 18.5
+    "seqs_per_step": 32,
+    "steps_per_epoch": 149
   },
   "replay": {
     "source": "HuggingFaceFW/fineweb-edu sample-10BT (stream order)",
@@ -389,7 +390,13 @@
     "docs": 1780,
     "tokens": 1944824,
     "packed_seqs": 475,
-    "packed_seqs_train_plus_replay": 5216
+    "packed_seqs_train_plus_replay": 5217,
+    "general_val": {
+      "source": "HuggingFaceFW/fineweb-edu sample/10BT/013_00000.parquet (stream order)",
+      "docs": 512,
+      "tokens": 500190,
+      "packed_seqs": 122
+    }
   },
   "tokenizer": {
     "term_counts": {

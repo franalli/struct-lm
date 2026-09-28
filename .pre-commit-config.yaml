@@ -16,7 +16,9 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1024]
-        exclude: ^uv\.lock$
+        # generations are committed on purpose (anyone can `run_eval.py --rescore`, see .gitignore);
+        # each run's is ~1.4 MB of prompts and outputs
+        exclude: ^(uv\.lock|results/runs/[^/]+/generations\.jsonl)$
       - id: detect-private-key
       - id: forbid-new-submodules
 

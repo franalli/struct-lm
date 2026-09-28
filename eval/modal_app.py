@@ -25,6 +25,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import modal
 
@@ -67,6 +68,7 @@ image = (
     # evaluates whatever is in eval/tasks/ right now: don't regenerate tasks between stages.
     .add_local_dir("eval", remote_path="/root/eval")  # tasks, prompts, scorers, judge, run_eval
     .add_local_dir("serve", remote_path="/root/serve")  # serve_vllm.sh, bench_latency.py
+    .add_local_dir("train", remote_path="/root/train")  # packing.py, for vllm_ppl.py's windows
 )
 
 # Settings shared by all GPU functions. 4 h covers a full 8B lm-eval run (MMLU is the long
@@ -187,6 +189,27 @@ def latency(model: str, run_name: str, tokenizer_mode: str) -> None:
     finally:
         server.terminate()
         server.wait(timeout=120)
+    vol.commit()
+
+
+@app.function(**COMMON)
+def vllm_ppl(model: str, config_format: str = "hf", no_yarn_scale: bool = False) -> None:
+    """eval/vllm_ppl.py: vLLM's perplexity on the trainer's val slice, to compare with transformers'
+    ppl_val_slice. Writes /vol/results/vllm_ppl/<model>-<format>[-noyarn].json.
+      modal run eval/modal_app.py::vllm_ppl --model /vol/checkpoints/base-8b-hf --config-format hf"""
+    vol.reload()
+    name = f"{Path(model).name}-{config_format}" + ("-noyarn" if no_yarn_scale else "")
+    cmd = [
+        sys.executable,
+        "/root/eval/vllm_ppl.py",
+        "--model",
+        model,
+        "--config-format",
+        config_format,
+        "--out",
+        f"/vol/results/vllm_ppl/{name}.json",
+    ]
+    subprocess.run(cmd + (["--no-yarn-scale"] if no_yarn_scale else []), check=True, cwd="/vol")
     vol.commit()
 
 

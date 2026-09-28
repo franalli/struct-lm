@@ -1,0 +1,9 @@
+{
+  "model": "/vol/checkpoints/base-8b-hf",
+  "config_format": "hf",
+  "no_yarn_scale": true,
+  "windows": 49,
+  "tokens": 200655,
+  "nats": 1.93063,
+  "ppl_val_slice": 6.8939
+}
