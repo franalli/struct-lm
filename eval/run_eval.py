@@ -150,7 +150,7 @@ def generate(
     Batches are per task because each task has its own SamplingParams (max_tokens, stop
     strings; see prompts.GEN). vLLM schedules each batch itself, so there's no batch size.
     vllm is imported here, not at the top, so --rescore runs on a Mac without it."""
-    from vllm import LLM, SamplingParams
+    from vllm import SamplingParams
 
     # Base models get the raw prompt; chat models get the same text as one user turn, and
     # llm.chat() applies the checkpoint's own template (via mistral-common in "mistral" mode).
@@ -159,23 +159,7 @@ def generate(
     for it in items:
         it["prompt_final"] = it["prompt"]
 
-    llm = LLM(
-        model=model,
-        tokenizer_mode=tokenizer_mode,  # "mistral": Tekken via mistral-common, as trained
-        limit_mm_per_prompt={"image": 0},  # Ministral 3 is multimodal; don't reserve vision memory
-        # HF-format weights and config for every checkpoint: a hub repo that also ships Mistral's
-        # native params.json + consolidated.safetensors is otherwise loaded through vLLM's native
-        # implementation (PixtralForConditionalGeneration), a merged checkpoint through the HF one
-        # (Mistral3ForConditionalGeneration), and their deltas would mix training with the path.
-        # "auto" (the hub's native path) only to extend a run that generated that way: Stage 0's
-        # base-8b and instruct-8b; config_format=hf can't load a hub repo's consolidated weights.
-        config_format=config_format,
-        dtype="bfloat16",
-        tensor_parallel_size=tp,
-        max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
-        gpu_memory_utilization=0.9,
-        seed=0,
-    )
+    llm = make_llm(model, tp, max_model_len, tokenizer_mode, config_format)
     for task in TASKS:
         batch = [it for it in items if it["task"] == task]
         if not batch:
@@ -194,28 +178,63 @@ def generate(
                 it["raw_output"], it["output"] = it["output"], answer_line(it["output"])
         print(f"generated {len(batch):4d} {task}")
 
-    # Gold-answer log-probability for domain_qa (eval/gold_lp.py), in the same engine: the
-    # prompt + gold answer as one sequence, summing the answer tokens' prompt logprobs.
-    qa = [it for it in items if it["task"] == "domain_qa"]
-    if qa:
-        from gold_lp import gold_token_ids
-        from vllm.inputs import TokensPrompt
+    gold_logprobs(llm, [it for it in items if it["task"] == "domain_qa"], model, chat)
 
-        encoded, failed = gold_token_ids(model, chat, qa)
-        if failed:
-            print(f"gold_lp: prompt not a token prefix of prompt + answer, left out: {failed}")
-        ids = [it["id"] for it in qa if it["id"] in encoded]
-        outs = llm.generate(
-            [TokensPrompt(prompt_token_ids=encoded[i][0]) for i in ids],
-            SamplingParams(max_tokens=1, prompt_logprobs=0),
-            use_tqdm=False,
-        )
-        by_id = {it["id"]: it for it in qa}
-        for i, o in zip(ids, outs):
-            full, n = encoded[i]
-            lp = sum(o.prompt_logprobs[k][full[k]].logprob for k in range(n, len(full)))
-            by_id[i]["gold_lp"], by_id[i]["gold_tokens"] = round(lp, 4), len(full) - n
-        print(f"gold_lp {len(ids):4d} domain_qa ({len(failed)} left out)")
+
+GOLD_FIELDS = ("gold_lp", "gold_tokens", "gold_lp_tokens", "gold_lp_end")
+
+
+def make_llm(model: str, tp: int, max_model_len: int, tokenizer_mode: str, config_format: str):
+    from vllm import LLM
+
+    return LLM(
+        model=model,
+        tokenizer_mode=tokenizer_mode,  # "mistral": Tekken via mistral-common, as trained
+        limit_mm_per_prompt={"image": 0},  # Ministral 3 is multimodal; don't reserve vision memory
+        # HF-format weights and config for every checkpoint: a hub repo that also ships Mistral's
+        # native params.json + consolidated.safetensors is otherwise loaded through vLLM's native
+        # implementation (PixtralForConditionalGeneration), a merged checkpoint through the HF one
+        # (Mistral3ForConditionalGeneration), and their deltas would mix training with the path.
+        # "auto" (the hub's native path) only to extend a run that generated that way: Stage 0's
+        # base-8b and instruct-8b; config_format=hf can't load a hub repo's consolidated weights.
+        config_format=config_format,
+        dtype="bfloat16",
+        tensor_parallel_size=tp,
+        max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
+        gpu_memory_utilization=0.9,
+        seed=0,
+    )
+
+
+def gold_logprobs(llm, qa: list[dict], model: str, chat: bool) -> None:
+    """Gold-answer log-probability for domain_qa items (eval/gold_lp.py), in an engine already
+    loaded: prompt + gold answer as one sequence, the answer tokens' prompt logprobs. Sets
+    gold_lp (their sum, the end marker included), gold_tokens, gold_lp_tokens (per token) and
+    gold_lp_end (the end marker's: "\\n\\n" for base, EOS for chat), so the answer alone is
+    gold_lp - gold_lp_end."""
+    if not qa:
+        return
+    from gold_lp import gold_token_ids
+    from vllm import SamplingParams
+    from vllm.inputs import TokensPrompt
+
+    encoded, failed = gold_token_ids(model, chat, qa)
+    if failed:
+        print(f"gold_lp: prompt not a token prefix of prompt + answer, left out: {failed}")
+    ids = [it["id"] for it in qa if it["id"] in encoded]
+    outs = llm.generate(
+        [TokensPrompt(prompt_token_ids=encoded[i][0]) for i in ids],
+        SamplingParams(max_tokens=1, prompt_logprobs=0),
+        use_tqdm=False,
+    )
+    by_id = {it["id"]: it for it in qa}
+    for i, o in zip(ids, outs):
+        full, n = encoded[i]
+        lps = [round(o.prompt_logprobs[k][full[k]].logprob, 4) for k in range(n, len(full))]
+        it = by_id[i]
+        it["gold_lp"], it["gold_tokens"] = round(sum(lps), 4), len(lps)
+        it["gold_lp_tokens"], it["gold_lp_end"] = lps, lps[-1]
+    print(f"gold_lp {len(ids):4d} domain_qa ({len(failed)} left out)")
 
 
 # ------------------------------------------------------------------- score ---
@@ -340,6 +359,9 @@ def score(items: list[dict], judge, seen: set[str] | None = None) -> tuple[list[
     if buckets["gold_lp"]:  # a few long gold strings can dominate the mean
         metrics["gold_lp_median"] = round(statistics.median(buckets["gold_lp"]), 4)
         metrics["gold_lp_n"] = len(buckets["gold_lp"])
+        ends = [it["gold_lp_end"] for it in items if it.get("gold_lp_end") is not None]
+        if ends:  # the end marker's share, so the answer's own log-probability can be read apart
+            metrics["gold_lp_end"] = round(statistics.fmean(ends), 4)
     if n_failed:
         metrics["judge_failed"] = n_failed
     return scored, metrics
@@ -515,6 +537,11 @@ def main() -> None:
         help="vLLM config format; auto only to extend Stage 0's native-path hub runs",
     )
     ap.add_argument(
+        "--gold-lp-only",
+        action="store_true",
+        help="recompute gold_lp for the saved domain_qa rows (no generation) and stop",
+    )
+    ap.add_argument(
         "--judge-cache",
         help="judge verdict cache (default <results-dir>/judge_cache.jsonl, required when "
         "--results-dir isn't the repo's results/: results/judge_cache.jsonl reuses it)",
@@ -531,6 +558,39 @@ def main() -> None:
     run_dir = results / "runs" / args.run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     gen_path = run_dir / "generations.jsonl"
+
+    if args.gold_lp_only:
+        # The gold-answer log-probabilities only: outputs, and so every accuracy column, stay as
+        # saved. Used after the end-marker fix (2026-10-04).
+        if not args.model:
+            ap.error("--gold-lp-only needs --model")
+        rows = load_jsonl(gen_path)
+        qa = [it for it in build_items(pathlib.Path(args.tasks_dir), None, ["domain_qa"])]
+        llm = make_llm(
+            args.model, args.tp, args.max_model_len, args.tokenizer_mode, args.config_format
+        )
+        gold_logprobs(llm, qa, args.model, args.chat)
+        by_id = {it["id"]: it for it in qa}
+        for r in rows:
+            if r["task"] == "domain_qa" and r["id"] in by_id:
+                for k in GOLD_FIELDS:
+                    r.pop(k, None)
+                    if k in by_id[r["id"]]:
+                        r[k] = by_id[r["id"]][k]
+        write_jsonl(gen_path, rows)
+        import vllm
+
+        meta_path = run_dir / "generations_meta.json"
+        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        meta.setdefault("domain_qa", {})["gold_lp"] = {
+            "date": datetime.datetime.now(datetime.UTC).date().isoformat(),
+            "model": args.model,
+            "end_marker": "EOS" if args.chat else "\\n\\n",
+            "vllm": vllm.__version__,
+        }
+        meta_path.write_text(json.dumps(meta, indent=2) + "\n")
+        print(f"gold_lp rewritten for {len(qa)} domain_qa rows -> {gen_path}")
+        return
 
     if args.rescore:
         # Re-attach saved outputs to freshly built items by (task, id). Items with no saved
@@ -555,8 +615,9 @@ def main() -> None:
         for it in items:
             row = saved[(it["task"], it["id"])]
             it["output"] = row["output"]
-            if "gold_lp" in row:
-                it["gold_lp"] = row["gold_lp"]
+            for k in GOLD_FIELDS:
+                if k in row:
+                    it[k] = row[k]
     else:
         if not args.model:
             ap.error("--model is required unless --rescore")
@@ -583,11 +644,7 @@ def main() -> None:
                     "output": it["output"],
                     # chat one-line tasks: the full reply before scorers.answer_line
                     **({"raw_output": it["raw_output"]} if "raw_output" in it else {}),
-                    **(
-                        {"gold_lp": it["gold_lp"], "gold_tokens": it["gold_tokens"]}
-                        if "gold_lp" in it
-                        else {}
-                    ),
+                    **{k: it[k] for k in GOLD_FIELDS if k in it},
                 }
                 for it in items
                 if it["task"] == t

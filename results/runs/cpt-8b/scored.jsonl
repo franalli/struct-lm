@@ -1,133 +1,328 @@
-{"task": "domain_qa", "id": "qa-0001", "correct": true, "output": " 0.20 f'_c"}
-{"task": "domain_qa", "id": "qa-0002", "correct": false, "output": " 12 in."}
-{"task": "domain_qa", "id": "qa-0003", "correct": false, "output": " 50%"}
-{"task": "domain_qa", "id": "qa-0004", "correct": false, "output": " 1.0 mm"}
-{"task": "domain_qa", "id": "qa-0005", "correct": false, "output": " 0.5 ft/year"}
-{"task": "domain_qa", "id": "qa-0006", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0007", "correct": true, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0008", "correct": true, "output": " 1.0"}
-{"task": "domain_qa", "id": "qa-0009", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0010", "correct": false, "output": " The Tunnel Design Memorandum"}
-{"task": "domain_qa", "id": "qa-0011", "correct": false, "output": " 25%"}
-{"task": "domain_qa", "id": "qa-0012", "correct": true, "output": " 160 ft"}
-{"task": "domain_qa", "id": "qa-0013", "correct": false, "output": " 0.25"}
-{"task": "domain_qa", "id": "qa-0014", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0015", "correct": false, "output": " Article 6.9.4.1.1"}
-{"task": "domain_qa", "id": "qa-0016", "correct": false, "output": " EM 1110-2-2104"}
-{"task": "domain_qa", "id": "qa-0017", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0018", "correct": false, "output": " Article 6.6.1.2.5"}
-{"task": "domain_qa", "id": "qa-0019", "correct": false, "output": " 150 psi"}
-{"task": "domain_qa", "id": "qa-0020", "correct": false, "output": " EM 1110-1-1003"}
-{"task": "domain_qa", "id": "qa-0021", "correct": false, "output": " 0.25g"}
-{"task": "domain_qa", "id": "qa-0022", "correct": false, "output": " FEMA P-1050"}
-{"task": "domain_qa", "id": "qa-0023", "correct": false, "output": " 11.2.2.2"}
-{"task": "domain_qa", "id": "qa-0024", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0025", "correct": false, "output": " 20%"}
-{"task": "domain_qa", "id": "qa-0026", "correct": true, "output": " EM 1110-2-1602"}
-{"task": "domain_qa", "id": "qa-0027", "correct": false, "output": " 15%"}
-{"task": "domain_qa", "id": "qa-0028", "correct": false, "output": " 0.25 f'c"}
-{"task": "domain_qa", "id": "qa-0029", "correct": false, "output": " Article 12.10.1.1"}
-{"task": "domain_qa", "id": "qa-0030", "correct": true, "output": " 24 hours"}
-{"task": "domain_qa", "id": "qa-0031", "correct": false, "output": " FEMA 440"}
-{"task": "domain_qa", "id": "qa-0032", "correct": true, "output": " Bruun Rule"}
-{"task": "domain_qa", "id": "qa-0033", "correct": false, "output": " 1000 ft"}
-{"task": "domain_qa", "id": "qa-0034", "correct": false, "output": " 6.10.11.2"}
-{"task": "domain_qa", "id": "qa-0035", "correct": false, "output": " 0.2"}
-{"task": "domain_qa", "id": "qa-0036", "correct": false, "output": " 300 series"}
-{"task": "domain_qa", "id": "qa-0037", "correct": false, "output": " 4 in."}
-{"task": "domain_qa", "id": "qa-0038", "correct": true, "output": " 20%"}
-{"task": "domain_qa", "id": "qa-0039", "correct": false, "output": " Histogram"}
-{"task": "domain_qa", "id": "qa-0040", "correct": false, "output": " Article 6.10.1.10.2"}
-{"task": "domain_qa", "id": "qa-0041", "correct": false, "output": " 0.5 kips/in."}
-{"task": "domain_qa", "id": "qa-0042", "correct": false, "output": " 0.85"}
-{"task": "domain_qa", "id": "qa-0043", "correct": false, "output": " ER 1110-2-1100"}
-{"task": "domain_qa", "id": "qa-0044", "correct": false, "output": " 5% damped spectral acceleration at the fundamental period of the structure"}
-{"task": "domain_qa", "id": "qa-0045", "correct": false, "output": " 7"}
-{"task": "domain_qa", "id": "qa-0046", "correct": true, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0047", "correct": false, "output": " Article 12.10.1.1"}
-{"task": "domain_qa", "id": "qa-0048", "correct": false, "output": " 3.5 in."}
-{"task": "domain_qa", "id": "qa-0049", "correct": false, "output": " Article 6.13.2.10"}
-{"task": "domain_qa", "id": "qa-0050", "correct": false, "output": " ASTM D 5875"}
-{"task": "domain_qa", "id": "qa-0051", "correct": false, "output": " 15"}
-{"task": "domain_qa", "id": "qa-0052", "correct": false, "output": " 75%"}
-{"task": "domain_qa", "id": "qa-0053", "correct": false, "output": " Article 6.10.1.10.2"}
-{"task": "domain_qa", "id": "qa-0054", "correct": false, "output": " None"}
-{"task": "domain_qa", "id": "qa-0055", "correct": false, "output": " 10 miles"}
-{"task": "domain_qa", "id": "qa-0056", "correct": false, "output": " 0.005 L_b"}
-{"task": "domain_qa", "id": "qa-0057", "correct": false, "output": " 0.001 ft"}
-{"task": "domain_qa", "id": "qa-0058", "correct": false, "output": " 10 seconds"}
-{"task": "domain_qa", "id": "qa-0059", "correct": false, "output": " 1.0"}
-{"task": "domain_qa", "id": "qa-0501", "correct": false, "output": " 0.35%"}
-{"task": "domain_qa", "id": "qa-0502", "correct": false, "output": " 10%"}
-{"task": "domain_qa", "id": "qa-0503", "correct": false, "output": " 135 deg."}
-{"task": "domain_qa", "id": "qa-0504", "correct": false, "output": " 0.05"}
-{"task": "domain_qa", "id": "qa-0505", "correct": false, "output": " 6 in."}
-{"task": "domain_qa", "id": "qa-0506", "correct": false, "output": " 45 degrees"}
-{"task": "domain_qa", "id": "qa-0507", "correct": false, "output": " Article 5.4.2.6"}
-{"task": "domain_qa", "id": "qa-0508", "correct": false, "output": " 10.2.2.2"}
-{"task": "domain_qa", "id": "qa-0509", "correct": false, "output": " All-Hazards"}
-{"task": "domain_qa", "id": "qa-0510", "correct": false, "output": " 1.25"}
-{"task": "domain_qa", "id": "qa-0511", "correct": false, "output": " AASHTO LRFD Article 9.7.2.2.2"}
-{"task": "domain_qa", "id": "qa-0512", "correct": false, "output": " 12 inches"}
-{"task": "domain_qa", "id": "qa-0513", "correct": false, "output": " 1000 mg/L"}
-{"task": "domain_qa", "id": "qa-0514", "correct": false, "output": " 10 ft"}
-{"task": "domain_qa", "id": "qa-0515", "correct": false, "output": " 0.01 ft^2"}
-{"task": "domain_qa", "id": "qa-0516", "correct": false, "output": " 0.85"}
-{"task": "domain_qa", "id": "qa-0517", "correct": false, "output": " Article 6.10.1.10.2"}
-{"task": "domain_qa", "id": "qa-0518", "correct": false, "output": " 0.85"}
-{"task": "domain_qa", "id": "qa-0519", "correct": false, "output": " Article 4.5.2.2"}
-{"task": "domain_qa", "id": "qa-0520", "correct": true, "output": " 120 ksi"}
-{"task": "domain_qa", "id": "qa-0521", "correct": false, "output": " 35 HRC"}
-{"task": "domain_qa", "id": "qa-0522", "correct": false, "output": " 10 min."}
-{"task": "domain_qa", "id": "qa-0523", "correct": false, "output": " 4"}
-{"task": "domain_qa", "id": "qa-0524", "correct": false, "output": " 10 years"}
-{"task": "domain_qa", "id": "qa-0525", "correct": false, "output": " Sulfate"}
-{"task": "domain_qa", "id": "qa-0526", "correct": false, "output": " 0.5"}
-{"task": "domain_qa", "id": "qa-0527", "correct": true, "output": " 1.5 in."}
-{"task": "domain_qa", "id": "qa-0528", "correct": false, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0529", "correct": false, "output": " The ratio of the 5% damped spectral acceleration at 0.2 s to the 5% damped spectral acceleration at 1.0 s."}
-{"task": "domain_qa", "id": "qa-0530", "correct": false, "output": " 12.10.3"}
-{"task": "domain_qa", "id": "qa-0531", "correct": false, "output": " 0.6"}
-{"task": "domain_qa", "id": "qa-0532", "correct": true, "output": " 0.6g"}
-{"task": "domain_qa", "id": "qa-0533", "correct": false, "output": " 10%"}
-{"task": "domain_qa", "id": "qa-0534", "correct": false, "output": " 1.5 d"}
-{"task": "domain_qa", "id": "qa-0535", "correct": false, "output": " 0.25√f'c"}
-{"task": "domain_qa", "id": "qa-0536", "correct": false, "output": " 0.5"}
-{"task": "domain_qa", "id": "qa-0537", "correct": false, "output": " Parabolic"}
-{"task": "domain_qa", "id": "qa-0538", "correct": false, "output": " 10.0"}
-{"task": "domain_qa", "id": "qa-0539", "correct": false, "output": " 100"}
-{"task": "domain_qa", "id": "qa-0540", "correct": false, "output": " 20%"}
-{"task": "domain_qa", "id": "qa-0541", "correct": false, "output": " 0.5"}
-{"task": "domain_qa", "id": "qa-0542", "correct": true, "output": " 10"}
-{"task": "domain_qa", "id": "qa-0543", "correct": true, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0544", "correct": false, "output": " 100 psi"}
-{"task": "domain_qa", "id": "qa-0545", "correct": false, "output": " 10"}
-{"task": "domain_qa", "id": "qa-0546", "correct": false, "output": " 100%"}
-{"task": "domain_qa", "id": "qa-0547", "correct": false, "output": " Article 3.6.1.2"}
-{"task": "domain_qa", "id": "qa-0548", "correct": false, "output": " Channel width is determined by the maximum width of the vessel to be accommodated."}
-{"task": "domain_qa", "id": "qa-0549", "correct": false, "output": " 50%"}
-{"task": "domain_qa", "id": "qa-0550", "correct": false, "output": " 50%"}
-{"task": "domain_qa", "id": "qa-0551", "correct": false, "output": " Annually"}
-{"task": "domain_qa", "id": "qa-0552", "correct": true, "output": " 75%"}
-{"task": "domain_qa", "id": "qa-0553", "correct": true, "output": " 1.3"}
-{"task": "domain_qa", "id": "qa-0554", "correct": true, "output": " 1.5"}
-{"task": "domain_qa", "id": "qa-0555", "correct": false, "output": " 0.85"}
-{"task": "domain_qa", "id": "qa-0556", "correct": true, "output": " 12 in."}
-{"task": "domain_qa", "id": "qa-0557", "correct": true, "output": " EM 1110-2-2906"}
-{"task": "domain_qa", "id": "qa-0558", "correct": false, "output": " 12 inches"}
-{"task": "domain_qa", "id": "qa-0559", "correct": false, "output": " 0.10%"}
-{"task": "domain_qa", "id": "qa-0560", "correct": false, "output": " STRAND7"}
-{"task": "domain_qa", "id": "qa-0561", "correct": false, "output": " 0.6"}
-{"task": "domain_qa", "id": "qa-0562", "correct": false, "output": " 5.5"}
-{"task": "domain_qa", "id": "qa-0563", "correct": false, "output": " Article 6.10.1.10.2"}
-{"task": "domain_qa", "id": "qa-0564", "correct": false, "output": " 1.0 cm"}
-{"task": "domain_qa", "id": "qa-0565", "correct": true, "output": " SSPC-SP 10"}
-{"task": "domain_qa", "id": "qa-0566", "correct": false, "output": " 1000 years"}
-{"task": "domain_qa", "id": "qa-0567", "correct": true, "output": " 12 hours"}
-{"task": "domain_qa", "id": "qa-0568", "correct": false, "output": " 12 inches"}
-{"task": "domain_qa", "id": "qa-0569", "correct": false, "output": " 11.4.5"}
-{"task": "domain_qa", "id": "qa-0570", "correct": false, "output": " 0.95"}
-{"task": "domain_qa", "id": "qa-0571", "correct": false, "output": " 10 years"}
+{"task": "domain_qa", "id": "qa-0001", "correct": true, "gold_lp": -4.8155, "output": " 0.20 f'_c"}
+{"task": "domain_qa", "id": "qa-0002", "correct": false, "gold_lp": -8.584, "output": " 12 in."}
+{"task": "domain_qa", "id": "qa-0003", "correct": false, "gold_lp": -3.6683, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-0004", "correct": false, "gold_lp": -5.0265, "output": " 1.0 mm"}
+{"task": "domain_qa", "id": "qa-0005", "correct": false, "gold_lp": -8.7061, "output": " 0.5 ft/year"}
+{"task": "domain_qa", "id": "qa-0006", "correct": false, "gold_lp": -4.2365, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0007", "correct": true, "gold_lp": -1.7404, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0008", "correct": true, "gold_lp": -0.8572, "output": " 1.0"}
+{"task": "domain_qa", "id": "qa-0009", "correct": false, "gold_lp": -10.5, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0010", "correct": false, "gold_lp": -6.636, "output": " The Tunnel Design Memorandum"}
+{"task": "domain_qa", "id": "qa-0011", "correct": false, "gold_lp": -3.2996, "output": " 25%"}
+{"task": "domain_qa", "id": "qa-0012", "correct": true, "gold_lp": -2.6141, "output": " 160 ft"}
+{"task": "domain_qa", "id": "qa-0013", "correct": false, "gold_lp": -5.5927, "output": " 0.25"}
+{"task": "domain_qa", "id": "qa-0014", "correct": false, "gold_lp": -5.8369, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0015", "correct": false, "gold_lp": -5.2388, "output": " Article 6.9.4.1.1"}
+{"task": "domain_qa", "id": "qa-0016", "correct": false, "gold_lp": -9.8437, "output": " EM 1110-2-2104"}
+{"task": "domain_qa", "id": "qa-0017", "correct": false, "gold_lp": -17.1292, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0018", "correct": false, "gold_lp": -5.5762, "output": " Article 6.6.1.2.5"}
+{"task": "domain_qa", "id": "qa-0019", "correct": false, "gold_lp": -3.3176, "output": " 150 psi"}
+{"task": "domain_qa", "id": "qa-0020", "correct": false, "gold_lp": -3.3717, "output": " EM 1110-1-1003"}
+{"task": "domain_qa", "id": "qa-0021", "correct": false, "gold_lp": -2.8674, "output": " 0.25g"}
+{"task": "domain_qa", "id": "qa-0022", "correct": false, "gold_lp": -3.5394, "output": " FEMA P-1050"}
+{"task": "domain_qa", "id": "qa-0023", "correct": false, "gold_lp": -8.8385, "output": " 11.2.2.2"}
+{"task": "domain_qa", "id": "qa-0024", "correct": false, "gold_lp": -3.1383, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0025", "correct": false, "gold_lp": -7.2407, "output": " 20%"}
+{"task": "domain_qa", "id": "qa-0026", "correct": true, "gold_lp": -2.3862, "output": " EM 1110-2-1602"}
+{"task": "domain_qa", "id": "qa-0027", "correct": false, "gold_lp": -6.3709, "output": " 15%"}
+{"task": "domain_qa", "id": "qa-0028", "correct": false, "gold_lp": -14.7812, "output": " 0.25 f'c"}
+{"task": "domain_qa", "id": "qa-0029", "correct": false, "gold_lp": -8.1965, "output": " Article 12.10.1.1"}
+{"task": "domain_qa", "id": "qa-0030", "correct": true, "gold_lp": -2.558, "output": " 24 hours"}
+{"task": "domain_qa", "id": "qa-0031", "correct": false, "gold_lp": -4.2253, "output": " FEMA 356"}
+{"task": "domain_qa", "id": "qa-0032", "correct": true, "gold_lp": -2.2996, "output": " Bruun Rule"}
+{"task": "domain_qa", "id": "qa-0033", "correct": false, "gold_lp": -3.8838, "output": " 1000 ft"}
+{"task": "domain_qa", "id": "qa-0034", "correct": false, "gold_lp": -4.6334, "output": " 6.10.11.2"}
+{"task": "domain_qa", "id": "qa-0035", "correct": false, "gold_lp": -9.7594, "output": " 0.2"}
+{"task": "domain_qa", "id": "qa-0036", "correct": false, "gold_lp": -3.0986, "output": " 300 series"}
+{"task": "domain_qa", "id": "qa-0037", "correct": false, "gold_lp": -5.369, "output": " 4 in."}
+{"task": "domain_qa", "id": "qa-0038", "correct": true, "gold_lp": -1.2819, "output": " 20%"}
+{"task": "domain_qa", "id": "qa-0039", "correct": false, "gold_lp": -18.3541, "output": " Histogram"}
+{"task": "domain_qa", "id": "qa-0040", "correct": false, "gold_lp": -7.522, "output": " Article 6.10.1.10.2"}
+{"task": "domain_qa", "id": "qa-0041", "correct": false, "gold_lp": -10.8175, "output": " 0.5 kips/in."}
+{"task": "domain_qa", "id": "qa-0042", "correct": false, "gold_lp": -2.913, "output": " 0.85"}
+{"task": "domain_qa", "id": "qa-0043", "correct": false, "gold_lp": -7.2131, "output": " ER 1110-2-1100"}
+{"task": "domain_qa", "id": "qa-0044", "correct": false, "gold_lp": -7.7576, "output": " 5% damped spectral acceleration at the fundamental period of the structure"}
+{"task": "domain_qa", "id": "qa-0045", "correct": false, "gold_lp": -1.4901, "output": " 7"}
+{"task": "domain_qa", "id": "qa-0046", "correct": true, "gold_lp": -2.036, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0047", "correct": false, "gold_lp": -8.3242, "output": " Article 12.10.1.1"}
+{"task": "domain_qa", "id": "qa-0048", "correct": false, "gold_lp": -4.9259, "output": " 3.5 in."}
+{"task": "domain_qa", "id": "qa-0049", "correct": false, "gold_lp": -6.3305, "output": " Article 6.13.2.10"}
+{"task": "domain_qa", "id": "qa-0050", "correct": false, "gold_lp": -6.025, "output": " ASTM D 5875"}
+{"task": "domain_qa", "id": "qa-0051", "correct": false, "gold_lp": -3.8086, "output": " 15"}
+{"task": "domain_qa", "id": "qa-0052", "correct": false, "gold_lp": -6.3628, "output": " 75%"}
+{"task": "domain_qa", "id": "qa-0053", "correct": false, "gold_lp": -6.4979, "output": " Article 6.10.1.10.2"}
+{"task": "domain_qa", "id": "qa-0054", "correct": false, "gold_lp": -19.4624, "output": " None"}
+{"task": "domain_qa", "id": "qa-0055", "correct": false, "gold_lp": -6.9897, "output": " 10 miles"}
+{"task": "domain_qa", "id": "qa-0056", "correct": false, "gold_lp": -6.1451, "output": " 0.005 L_b"}
+{"task": "domain_qa", "id": "qa-0057", "correct": false, "gold_lp": -6.2846, "output": " 0.001 ft"}
+{"task": "domain_qa", "id": "qa-0058", "correct": false, "gold_lp": -4.1918, "output": " 10 seconds"}
+{"task": "domain_qa", "id": "qa-0059", "correct": false, "gold_lp": -13.1955, "output": " 1.0"}
+{"task": "domain_qa", "id": "qa-0501", "correct": false, "gold_lp": -3.9037, "output": " 0.5%"}
+{"task": "domain_qa", "id": "qa-0502", "correct": false, "gold_lp": -2.7901, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-0503", "correct": false, "gold_lp": -8.3015, "output": " 135 deg."}
+{"task": "domain_qa", "id": "qa-0504", "correct": false, "gold_lp": -4.8325, "output": " 0.05"}
+{"task": "domain_qa", "id": "qa-0505", "correct": false, "gold_lp": -3.0006, "output": " 6 in."}
+{"task": "domain_qa", "id": "qa-0506", "correct": false, "gold_lp": -6.4633, "output": " 45 degrees"}
+{"task": "domain_qa", "id": "qa-0507", "correct": false, "gold_lp": -7.2408, "output": " Article 5.4.2.5"}
+{"task": "domain_qa", "id": "qa-0508", "correct": false, "gold_lp": -16.0226, "output": " 10.3.2.2"}
+{"task": "domain_qa", "id": "qa-0509", "correct": false, "gold_lp": -4.3638, "output": " All-Hazards"}
+{"task": "domain_qa", "id": "qa-0510", "correct": false, "gold_lp": -3.5755, "output": " 1.25"}
+{"task": "domain_qa", "id": "qa-0511", "correct": false, "gold_lp": -9.5324, "output": " AASHTO LRFD Article 9.7.2.2.2"}
+{"task": "domain_qa", "id": "qa-0512", "correct": false, "gold_lp": -3.4155, "output": " 12 inches"}
+{"task": "domain_qa", "id": "qa-0513", "correct": false, "gold_lp": -7.9049, "output": " 1000 mg/L"}
+{"task": "domain_qa", "id": "qa-0514", "correct": false, "gold_lp": -3.7082, "output": " 10 ft"}
+{"task": "domain_qa", "id": "qa-0515", "correct": false, "gold_lp": -11.567, "output": " 0.005 ft^2"}
+{"task": "domain_qa", "id": "qa-0516", "correct": false, "gold_lp": -5.0628, "output": " 0.75"}
+{"task": "domain_qa", "id": "qa-0517", "correct": false, "gold_lp": -21.8691, "output": " Article 6.10.1.10.2"}
+{"task": "domain_qa", "id": "qa-0518", "correct": false, "gold_lp": -5.1028, "output": " 0.85"}
+{"task": "domain_qa", "id": "qa-0519", "correct": false, "gold_lp": -10.6345, "output": " Article 4.5.2.2"}
+{"task": "domain_qa", "id": "qa-0520", "correct": true, "gold_lp": -1.649, "output": " 120 ksi"}
+{"task": "domain_qa", "id": "qa-0521", "correct": false, "gold_lp": -9.8589, "output": " 35 HRC"}
+{"task": "domain_qa", "id": "qa-0522", "correct": false, "gold_lp": -6.561, "output": " 10 min."}
+{"task": "domain_qa", "id": "qa-0523", "correct": false, "gold_lp": -1.7513, "output": " 4"}
+{"task": "domain_qa", "id": "qa-0524", "correct": false, "gold_lp": -5.3365, "output": " 10 years"}
+{"task": "domain_qa", "id": "qa-0525", "correct": false, "gold_lp": -5.7215, "output": " Sulfate"}
+{"task": "domain_qa", "id": "qa-0526", "correct": false, "gold_lp": -4.4712, "output": " 0.5"}
+{"task": "domain_qa", "id": "qa-0527", "correct": true, "gold_lp": -3.354, "output": " 1.5 in."}
+{"task": "domain_qa", "id": "qa-0528", "correct": false, "gold_lp": -3.998, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0529", "correct": false, "gold_lp": -29.3804, "output": " The ratio of the 5% damped spectral acceleration at 0.2 s to the 5% damped spectral acceleration at 1.0 s."}
+{"task": "domain_qa", "id": "qa-0530", "correct": false, "gold_lp": -5.1014, "output": " 12.10.3"}
+{"task": "domain_qa", "id": "qa-0531", "correct": false, "gold_lp": -2.5549, "output": " 0.6"}
+{"task": "domain_qa", "id": "qa-0532", "correct": true, "gold_lp": -2.7059, "output": " 0.6g"}
+{"task": "domain_qa", "id": "qa-0533", "correct": false, "gold_lp": -5.4094, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-0534", "correct": false, "gold_lp": -7.8643, "output": " 1.5 d"}
+{"task": "domain_qa", "id": "qa-0535", "correct": false, "gold_lp": -22.8003, "output": " 0.25√f'c"}
+{"task": "domain_qa", "id": "qa-0536", "correct": false, "gold_lp": -4.5667, "output": " 0.5"}
+{"task": "domain_qa", "id": "qa-0537", "correct": false, "gold_lp": -5.6737, "output": " Parabolic"}
+{"task": "domain_qa", "id": "qa-0538", "correct": false, "gold_lp": -5.6408, "output": " 10.0"}
+{"task": "domain_qa", "id": "qa-0539", "correct": false, "gold_lp": -3.8877, "output": " 100"}
+{"task": "domain_qa", "id": "qa-0540", "correct": false, "gold_lp": -2.3711, "output": " 20%"}
+{"task": "domain_qa", "id": "qa-0541", "correct": false, "gold_lp": -3.1335, "output": " 0.4"}
+{"task": "domain_qa", "id": "qa-0542", "correct": true, "gold_lp": -2.9812, "output": " 10"}
+{"task": "domain_qa", "id": "qa-0543", "correct": true, "gold_lp": -5.9731, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0544", "correct": false, "gold_lp": -10.5862, "output": " 100 psi"}
+{"task": "domain_qa", "id": "qa-0545", "correct": false, "gold_lp": -3.2541, "output": " 10"}
+{"task": "domain_qa", "id": "qa-0546", "correct": false, "gold_lp": -4.1247, "output": " 100%"}
+{"task": "domain_qa", "id": "qa-0547", "correct": false, "gold_lp": -7.6961, "output": " Article 3.6.1.2"}
+{"task": "domain_qa", "id": "qa-0548", "correct": false, "gold_lp": -12.4952, "output": " Channel width is determined by the maximum width of the vessel to be accommodated."}
+{"task": "domain_qa", "id": "qa-0549", "correct": false, "gold_lp": -5.2678, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-0550", "correct": false, "gold_lp": -7.2335, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-0551", "correct": false, "gold_lp": -7.6818, "output": " Annually"}
+{"task": "domain_qa", "id": "qa-0552", "correct": true, "gold_lp": -5.1347, "output": " 75%"}
+{"task": "domain_qa", "id": "qa-0553", "correct": true, "gold_lp": -2.3509, "output": " 1.3"}
+{"task": "domain_qa", "id": "qa-0554", "correct": true, "gold_lp": -2.4657, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-0555", "correct": false, "gold_lp": -4.1639, "output": " 0.85"}
+{"task": "domain_qa", "id": "qa-0556", "correct": true, "gold_lp": -3.4193, "output": " 12 in."}
+{"task": "domain_qa", "id": "qa-0557", "correct": true, "gold_lp": -1.444, "output": " EM 1110-2-2906"}
+{"task": "domain_qa", "id": "qa-0558", "correct": false, "gold_lp": -7.0912, "output": " 12 in."}
+{"task": "domain_qa", "id": "qa-0559", "correct": false, "gold_lp": -11.3038, "output": " 0.10%"}
+{"task": "domain_qa", "id": "qa-0560", "correct": false, "gold_lp": -10.8347, "output": " STRAND7"}
+{"task": "domain_qa", "id": "qa-0561", "correct": false, "gold_lp": -2.5333, "output": " 0.6"}
+{"task": "domain_qa", "id": "qa-0562", "correct": false, "gold_lp": -2.6977, "output": " 5.5"}
+{"task": "domain_qa", "id": "qa-0563", "correct": false, "gold_lp": -9.9625, "output": " Article 6.10.1.10.2"}
+{"task": "domain_qa", "id": "qa-0564", "correct": false, "gold_lp": -5.3647, "output": " 1.0 cm"}
+{"task": "domain_qa", "id": "qa-0565", "correct": true, "gold_lp": -2.5609, "output": " SSPC-SP 10"}
+{"task": "domain_qa", "id": "qa-0566", "correct": false, "gold_lp": -5.3111, "output": " 1000 years"}
+{"task": "domain_qa", "id": "qa-0567", "correct": true, "gold_lp": -3.0676, "output": " 12 hours"}
+{"task": "domain_qa", "id": "qa-0568", "correct": false, "gold_lp": -6.7251, "output": " 12 inches"}
+{"task": "domain_qa", "id": "qa-0569", "correct": false, "gold_lp": -4.2224, "output": " 11.4.5"}
+{"task": "domain_qa", "id": "qa-0570", "correct": false, "gold_lp": -4.4932, "output": " 1.0"}
+{"task": "domain_qa", "id": "qa-0571", "correct": false, "gold_lp": -13.0824, "output": " 10 years"}
+{"task": "domain_qa", "id": "qa-1001", "correct": false, "gold_lp": -3.3265, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1002", "correct": false, "gold_lp": -6.0011, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1003", "correct": false, "gold_lp": -4.1036, "output": " 12 in."}
+{"task": "domain_qa", "id": "qa-1004", "correct": false, "gold_lp": -3.2516, "output": " FEMA 154"}
+{"task": "domain_qa", "id": "qa-1005", "correct": false, "gold_lp": -2.9547, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1006", "correct": false, "gold_lp": -6.4816, "output": " P/Pye"}
+{"task": "domain_qa", "id": "qa-1007", "correct": true, "gold_lp": -3.3178, "output": " 12 inches"}
+{"task": "domain_qa", "id": "qa-1008", "correct": false, "gold_lp": -7.1015, "output": " 100%"}
+{"task": "domain_qa", "id": "qa-1009", "correct": false, "gold_lp": -9.0177, "output": " 1.2.2"}
+{"task": "domain_qa", "id": "qa-1010", "correct": true, "gold_lp": -1.5448, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1011", "correct": true, "gold_lp": -1.9667, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1012", "correct": false, "gold_lp": -2.6235, "output": " 25%"}
+{"task": "domain_qa", "id": "qa-1013", "correct": false, "gold_lp": -3.3642, "output": " 100 years"}
+{"task": "domain_qa", "id": "qa-1014", "correct": false, "gold_lp": -6.4242, "output": " Simplified Janbu Method"}
+{"task": "domain_qa", "id": "qa-1015", "correct": false, "gold_lp": -3.9986, "output": " 0.75"}
+{"task": "domain_qa", "id": "qa-1016", "correct": true, "gold_lp": -7.4128, "output": " 1000 kips/in."}
+{"task": "domain_qa", "id": "qa-1017", "correct": false, "gold_lp": -3.3458, "output": " 100 ft"}
+{"task": "domain_qa", "id": "qa-1018", "correct": false, "gold_lp": -4.0373, "output": " 23 CFR 650.315"}
+{"task": "domain_qa", "id": "qa-1019", "correct": false, "gold_lp": -2.6621, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1020", "correct": false, "gold_lp": -15.9009, "output": " 10.3.2"}
+{"task": "domain_qa", "id": "qa-1021", "correct": false, "gold_lp": -13.4657, "output": " Section 5.2.2"}
+{"task": "domain_qa", "id": "qa-1022", "correct": false, "gold_lp": -4.989, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1023", "correct": false, "gold_lp": -10.2908, "output": " \"This report is issued for informational purposes only and is not to be used for decision-making purposes.\""}
+{"task": "domain_qa", "id": "qa-1024", "correct": false, "gold_lp": -3.6156, "output": " 10 km"}
+{"task": "domain_qa", "id": "qa-1025", "correct": false, "gold_lp": -4.5438, "output": " 10 km"}
+{"task": "domain_qa", "id": "qa-1026", "correct": true, "gold_lp": -4.6358, "output": " ASTM C 1138"}
+{"task": "domain_qa", "id": "qa-1027", "correct": false, "gold_lp": -4.714, "output": " 1.15"}
+{"task": "domain_qa", "id": "qa-1028", "correct": false, "gold_lp": -7.244, "output": " Building Performance Group (BPG)"}
+{"task": "domain_qa", "id": "qa-1029", "correct": false, "gold_lp": -7.5816, "output": " 1.5 in."}
+{"task": "domain_qa", "id": "qa-1030", "correct": false, "gold_lp": -2.6715, "output": " Category C"}
+{"task": "domain_qa", "id": "qa-1031", "correct": true, "gold_lp": -2.8415, "output": " EM 1110-2-2906"}
+{"task": "domain_qa", "id": "qa-1032", "correct": false, "gold_lp": -4.5175, "output": " 0.002"}
+{"task": "domain_qa", "id": "qa-1033", "correct": false, "gold_lp": -4.63, "output": " 0.25"}
+{"task": "domain_qa", "id": "qa-1034", "correct": false, "gold_lp": -3.8005, "output": " Article 6.10.11"}
+{"task": "domain_qa", "id": "qa-1035", "correct": false, "gold_lp": -4.3436, "output": " FEMA 547"}
+{"task": "domain_qa", "id": "qa-1036", "correct": false, "gold_lp": -5.5213, "output": " ASTM D4138"}
+{"task": "domain_qa", "id": "qa-1037", "correct": true, "gold_lp": -2.9457, "output": " 1 inch"}
+{"task": "domain_qa", "id": "qa-1038", "correct": true, "gold_lp": -0.8252, "output": " FEMA P-750"}
+{"task": "domain_qa", "id": "qa-1039", "correct": true, "gold_lp": -5.0357, "output": " 10 ft"}
+{"task": "domain_qa", "id": "qa-1040", "correct": false, "gold_lp": -7.523, "output": " 25%"}
+{"task": "domain_qa", "id": "qa-1041", "correct": false, "gold_lp": -3.8963, "output": " 6"}
+{"task": "domain_qa", "id": "qa-1042", "correct": true, "gold_lp": -2.6883, "output": " 150"}
+{"task": "domain_qa", "id": "qa-1043", "correct": false, "gold_lp": -6.3719, "output": " Article 6.10.1.10.2"}
+{"task": "domain_qa", "id": "qa-1044", "correct": false, "gold_lp": -14.4479, "output": " 0.5d"}
+{"task": "domain_qa", "id": "qa-1045", "correct": false, "gold_lp": -9.3305, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-1046", "correct": false, "gold_lp": -12.1482, "output": " ASTM E1592"}
+{"task": "domain_qa", "id": "qa-1047", "correct": true, "gold_lp": -4.5496, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-1048", "correct": false, "gold_lp": -6.1353, "output": " 80%"}
+{"task": "domain_qa", "id": "qa-1049", "correct": false, "gold_lp": -7.5688, "output": " 1000 ohm-cm"}
+{"task": "domain_qa", "id": "qa-1050", "correct": true, "gold_lp": -4.9964, "output": " 100%"}
+{"task": "domain_qa", "id": "qa-1051", "correct": false, "gold_lp": -3.0206, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1052", "correct": false, "gold_lp": -3.1638, "output": " 0.005"}
+{"task": "domain_qa", "id": "qa-1053", "correct": false, "gold_lp": -4.1102, "output": " 0.3"}
+{"task": "domain_qa", "id": "qa-1054", "correct": false, "gold_lp": -2.756, "output": " 0.15"}
+{"task": "domain_qa", "id": "qa-1055", "correct": false, "gold_lp": -5.5805, "output": " EM 1110-2-1613"}
+{"task": "domain_qa", "id": "qa-1056", "correct": false, "gold_lp": -6.4384, "output": " 12.14.3.2"}
+{"task": "domain_qa", "id": "qa-1057", "correct": false, "gold_lp": -12.7886, "output": " FEMA P-2055 Form 1"}
+{"task": "domain_qa", "id": "qa-1058", "correct": false, "gold_lp": -14.9241, "output": " 1.25R"}
+{"task": "domain_qa", "id": "qa-1059", "correct": false, "gold_lp": -4.7991, "output": " 0.6"}
+{"task": "domain_qa", "id": "qa-1060", "correct": false, "gold_lp": -4.7439, "output": " EM 1110-2-1602"}
+{"task": "domain_qa", "id": "qa-1061", "correct": false, "gold_lp": -6.1546, "output": " EM 1110-2-1902"}
+{"task": "domain_qa", "id": "qa-1062", "correct": false, "gold_lp": -6.9328, "output": " EM 1110-2-2102"}
+{"task": "domain_qa", "id": "qa-1063", "correct": true, "gold_lp": -2.0586, "output": " ASTM C512"}
+{"task": "domain_qa", "id": "qa-1064", "correct": false, "gold_lp": -9.5911, "output": " Ice jam flood control"}
+{"task": "domain_qa", "id": "qa-1065", "correct": true, "gold_lp": -2.8576, "output": " 0.75"}
+{"task": "domain_qa", "id": "qa-1066", "correct": false, "gold_lp": -5.8886, "output": " Dredging Operations and Environmental Research (DOER)"}
+{"task": "domain_qa", "id": "qa-1067", "correct": true, "gold_lp": -2.8595, "output": " ASTM A820"}
+{"task": "domain_qa", "id": "qa-1068", "correct": false, "gold_lp": -6.9774, "output": " Phragmites"}
+{"task": "domain_qa", "id": "qa-1069", "correct": false, "gold_lp": -5.6655, "output": " 15 minutes"}
+{"task": "domain_qa", "id": "qa-1070", "correct": false, "gold_lp": -6.0173, "output": " ASCE 7-16"}
+{"task": "domain_qa", "id": "qa-1071", "correct": false, "gold_lp": -9.0137, "output": " 1000"}
+{"task": "domain_qa", "id": "qa-1072", "correct": true, "gold_lp": -5.065, "output": " Vacuum grouting"}
+{"task": "domain_qa", "id": "qa-1073", "correct": false, "gold_lp": -11.2176, "output": " Weld passes"}
+{"task": "domain_qa", "id": "qa-1074", "correct": false, "gold_lp": -14.6782, "output": " 4.2.2.2"}
+{"task": "domain_qa", "id": "qa-1075", "correct": true, "gold_lp": -2.3396, "output": " 14 days"}
+{"task": "domain_qa", "id": "qa-1076", "correct": true, "gold_lp": -6.6286, "output": " 50% RH"}
+{"task": "domain_qa", "id": "qa-1077", "correct": false, "gold_lp": -6.5221, "output": " 13.6.1.2"}
+{"task": "domain_qa", "id": "qa-1078", "correct": false, "gold_lp": -13.5171, "output": " AISC 341"}
+{"task": "domain_qa", "id": "qa-1079", "correct": false, "gold_lp": -6.0038, "output": " 1.0"}
+{"task": "domain_qa", "id": "qa-1080", "correct": false, "gold_lp": -3.6942, "output": " 0.5"}
+{"task": "domain_qa", "id": "qa-1081", "correct": false, "gold_lp": -11.3341, "output": " ER 1110-2-1100"}
+{"task": "domain_qa", "id": "qa-1082", "correct": false, "gold_lp": -11.3008, "output": " 4.0 ksi"}
+{"task": "domain_qa", "id": "qa-1083", "correct": false, "gold_lp": -5.2335, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1084", "correct": false, "gold_lp": -5.969, "output": " 20 lb/ft"}
+{"task": "domain_qa", "id": "qa-1085", "correct": false, "gold_lp": -9.133, "output": " Hot melt adhesive"}
+{"task": "domain_qa", "id": "qa-1086", "correct": true, "gold_lp": -1.9196, "output": " 0.80"}
+{"task": "domain_qa", "id": "qa-1087", "correct": false, "gold_lp": -4.9095, "output": " 100 ft"}
+{"task": "domain_qa", "id": "qa-1088", "correct": false, "gold_lp": -4.7669, "output": " 100%"}
+{"task": "domain_qa", "id": "qa-1089", "correct": false, "gold_lp": -11.4842, "output": " 20%"}
+{"task": "domain_qa", "id": "qa-1091", "correct": false, "gold_lp": -9.4478, "output": " Mean lower low water (MLLW)"}
+{"task": "domain_qa", "id": "qa-1092", "correct": false, "gold_lp": -9.2174, "output": " 12.14.2"}
+{"task": "domain_qa", "id": "qa-1093", "correct": false, "gold_lp": -7.1805, "output": " 100 mm"}
+{"task": "domain_qa", "id": "qa-1094", "correct": false, "gold_lp": -6.0228, "output": " 14 days"}
+{"task": "domain_qa", "id": "qa-1095", "correct": false, "gold_lp": -7.1514, "output": " 12 inches"}
+{"task": "domain_qa", "id": "qa-1096", "correct": false, "gold_lp": -9.8678, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1097", "correct": false, "gold_lp": -8.14, "output": " Article 6.10.1.10"}
+{"task": "domain_qa", "id": "qa-1098", "correct": false, "gold_lp": -3.0342, "output": " 10"}
+{"task": "domain_qa", "id": "qa-1099", "correct": false, "gold_lp": -4.6678, "output": " 0.75"}
+{"task": "domain_qa", "id": "qa-1100", "correct": false, "gold_lp": -5.4164, "output": " 1.5 ft"}
+{"task": "domain_qa", "id": "qa-1101", "correct": true, "gold_lp": -5.3717, "output": " 3"}
+{"task": "domain_qa", "id": "qa-1102", "correct": false, "gold_lp": -6.2749, "output": " +/- 0.5 ft"}
+{"task": "domain_qa", "id": "qa-1103", "correct": false, "gold_lp": -15.7552, "output": " Life Safety"}
+{"task": "domain_qa", "id": "qa-1104", "correct": false, "gold_lp": -2.6516, "output": " 15 minutes"}
+{"task": "domain_qa", "id": "qa-1106", "correct": false, "gold_lp": -13.4109, "output": " Article 1.3.2"}
+{"task": "domain_qa", "id": "qa-1107", "correct": false, "gold_lp": -8.239, "output": " 6.10.10.2"}
+{"task": "domain_qa", "id": "qa-1108", "correct": false, "gold_lp": -2.0898, "output": " 100%"}
+{"task": "domain_qa", "id": "qa-1109", "correct": false, "gold_lp": -4.8955, "output": " ER 1110-2-1100"}
+{"task": "domain_qa", "id": "qa-1110", "correct": false, "gold_lp": -7.6698, "output": " 100 ft"}
+{"task": "domain_qa", "id": "qa-1111", "correct": false, "gold_lp": -9.0726, "output": " AISC 360-16"}
+{"task": "domain_qa", "id": "qa-1112", "correct": false, "gold_lp": -3.984, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1113", "correct": false, "gold_lp": -2.861, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-1114", "correct": false, "gold_lp": -4.032, "output": " 1"}
+{"task": "domain_qa", "id": "qa-1115", "correct": false, "gold_lp": -3.8309, "output": " 0.5 ft"}
+{"task": "domain_qa", "id": "qa-1116", "correct": false, "gold_lp": -8.9564, "output": " 1.1"}
+{"task": "domain_qa", "id": "qa-1117", "correct": false, "gold_lp": -6.6256, "output": " 10 ksi"}
+{"task": "domain_qa", "id": "qa-1118", "correct": false, "gold_lp": -9.764, "output": " 80%"}
+{"task": "domain_qa", "id": "qa-1119", "correct": false, "gold_lp": -4.0592, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1121", "correct": true, "gold_lp": -6.1951, "output": " 0.5"}
+{"task": "domain_qa", "id": "qa-1122", "correct": false, "gold_lp": -6.2125, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1123", "correct": false, "gold_lp": -6.9305, "output": " 0.2 sec"}
+{"task": "domain_qa", "id": "qa-1124", "correct": false, "gold_lp": -4.1467, "output": " Article 3.6.1.4.2"}
+{"task": "domain_qa", "id": "qa-1125", "correct": true, "gold_lp": -2.0545, "output": " EM 1110-2-1415"}
+{"task": "domain_qa", "id": "qa-1127", "correct": false, "gold_lp": -7.5784, "output": " 12.12.1.1"}
+{"task": "domain_qa", "id": "qa-1128", "correct": false, "gold_lp": -7.3948, "output": " 12.12.2.1"}
+{"task": "domain_qa", "id": "qa-1129", "correct": false, "gold_lp": -4.7086, "output": " 1.5 ft"}
+{"task": "domain_qa", "id": "qa-1130", "correct": false, "gold_lp": -6.0806, "output": " Article 6.10.1.6.2"}
+{"task": "domain_qa", "id": "qa-1131", "correct": false, "gold_lp": -4.8228, "output": " R = 3.5"}
+{"task": "domain_qa", "id": "qa-1132", "correct": false, "gold_lp": -5.7648, "output": " 10 years"}
+{"task": "domain_qa", "id": "qa-1133", "correct": false, "gold_lp": -3.5212, "output": " 12 hours"}
+{"task": "domain_qa", "id": "qa-1134", "correct": false, "gold_lp": -7.2665, "output": " 120 pcf"}
+{"task": "domain_qa", "id": "qa-1135", "correct": false, "gold_lp": -10.111, "output": " 12%"}
+{"task": "domain_qa", "id": "qa-1136", "correct": false, "gold_lp": -2.7849, "output": " 100 psi"}
+{"task": "domain_qa", "id": "qa-1137", "correct": false, "gold_lp": -2.8901, "output": " 24 hours"}
+{"task": "domain_qa", "id": "qa-1138", "correct": false, "gold_lp": -6.6871, "output": " 46"}
+{"task": "domain_qa", "id": "qa-1140", "correct": false, "gold_lp": -3.0114, "output": " 0.85"}
+{"task": "domain_qa", "id": "qa-1141", "correct": false, "gold_lp": -3.1492, "output": " FEMA P-58-1"}
+{"task": "domain_qa", "id": "qa-1142", "correct": false, "gold_lp": -8.3669, "output": " NIST GCR 17-917-45"}
+{"task": "domain_qa", "id": "qa-1143", "correct": false, "gold_lp": -9.3702, "output": " 6.13.2.10"}
+{"task": "domain_qa", "id": "qa-1144", "correct": false, "gold_lp": -4.2017, "output": " 0.02"}
+{"task": "domain_qa", "id": "qa-1145", "correct": false, "gold_lp": -6.8604, "output": " 25%"}
+{"task": "domain_qa", "id": "qa-1146", "correct": false, "gold_lp": -6.6853, "output": " 0.5"}
+{"task": "domain_qa", "id": "qa-1147", "correct": false, "gold_lp": -3.0882, "output": " 2.5"}
+{"task": "domain_qa", "id": "qa-1148", "correct": false, "gold_lp": -2.9174, "output": " 10"}
+{"task": "domain_qa", "id": "qa-1149", "correct": false, "gold_lp": -2.9061, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1150", "correct": false, "gold_lp": -5.8349, "output": " Submersible"}
+{"task": "domain_qa", "id": "qa-1151", "correct": false, "gold_lp": -6.5779, "output": " 100 lb"}
+{"task": "domain_qa", "id": "qa-1153", "correct": false, "gold_lp": -9.0053, "output": " Tier 1"}
+{"task": "domain_qa", "id": "qa-1155", "correct": false, "gold_lp": -4.8892, "output": " 90%"}
+{"task": "domain_qa", "id": "qa-1156", "correct": true, "gold_lp": -1.77, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1157", "correct": false, "gold_lp": -3.9321, "output": " 2.0"}
+{"task": "domain_qa", "id": "qa-1158", "correct": false, "gold_lp": -2.6613, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1160", "correct": false, "gold_lp": -7.2367, "output": " 1/4 in."}
+{"task": "domain_qa", "id": "qa-1163", "correct": false, "gold_lp": -13.8887, "output": " Boulder"}
+{"task": "domain_qa", "id": "qa-1165", "correct": false, "gold_lp": -5.9779, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-1166", "correct": false, "gold_lp": -5.4912, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1167", "correct": false, "gold_lp": -6.7967, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1169", "correct": false, "gold_lp": -5.0776, "output": " 1,000 cu yd"}
+{"task": "domain_qa", "id": "qa-1170", "correct": false, "gold_lp": -7.1842, "output": " 100 years"}
+{"task": "domain_qa", "id": "qa-1172", "correct": false, "gold_lp": -4.5769, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1173", "correct": false, "gold_lp": -3.0949, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1181", "correct": false, "gold_lp": -4.7348, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1182", "correct": false, "gold_lp": -5.5446, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1184", "correct": false, "gold_lp": -2.7051, "output": " 0.85"}
+{"task": "domain_qa", "id": "qa-1185", "correct": false, "gold_lp": -5.2659, "output": " 100 mV"}
+{"task": "domain_qa", "id": "qa-1186", "correct": false, "gold_lp": -8.4279, "output": " 100-year flood"}
+{"task": "domain_qa", "id": "qa-1187", "correct": true, "gold_lp": -4.3151, "output": " Every 5 years"}
+{"task": "domain_qa", "id": "qa-1188", "correct": false, "gold_lp": -7.4569, "output": " 12 hours"}
+{"task": "domain_qa", "id": "qa-1190", "correct": false, "gold_lp": -6.6045, "output": " ± 30%"}
+{"task": "domain_qa", "id": "qa-1191", "correct": false, "gold_lp": -2.3061, "output": " 133%"}
+{"task": "domain_qa", "id": "qa-1192", "correct": false, "gold_lp": -8.4845, "output": " To provide for the safety, health, and welfare of the public."}
+{"task": "domain_qa", "id": "qa-1193", "correct": false, "gold_lp": -7.0714, "output": " 1.0"}
+{"task": "domain_qa", "id": "qa-1194", "correct": false, "gold_lp": -7.267, "output": " 0.5%"}
+{"task": "domain_qa", "id": "qa-1195", "correct": false, "gold_lp": -5.677, "output": " 1:10"}
+{"task": "domain_qa", "id": "qa-1197", "correct": false, "gold_lp": -15.9275, "output": " AISC 360-16"}
+{"task": "domain_qa", "id": "qa-1199", "correct": false, "gold_lp": -10.9121, "output": " Benchmarks"}
+{"task": "domain_qa", "id": "qa-1200", "correct": false, "gold_lp": -6.4158, "output": " 100 ft"}
+{"task": "domain_qa", "id": "qa-1201", "correct": false, "gold_lp": -6.207, "output": " 12 ft"}
+{"task": "domain_qa", "id": "qa-1202", "correct": false, "gold_lp": -5.184, "output": " 4 ft"}
+{"task": "domain_qa", "id": "qa-1204", "correct": false, "gold_lp": -2.994, "output": " 4 in."}
+{"task": "domain_qa", "id": "qa-1206", "correct": false, "gold_lp": -2.4174, "output": " 20%"}
+{"task": "domain_qa", "id": "qa-1208", "correct": false, "gold_lp": -2.6599, "output": " 50%"}
+{"task": "domain_qa", "id": "qa-1209", "correct": true, "gold_lp": -4.0723, "output": " 120 ft"}
+{"task": "domain_qa", "id": "qa-1210", "correct": false, "gold_lp": -9.973, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1212", "correct": false, "gold_lp": -3.5375, "output": " 10 ksi"}
+{"task": "domain_qa", "id": "qa-1213", "correct": false, "gold_lp": -4.3125, "output": " 1.25"}
+{"task": "domain_qa", "id": "qa-1214", "correct": false, "gold_lp": -11.1724, "output": " The U.S. Steel Method"}
+{"task": "domain_qa", "id": "qa-1215", "correct": true, "gold_lp": -2.9809, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1216", "correct": false, "gold_lp": -2.9347, "output": " 1.25"}
+{"task": "domain_qa", "id": "qa-1217", "correct": false, "gold_lp": -3.7471, "output": " 1.5"}
+{"task": "domain_qa", "id": "qa-1218", "correct": false, "gold_lp": -4.8649, "output": " 10 degrees"}
+{"task": "domain_qa", "id": "qa-1219", "correct": false, "gold_lp": -6.2834, "output": " 10%"}
+{"task": "domain_qa", "id": "qa-1220", "correct": false, "gold_lp": -9.9918, "output": " Kaplan-Meier"}
+{"task": "domain_qa", "id": "qa-1221", "correct": false, "gold_lp": -6.2735, "output": " 1,000 ft"}
+{"task": "domain_qa", "id": "qa-1222", "correct": false, "gold_lp": -11.8424, "output": " Web-only connection"}
+{"task": "domain_qa", "id": "qa-1223", "correct": false, "gold_lp": -5.5346, "output": " Ultrasonic"}
 {"task": "grounded", "id": "gr-0001", "cite_valid": false, "correct": 1, "acc_reason": "The answer correctly and concisely describes the method for determining the influence surface ordinate as stated in the gold passage.", "supported": 0, "judge_reason": "cites no provided passage", "output": " The influence surface ordinate for the vertical bending moment at a specific node in a bridge superstructure 3D model is determined by analyzing the model for a vertical unit load applied at that node. The corresponding influence surface ordinate has a value equal to the vertical bending moment at the node caused by that unit load."}
 {"task": "grounded", "id": "gr-0002", "cite_valid": false, "correct": 1, "acc_reason": "The answer correctly identifies the purpose of U-shaped stirrups in concrete bridge elements as resisting diagonal tension (shear) stresses, matching the gold passage exactly.", "supported": 0, "judge_reason": "cites no provided passage", "output": " The purpose of placing U-shaped stirrups in concrete bridge elements is to resist diagonal tension (shear) stresses."}
 {"task": "grounded", "id": "gr-0003", "cite_valid": false, "correct": 1, "acc_reason": "The answer correctly identifies the threshold for the slenderness ratio (KL/r) at which AASHTO specifications require a rigorous P-Δ analysis as 100, matching the gold passage.", "supported": 0, "judge_reason": "cites no provided passage", "output": " According to the AASHTO LRFD Bridge Design Specifications, 7th Edition (5) and AASHTO Standard Specifications for Highway Bridges (6), a rigorous P-Δ analysis is required if the slenderness ratio (KL/r) exceeds 100."}

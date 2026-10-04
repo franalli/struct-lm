@@ -25,6 +25,7 @@ import argparse
 import json
 import math
 import re
+import statistics
 import sys
 from pathlib import Path
 
@@ -410,7 +411,22 @@ DELTA_ROWS = [  # (label, metrics.json key, kind, lm-eval task and stderr key or
     ("grounded_acc", "grounded_acc", "kpi", "grounded"),
     ("vocab_recall", "vocab_recall", "kpi", "vocab"),
     ("halluc_rate", "halluc_rate", "kpi", "adversarial"),
+    ("gold-answer log-prob (nats)", "gold_lp", "lp", None),
+    ("2026-report perplexity", "ppl_postcutoff", "ppl", None),
 ]
+
+
+def paired_lp_se(ref: str, run: str) -> float:
+    """Standard error of the per-item gold_lp difference run - ref on the same domain_qa items:
+    the noise a paired comparison of a continuous score has to beat."""
+
+    def load(r: str) -> dict:
+        rows = (json.loads(line) for line in (RUNS / r / "generations.jsonl").open())
+        return {x["id"]: x["gold_lp"] for x in rows if x["task"] == "domain_qa" and "gold_lp" in x}
+
+    a, b = load(ref), load(run)
+    d = [b[i] - a[i] for i in a if i in b]
+    return statistics.stdev(d) / math.sqrt(len(d)) if len(d) > 1 else 0
 
 
 def delta_table() -> str:
@@ -438,23 +454,33 @@ def delta_table() -> str:
         for r, metrics in runs.items():
             v = metrics.get(key)
             if v is not None:
-                change[r] = (v / ref[key] - 1) * 100 if kind == "ppl" else (v - ref[key]) * 100
-        seed = abs(change.get(SEED_PAIR[0], 0) - change.get(SEED_PAIR[1], 0))
-        if kind == "lm" and extra[0] in lm:
+                change[r] = (
+                    (v / ref[key] - 1) * 100
+                    if kind == "ppl"
+                    else (v - ref[key])
+                    if kind == "lp"
+                    else (v - ref[key]) * 100
+                )
+        # the seed gap needs both seeds measured; a missing one is no gap, not a gap of 0
+        pair = [change.get(r) for r in SEED_PAIR]
+        seed = abs(pair[0] - pair[1]) if None not in pair else None
+        if kind == "lp":
+            se = paired_lp_se(REF, SEED_PAIR[0])
+        elif kind == "lm" and extra[0] in lm:
             se = lm[extra[0]].get(extra[1], 0) * 100
         elif kind == "kpi":
             n = ref.get("n", {}).get(extra, 0)
             se = math.sqrt(ref[key] * (1 - ref[key]) / n) * 100 if n else 0
         else:
             se = 0
-        unit = "%" if kind == "ppl" else " pt"
-        base = f"{ref[key]:.2f}" if kind == "ppl" else f"{ref[key]:.3f}"
+        base = f"{ref[key]:.2f}" if kind in ("ppl", "lp") else f"{ref[key]:.3f}"
         cells = [label, base]
+        fmt = {"ppl": "{:+.2f}%", "lp": "{:+.2f}"}.get(kind, "{:+.1f}")
         for r in names:
             v = change.get(r)
-            cells.append("" if v is None else f"{v:+.2f}{unit}" if kind == "ppl" else f"{v:+.1f}")
-        noise = max(seed, se)
-        cells.append(f"{noise:.2f}{unit}" if kind == "ppl" else f"{noise:.1f}")
+            cells.append("" if v is None else fmt.format(v))
+        noise = max(x for x in (seed, se) if x is not None) if (seed or se) else None
+        cells.append("" if noise is None else fmt.format(noise).lstrip("+"))
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
@@ -512,15 +538,18 @@ def main() -> None:
     ppl = {
         f.stem: json.loads(f.read_text())
         for f in sorted(PPL.glob("*.json"))
-        if not f.stem.startswith("smoke")
+        if not f.stem.startswith("smoke") and not f.stem.endswith("-remerge")
     }
     if BASE in ppl and len(ppl) > 1:
         md += f"\n## Perplexity vs {BASE}\n\n" + ppl_table(ppl) + "\n"
     if deltas := delta_table():
         md += (
-            f"\n## Change vs {REF}, next to the noise\n\n{deltas}\n\nPerplexity in %, the rest in "
-            "points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error "
-            "for base-8b-hf): a change smaller than it is not a result.\n"
+            f"\n## Change vs {REF}, next to the noise\n\n{deltas}\n\nPerplexity in %, the "
+            "gold-answer log-probability in nats per answer, the rest in points. noise = max(the "
+            "seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for "
+            "the log-probability the paired per-item difference): a change smaller than it is not "
+            "a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose "
+            "weights were deleted, has none.\n"
         )
     Path("results/train_runs.md").write_text(md)
     print(md)

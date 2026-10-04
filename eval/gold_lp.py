@@ -9,8 +9,11 @@ parser and no judge, and far less variance than accuracy.
 
 The prompt is exactly the one generation uses (prompts.qa_prompt), and the scored continuation is
 the gold answer as the model would write it:
-  base   " " + answer + "\\n"   (the few-shot format "A: 0.95 d_b\\n"; the newline ends the answer,
-                                so a gold that is a prefix of a longer string isn't free)
+  base   " " + answer + "\\n\\n"  (the few-shot format: every answer in the prompt is followed by
+                                the "\\n\\n" token, then "Q:". The end marker means a gold that is a
+                                prefix of a longer string isn't free. A lone "\\n" token, used until
+                                2026-10-04, never follows an answer in the prompt; its log-probability
+                                fell under CPT, which made gold_lp look worse after training)
   chat   the assistant message `answer`, then EOS (mistral-common's encode_instruct); scored in
          the chat format, so an Instruct row is not comparable to base-format rows
 The answer's tokens are the full sequence minus the prompt's, which needs the prompt's tokens to be
@@ -57,7 +60,7 @@ def token_ids(model: str, chat: bool, prompt: str, answer: str) -> tuple[list[in
     else:
         tek = tok.instruct_tokenizer.tokenizer
         p = [tek.bos_id, *tek.encode(prompt, bos=False, eos=False)]
-        full = [tek.bos_id, *tek.encode(f"{prompt} {answer}\n", bos=False, eos=False)]
+        full = [tek.bos_id, *tek.encode(f"{prompt} {answer}\n\n", bos=False, eos=False)]
     return (full, len(p)) if full[: len(p)] == p and len(full) > len(p) else None
 
 

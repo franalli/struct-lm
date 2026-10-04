@@ -243,7 +243,10 @@ mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/ba
    better; `ppl_train` is measured on a train slice, for base too) and `ppl_postcutoff` (the 13
    2026 reports, `--only postcutoff`). `gold_lp` / `gold_lp_seen` / `gold_lp_unseen`: mean
    log-probability of the gold QA answer in nats per item (`eval/gold_lp.py`, computed in the
-   generation engine; Instruct in chat format, not comparable to base rows).
+   generation engine; Instruct in chat format, not comparable to base rows). It scores the answer
+   plus the end token the prompt uses after answers ("\n\n"; a lone "\n" penalised CPT, fixed
+   2026-10-04); `run_eval.py --gold-lp-only` recomputes it in saved generations without touching
+   outputs. Read it paired per item against the base, with the seed gap (0.007 nats on v2).
 8. **Judge:** decide by rule anything a rule can decide, before the judge sees it: empty or
    citation-only answers, answers citing no provided passage, the exact abstain phrase, and vocab
    outputs with no definition line. Give the judge only what the verdict depends on (the

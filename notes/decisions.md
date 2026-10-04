@@ -1467,3 +1467,66 @@ would need a higher cap, more items from the long manuals, and another review.
 - Regenerate domain_qa for the compared checkpoints (pre-approved launch plan above).
 - Results go into a new `results/table.md`; the current 130-item table is frozen as
   `results/table_v1.1.md` (the current scorer), next to `table_v1.md` (as published).
+
+## 2026-10-04: Eval v2 scored; gold_lp end marker fixed; CPT makes read facts ~1.8x more probable
+**GPU runs (pre-approved by the user, 1 x H100 each):**
+- **Regenerated:** domain_qa on eval v2 with `--tasks domain_qa` for base-8b-hf, instruct-8b
+  (`--chat --config-format auto`, its Stage 0 path), cpt-8b-replay10, cpt-8b and cpt-8b-seed1.
+  Every pulled file was checked: the rows of the other three tasks are byte-identical to the
+  committed ones, all 325 domain_qa rows carry `gold_lp`, and `generations_meta.json` records the
+  run.
+- **`ppl_postcutoff`:** base-8b-hf 6.206, cpt-8b-replay10 6.180 (-0.43%), cpt-8b-seed1 6.175
+  (-0.51%). Measured over whole documents, the 2026 reports confirm the probe's -0.4%.
+- **cpt-8b-seed1 re-merged from its adapter** (CPU `merge`, as originally). Perplexity reproduces
+  bit for bit: every per-window NLL sum is identical, domain val 6.7184. It stands as the noise
+  floor; `results/ppl/cpt-8b-seed1-remerge.json` is the evidence.
+- **Table:** `results/table.md` starts on eval v2. cpt-8b-full and the Stage 0 base-8b keep blank
+  qa cells (`--allow-partial`), and all rescoring made 0 judge calls.
+
+**The gold_lp end-marker flaw, found and fixed the same day.** The first gold_lp scored the answer
+followed by a lone "\n" token. In the prompt every few-shot answer is followed by the "\n\n"
+token, so the lone "\n" was an unnatural continuation, and its log-probability fell under CPT
+(the corpus's paragraph breaks are "\n\n"):
+
+| | base-8b-hf | CPT |
+|---|---|---|
+| gold_lp, flawed | -12.18 | -14.20 |
+| gold_lp, fixed | -6.78 | -6.19 |
+
+That made CPT look worse at knowing the answers. The fix:
+- **End marker:** `eval/gold_lp.py` scores " " + answer + "\n\n" (Tekken merges "\n\n" with a
+  final "%", "." or "'" in 28 items, as it does in the prompt). All 325 items pass the boundary
+  check in both formats.
+- **Per-token data:** each item stores `gold_lp_tokens` and `gold_lp_end`, so the end marker can
+  always be separated out. It is about -0.45 nats for base models; EOS is -0.78 for Instruct.
+- **Re-run:** `run_eval.py --gold-lp-only` (Modal `kpi_eval --gold-lp-only`, 5 more H100 runs,
+  user-approved) recomputed the fields without touching any output.
+- **Instruct:** chat ends with EOS and was unaffected; its rerun reproduces its values exactly.
+
+**Results (eval v2, paired per item against base-8b-hf, 95% bootstrap over items):**
+
+| Run | Δ qa_acc (points) | Δ gold_lp (nats/answer) | Items more likely |
+|---|---|---|---|
+| cpt-8b | +2.5 [+0.3, +4.6] | +0.59 [+0.45, +0.75] | 70% |
+| cpt-8b-seed1 | +0.9 [-1.5, +3.4] | +0.58 [+0.44, +0.74] | 71% |
+| cpt-8b-replay10 | +0.9 [-0.9, +3.1] | +0.52 [+0.38, +0.66] | 68% |
+
+- **Noise:** the seed gap is 1.5 points on qa_acc (standard error 1.8 at n = 325) and 0.007 nats on
+  gold_lp ([-0.037, +0.051]).
+- **By kind, per answer token** (cpt-8b): numbers +0.058 [+0.041, +0.076], identifiers +0.127
+  [+0.074, +0.187], terms +0.147 [+0.048, +0.255]. Identifiers move most per answer only because
+  they are longest (10.4 tokens against 5.2 for numbers).
+- **Base qa_acc** on v2 is 0.120. By kind: number 0.144, identifier 0.077, term 0.053.
+
+**Reading:**
+- **CPT injected knowledge of the documents it read.** The gold answer to a closed-book question
+  about a read document becomes about 1.8x more probable. Two seeds agree to 0.007 nats, and 70%
+  of items move up.
+- **Pass/fail can't resolve it.** The effect is about one noise unit in accuracy, which is why
+  Stage 2's 130-item qa_acc showed nothing.
+- **Not transfer.** Every eval item comes from a train document, so this is the closed-book
+  counterpart of the -8% train-slice perplexity. Transfer is what `ppl_postcutoff` measures (-0.4%).
+- **Numbers move least per token.** The specific values are the hardest to shift, which is a
+  target for SFT's QA synthesis.
+- **Revises the Stage 2 conclusion "no detectable KPI change".** The change was there, in the
+  probabilities, below accuracy's resolution.

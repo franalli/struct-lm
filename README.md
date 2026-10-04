@@ -353,16 +353,21 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | MMLU | 0.767 | -0.4 | -0.2 | -0.1 | -0.5 | 0.3 |
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
-| qa_acc | 0.154 | +0.8 | +0.0 | +0.0 | +3.1 | 3.2 |
+| qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
 | grounded_acc | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
+| gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
+| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 
-Perplexity in %, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error for base-8b-hf): a change smaller than it is not a result.
+Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose weights were deleted, has none.
 <!-- stage2-tables:end -->
 
 **Bottom line.** At 20M tokens and one epoch, CPT learns the documents it reads (-8% perplexity) and
 almost nothing that transfers to documents it hasn't seen (-0.4% on reports published in 2026).
+It does make the facts in the documents it read more likely: closed-book gold answers become about
+1.8x more probable (+0.59 nats per answer, both seeds), a gain pass/fail accuracy is too coarse to
+resolve at this size.
 
 - **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
   documents harder, with 2-4x the forgetting and no held-out gain.
@@ -415,16 +420,20 @@ and it needs repetition or augmentation to stick.
    - **Little domain-general structure left.** The base already models this register well (domain
      val 6.9 against 8.2 on web text), so there is little general structure left to learn at this
      scale.
-   - **Caveats:** 13 documents, mostly research reports rather than manuals, and two windows per
-     document.
+   - **Confirmed over whole documents.** Measured like domain val (`ppl_postcutoff`, all 82
+     windows of the 13 reports), CPT moves the 2026 set -0.43% (replay) and -0.51% (seed 1),
+     against -2.3% on held-out val.
+   - **Caveats:** 13 documents, mostly research reports rather than manuals.
 2. **Pushing harder moves the wrong way.** The train slice fell -8% (`cpt-8b`), -12% (LR 2e-4) and
    -22% (full-parameter), while held-out stayed flat each time, between -2.15% and -2.42%.
    - **lr2x:** general-text perplexity rose about 2x as much as the main run's.
    - **Full-parameter:** about 3x the main run's general-text rise, and about 4x its GSM8K loss
      (-3.0 points against -0.7 to -0.8). That GSM8K drop is the one benchmark delta that clears the
      noise (1.1) by a wide margin.
-   - **Full-parameter's task gains:** +3.1 qa_acc (noise 3.2) and +3.8 vocab (noise 3.1) sit at the noise edge, and
-     every one of those items comes from a training document. They are knowledge of what it read.
+   - **Full-parameter's task gains** on the 130-item eval v1 (`results/table_v1.md`): +3.1 qa_acc
+     (noise 3.2) and +3.8 vocab (noise 3.1), at the noise edge. Every one of those items comes from
+     a training document, so they are knowledge of what it read. Its weights were deleted before
+     the QA task grew, so it has no 325-item QA scores.
 
    LoRA stays the default: "LoRA learns less and forgets less" (Biderman et al., 2024).
 3. **The base hadn't memorised the corpus.** The six "recalled" spans continue patterns set up in
@@ -433,9 +442,27 @@ and it needs repetition or augmentation to stick.
    So pretraining exposure doesn't explain the small gain. A single pass in pretraining can't be
    ruled out: one epoch of our own CPT moves verbatim recall by 0.13 tokens, less than this
    comparison resolves.
-4. **Task scores are Stage 3 metrics.** A base model doesn't follow instructions, and its task
-   scores swing 4-5 points between seeds: grounded_acc moves -0.9 for one seed and -4.6 for the
-   other. Only full-parameter moves outside that, and only at the edge.
+4. **Pass/fail scores can't see Stage 2; the gold answer's probability can.** On the 325-item
+   closed-book task (eval v2), qa_acc moves +2.5, +0.9 and +0.9 points for the three LoRA runs,
+   against a noise of 1.8. The log-probability of the gold answer (`gold_lp`, per item, paired
+   against `base-8b-hf`) moves clearly:
+
+   | Run | Change in `gold_lp`, nats per answer [95% CI] | Items more likely |
+   |---|---|---|
+   | `cpt-8b` | +0.59 [+0.45, +0.75] | 70% |
+   | `cpt-8b-seed1` | +0.58 [+0.44, +0.74] | 71% |
+   | `cpt-8b-replay10` | +0.52 [+0.38, +0.66] | 68% |
+
+   - **The seeds agree:** the two seeds differ by 0.007 nats.
+   - **Numbers move least.** Per answer token, CPT moves values +0.06 nats, identifiers +0.13 and
+     terms +0.15.
+   - **What it is:** every eval item comes from a document CPT read, so this is the closed-book
+     counterpart of the -8% train-slice perplexity: knowledge of what it read, not transfer.
+   - **The end-marker fix:** the answer is scored with the end token the prompt uses after every
+     answer ("\n\n"). The first measurement used a lone "\n", which never follows an answer in
+     the prompt and made CPT look worse (`notes/decisions.md`).
+   - **The other task scores** (grounded, citations, hallucination) need instruction following,
+     which a base model lacks, and swing 4-5 points between seeds; they are Stage 3 metrics.
 5. **Replay was adopted on a rule that fired at one noise unit; it's kept.** Mixing in 10%
    FineWeb-Edu left domain perplexity identical and brought the MMLU dip to -0.1 from -0.4. That
    margin is about one noise unit (0.3), so the pre-registered rule fired on noise; the flaw is
@@ -471,50 +498,76 @@ and it needs repetition or augmentation to stick.
 ### 4. Results
 
 Every scored checkpoint, from [`results/table.md`](results/table.md) (copied here by
-`train/report.py`). Stage 2 rows are base models, scored without `--chat`.
+`train/report.py`), on eval v2: domain_qa has 325 items, the other tasks are unchanged. The
+130-item tables are frozen in [`results/table_v1.md`](results/table_v1.md) (as published with
+Stage 2) and [`results/table_v1.1.md`](results/table_v1.1.md) (current scorer). Stage 2 rows are
+base models, scored without `--chat`.
 
 - **Task scores** come from the frozen eval, with judge columns scored locally:
   - `qa_num`, `qa_ident` and `qa_term` split `qa_acc` by answer kind (`eval/qa_rules.py`):
-    values, identifiers and terms. Identifiers are document ids and article numbers, arbitrary
-    strings and the slowest kind to learn. Terms include everything else. A hand audit of 169
-    misses found 2 scoring errors, both fixed, so low text scores are genuine.
+    values, identifiers (document ids and article numbers) and terms, which include everything
+    else. A hand audit of 169 misses found 2 scoring errors, both fixed, so the low scores are
+    genuine.
   - The `_seen` / `_unseen` columns split `qa_acc` and `vocab_recall` by whether Stage 3's SFT
     synthesis may use the item's source chunk (`eval/sft_split.py`). Before Stage 3 nothing is
-    seen, so the two halves are a null check, with about 65 items each for QA.
+    seen, so the two halves (167 and 158 QA items) are a null check.
+  - `cpt-8b-full` and the Stage 0 `base-8b` have no QA scores on v2. Full's weights were deleted
+    before the task grew, and `base-8b-hf` supersedes the Stage 0 row.
+- **Gold-answer log-probability** (`gold_lp`, nats per answer, higher is better,
+  `eval/gold_lp.py`) is the continuous companion to `qa_acc` on the same items. Instruct is scored
+  in its chat format, so its value isn't comparable to the base-format rows.
 - **Benchmarks** are from lm-eval: 5-shot, never with the chat template.
-- **Perplexity** is from `eval/perplexity.py` (lower is better).
+- **Perplexity** is from `eval/perplexity.py` (lower is better). `ppl_postcutoff` covers the 13
+  federal reports published after the base model.
 
 <!-- results-table:start -->
-Items per task: domain_qa 130, grounded 108, vocab 210, adversarial 76, qa_number 91, qa_identifier 26, qa_term 13.
+Items per task: domain_qa 325, grounded 108, vocab 210, adversarial 76, qa_number 222, qa_identifier 65, qa_term 38.
 
 **Task scores**
 
 | run | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen | grounded_acc | cite_valid | cite_supported | vocab_recall | vocab_seen | vocab_unseen | halluc_rate |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| base-8b | 0.146 | 0.187 | 0.038 | 0.077 | 0.123 | 0.169 | 0.852 | 0.130 | 0.102 | 0.719 | 0.723 | 0.716 | 0.882 |
-| instruct-8b | 0.123 | 0.154 | 0.038 | 0.077 | 0.123 | 0.123 | 0.898 | 0.833 | 0.787 | 0.786 | 0.802 | 0.771 | 0.013 |
-| cpt-8b | 0.162 | 0.198 | 0.077 | 0.077 | 0.139 | 0.185 | 0.833 | 0.148 | 0.074 | 0.710 | 0.693 | 0.725 | 0.908 |
-| cpt-8b-seed1 | 0.154 | 0.176 | 0.115 | 0.077 | 0.139 | 0.169 | 0.796 | 0.102 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
-| base-8b-hf | 0.154 | 0.198 | 0.038 | 0.077 | 0.123 | 0.185 | 0.843 | 0.120 | 0.083 | 0.705 | 0.713 | 0.697 | 0.895 |
-| cpt-8b-full | 0.185 | 0.220 | 0.115 | 0.077 | 0.139 | 0.231 | 0.889 | 0.148 | 0.102 | 0.743 | 0.733 | 0.752 | 0.921 |
-| cpt-8b-replay10 | 0.154 | 0.176 | 0.115 | 0.077 | 0.139 | 0.169 | 0.778 | 0.056 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
+| base-8b-hf | 0.120 | 0.144 | 0.077 | 0.053 | 0.126 | 0.114 | 0.843 | 0.120 | 0.083 | 0.705 | 0.713 | 0.697 | 0.895 |
+| instruct-8b | 0.099 | 0.126 | 0.031 | 0.053 | 0.114 | 0.082 | 0.898 | 0.833 | 0.787 | 0.786 | 0.802 | 0.771 | 0.013 |
+| cpt-8b | 0.145 | 0.167 | 0.123 | 0.053 | 0.156 | 0.133 | 0.833 | 0.148 | 0.074 | 0.710 | 0.693 | 0.725 | 0.908 |
+| cpt-8b-seed1 | 0.129 | 0.144 | 0.123 | 0.053 | 0.132 | 0.127 | 0.796 | 0.102 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
+| cpt-8b-replay10 | 0.129 | 0.144 | 0.123 | 0.053 | 0.150 | 0.108 | 0.778 | 0.056 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
+| cpt-8b-full |  |  |  |  |  |  | 0.889 | 0.148 | 0.102 | 0.743 | 0.733 | 0.752 | 0.921 |
+| base-8b |  |  |  |  |  |  | 0.852 | 0.130 | 0.102 | 0.719 | 0.723 | 0.716 | 0.882 |
+
+**Gold-answer log-probability (nats per item, higher is better)**
+
+| run | gold_lp | gold_lp_seen | gold_lp_unseen |
+| --- | --- | --- | --- |
+| base-8b-hf | -6.777 | -6.722 | -6.835 |
+| instruct-8b | -8.271 | -8.008 | -8.549 |
+| cpt-8b | -6.186 | -6.237 | -6.133 |
+| cpt-8b-seed1 | -6.193 | -6.236 | -6.148 |
+| cpt-8b-replay10 | -6.262 | -6.356 | -6.162 |
+| cpt-8b-full |  |  |  |
+| base-8b |  |  |  |
 
 **Benchmarks and perplexity**
 
 | run | mmlu | mmlu_stem | mmlu_hum | mmlu_soc | mmlu_other | gsm8k | hellaswag | ppl_train | ppl_domain_val | ppl_general_val | ppl_postcutoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| base-8b | 0.768 | 0.732 | 0.707 | 0.862 | 0.805 | 0.794 | 0.801 | 6.18 | 6.88 | 8.15 |  |
+| base-8b-hf | 0.767 | 0.733 | 0.704 | 0.862 | 0.803 | 0.793 | 0.801 | 6.18 | 6.88 | 8.15 | 6.21 |
 | instruct-8b | 0.761 | 0.735 | 0.691 | 0.854 | 0.802 | 0.855 | 0.801 |  |  |  |  |
 | cpt-8b | 0.764 | 0.729 | 0.699 | 0.857 | 0.804 | 0.785 | 0.801 | 5.67 | 6.72 | 8.18 |  |
-| cpt-8b-seed1 | 0.765 | 0.727 | 0.699 | 0.861 | 0.809 | 0.786 | 0.800 | 5.69 | 6.72 | 8.17 |  |
-| base-8b-hf | 0.767 | 0.733 | 0.704 | 0.862 | 0.803 | 0.793 | 0.801 | 6.18 | 6.88 | 8.15 |  |
+| cpt-8b-seed1 | 0.765 | 0.727 | 0.699 | 0.861 | 0.809 | 0.786 | 0.800 | 5.69 | 6.72 | 8.17 | 6.17 |
+| cpt-8b-replay10 | 0.766 | 0.730 | 0.707 | 0.856 | 0.806 | 0.791 | 0.800 | 5.65 | 6.72 | 7.97 | 6.18 |
 | cpt-8b-full | 0.762 | 0.729 | 0.692 | 0.860 | 0.806 | 0.763 | 0.798 | 4.82 | 6.73 | 8.25 |  |
-| cpt-8b-replay10 | 0.766 | 0.730 | 0.707 | 0.856 | 0.806 | 0.791 | 0.800 | 5.65 | 6.72 | 7.97 |  |
+| base-8b | 0.768 | 0.732 | 0.707 | 0.862 | 0.805 | 0.794 | 0.801 | 6.18 | 6.88 | 8.15 |  |
 <!-- results-table:end -->
 
-**Stage 2 (CPT) earned little.** Held-out perplexity fell 2.3%, documents published in 2026 gained
-0.4%, and no task score moved outside the noise. `cpt-8b-replay10` goes forward because LoRA with
-replay costs almost nothing in forgetting, not because CPT helped. _Stage 3 onward: to follow._
+**Stage 2 (CPT) earned little.**
+- **Perplexity:** held-out perplexity fell 2.3%, and documents published in 2026 gained 0.4%.
+- **Task scores:** no pass/fail score moved outside the noise.
+- **Gold answers:** closed-book gold answers to facts from the documents it read became about 1.8x
+  more probable (`gold_lp` +0.59 nats per answer), which SFT can build on.
+- **Why `cpt-8b-replay10` goes forward:** LoRA with replay costs almost nothing in forgetting.
+
+_Stage 3 onward: to follow._
 
 ### 5. Serving
 
@@ -558,8 +611,8 @@ Mistral's native vLLM path, `base-8b-hf` and `cpt-8b` the HF path with the YaRN 
   questions and not refusing across the board.
 - **Knowledge of a 20M-token corpus needs repetition or augmentation,** such as paraphrased
   restatements or QA rewrites of each document, rather than one pass of next-token training.
-- **Make the 2026 set a standing transfer measure.** Measure it with `eval/perplexity.py` over
-  whole documents, and grow it (FHWA's 2026 reports need a browser download).
+- **Keep the 2026 set as the standing transfer measure.** It is `ppl_postcutoff`, now measured
+  over whole documents. Grow it; FHWA's 2026 reports need a browser download.
 - **Use fused or chunked cross-entropy for single-GPU training.** The 131k-vocab logits are the
   largest activation, and smaller logits memory allows larger micro-batches.
 - **File the vLLM YaRN issue** with the repro in `notes/contributions.md`.

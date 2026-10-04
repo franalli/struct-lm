@@ -1,0 +1,26 @@
+{
+  "domain_qa": {
+    "date": "2026-10-04",
+    "model": "/vol/checkpoints/cpt-8b-replay10",
+    "chat": false,
+    "config_format": "hf",
+    "vllm": "0.29.0",
+    "n": 325,
+    "prompts_sha256": "871281bd764075375397cc2077d7977f762cb3f456bfc3a0bae68e3b0f6d7f07",
+    "gold_lp": {
+      "date": "2026-10-04",
+      "model": "/vol/checkpoints/cpt-8b-replay10",
+      "end_marker": "\\n\\n",
+      "vllm": "0.29.0"
+    }
+  },
+  "grounded": {
+    "note": "generated before provenance was recorded (2026-10-04)"
+  },
+  "vocab": {
+    "note": "generated before provenance was recorded (2026-10-04)"
+  },
+  "adversarial": {
+    "note": "generated before provenance was recorded (2026-10-04)"
+  }
+}

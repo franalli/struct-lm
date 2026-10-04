@@ -94,6 +94,7 @@ def kpi_eval(
     generate_only: bool = False,
     tasks: str = "",
     config_format: str = "hf",
+    gold_lp_only: bool = False,
 ) -> None:
     """The domain KPI eval: run_eval.py with container paths. Arguments map 1:1 to its flags.
     `tasks` (comma-separated, "" = all) regenerates only those tasks; the run's other saved
@@ -129,6 +130,8 @@ def kpi_eval(
     if tasks:
         cmd += ["--tasks", tasks]
     cmd += ["--config-format", config_format]
+    if gold_lp_only:
+        cmd.append("--gold-lp-only")
     subprocess.run(cmd, check=True, cwd="/root")  # check=True: a failed eval fails the Modal call
     vol.commit()  # persist results; without this, writes to /vol are lost when the container exits
 
@@ -257,6 +260,7 @@ def main(
     tokenizer_mode: str = "mistral",  # "auto" for non-Mistral-3 checkpoints
     tasks: str = "",  # KPI only: e.g. "domain_qa" regenerates that task and keeps the others
     config_format: str = "hf",  # KPI only: "auto" to extend Stage 0's native-path hub runs
+    gold_lp_only: bool = False,  # KPI only: recompute gold_lp in the saved generations, no generation
 ) -> None:
     """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
     bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi) or
@@ -283,6 +287,7 @@ def main(
             generate_only,
             tasks,
             config_format,
+            gold_lp_only,
         )
     if which == "latency":
         latency.remote(model, run_name, tokenizer_mode)

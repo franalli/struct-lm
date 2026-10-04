@@ -1,5 +1,5 @@
 {
-  "run": "cpt-8b-seed1",
+  "run": "cpt-8b-seed1-remerge",
   "model": "/vol/checkpoints/cpt-8b-seed1",
   "ppl_train": 5.687,
   "ppl_domain_val": 6.7184,

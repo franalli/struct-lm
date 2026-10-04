@@ -1,10 +1,4 @@
 {
-  "qa_acc": 0.1846,
-  "qa_num": 0.2198,
-  "qa_ident": 0.1154,
-  "qa_term": 0.0769,
-  "qa_seen": 0.1385,
-  "qa_unseen": 0.2308,
   "grounded_acc": 0.8889,
   "cite_valid": 0.1481,
   "cite_supported": 0.1019,
@@ -13,7 +7,7 @@
   "vocab_unseen": 0.7523,
   "halluc_rate": 0.9211,
   "n": {
-    "domain_qa": 130,
+    "domain_qa": 0,
     "grounded": 108,
     "vocab": 210,
     "adversarial": 76

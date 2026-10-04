@@ -34,9 +34,11 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | MMLU | 0.767 | -0.4 | -0.2 | -0.1 | -0.5 | 0.3 |
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
-| qa_acc | 0.154 | +0.8 | +0.0 | +0.0 | +3.1 | 3.2 |
+| qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
 | grounded_acc | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
+| gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
+| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 
-Perplexity in %, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error for base-8b-hf): a change smaller than it is not a result.
+Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose weights were deleted, has none.
