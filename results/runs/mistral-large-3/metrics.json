@@ -1,0 +1,16 @@
+{
+  "qa_acc": 0.28,
+  "qa_num": 0.2477,
+  "qa_ident": 0.4462,
+  "qa_term": 0.1842,
+  "qa_seen": 0.2754,
+  "qa_unseen": 0.2848,
+  "n": {
+    "domain_qa": 325,
+    "grounded": 0,
+    "vocab": 0,
+    "adversarial": 0
+  },
+  "model": "mistral-large-2512 (Mistral API)",
+  "chat": true
+}

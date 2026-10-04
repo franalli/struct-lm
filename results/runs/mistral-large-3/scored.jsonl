@@ -1,0 +1,325 @@
+{"task": "domain_qa", "id": "qa-0001", "correct": true, "output": "0.2 f'_c"}
+{"task": "domain_qa", "id": "qa-0002", "correct": false, "output": "3 in."}
+{"task": "domain_qa", "id": "qa-0003", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-0004", "correct": false, "output": "5 ppm"}
+{"task": "domain_qa", "id": "qa-0005", "correct": false, "output": "1.5 ft/yr"}
+{"task": "domain_qa", "id": "qa-0006", "correct": false, "output": "0.5"}
+{"task": "domain_qa", "id": "qa-0007", "correct": true, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-0008", "correct": true, "output": "1.0"}
+{"task": "domain_qa", "id": "qa-0009", "correct": false, "output": "0.9"}
+{"task": "domain_qa", "id": "qa-0010", "correct": false, "output": "Design Documentation Report (DDR)"}
+{"task": "domain_qa", "id": "qa-0011", "correct": false, "output": "25%"}
+{"task": "domain_qa", "id": "qa-0012", "correct": true, "output": "160 ft"}
+{"task": "domain_qa", "id": "qa-0013", "correct": false, "output": "5%"}
+{"task": "domain_qa", "id": "qa-0014", "correct": false, "output": "10%"}
+{"task": "domain_qa", "id": "qa-0015", "correct": true, "output": "6.5.4.2"}
+{"task": "domain_qa", "id": "qa-0016", "correct": false, "output": "EM 1110-2-3001"}
+{"task": "domain_qa", "id": "qa-0017", "correct": false, "output": "1.25"}
+{"task": "domain_qa", "id": "qa-0018", "correct": true, "output": "6.6.1.3"}
+{"task": "domain_qa", "id": "qa-0019", "correct": false, "output": "50 psi"}
+{"task": "domain_qa", "id": "qa-0020", "correct": false, "output": "EM 1110-1-1005"}
+{"task": "domain_qa", "id": "qa-0021", "correct": true, "output": "0.2 g"}
+{"task": "domain_qa", "id": "qa-0022", "correct": true, "output": "FEMA P-361"}
+{"task": "domain_qa", "id": "qa-0023", "correct": false, "output": "7.3.2.1"}
+{"task": "domain_qa", "id": "qa-0024", "correct": false, "output": "1.2"}
+{"task": "domain_qa", "id": "qa-0025", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-0026", "correct": true, "output": "EM 1110-2-1602"}
+{"task": "domain_qa", "id": "qa-0027", "correct": false, "output": "10%"}
+{"task": "domain_qa", "id": "qa-0028", "correct": true, "output": "0.2 f'_c"}
+{"task": "domain_qa", "id": "qa-0029", "correct": false, "output": "6.7.2"}
+{"task": "domain_qa", "id": "qa-0030", "correct": false, "output": "72 hours"}
+{"task": "domain_qa", "id": "qa-0031", "correct": true, "output": "FEMA P-695"}
+{"task": "domain_qa", "id": "qa-0032", "correct": true, "output": "Bruun Rule"}
+{"task": "domain_qa", "id": "qa-0033", "correct": false, "output": "1000 ft"}
+{"task": "domain_qa", "id": "qa-0034", "correct": true, "output": "6.10.9.2"}
+{"task": "domain_qa", "id": "qa-0035", "correct": true, "output": "10"}
+{"task": "domain_qa", "id": "qa-0036", "correct": false, "output": "300 series"}
+{"task": "domain_qa", "id": "qa-0037", "correct": false, "output": "4 in."}
+{"task": "domain_qa", "id": "qa-0038", "correct": true, "output": "20%"}
+{"task": "domain_qa", "id": "qa-0039", "correct": false, "output": "Log-Pearson Type III"}
+{"task": "domain_qa", "id": "qa-0040", "correct": false, "output": "6.11.8.2.3"}
+{"task": "domain_qa", "id": "qa-0041", "correct": false, "output": "Effective stiffness"}
+{"task": "domain_qa", "id": "qa-0042", "correct": false, "output": "0.70"}
+{"task": "domain_qa", "id": "qa-0043", "correct": true, "output": "ER 1110-2-1156"}
+{"task": "domain_qa", "id": "qa-0044", "correct": false, "output": "Sa_avg"}
+{"task": "domain_qa", "id": "qa-0045", "correct": true, "output": "11"}
+{"task": "domain_qa", "id": "qa-0046", "correct": false, "output": "4"}
+{"task": "domain_qa", "id": "qa-0047", "correct": false, "output": "6.12.2.4.2"}
+{"task": "domain_qa", "id": "qa-0048", "correct": false, "output": "2.5 in."}
+{"task": "domain_qa", "id": "qa-0049", "correct": true, "output": "6.13.5.3"}
+{"task": "domain_qa", "id": "qa-0050", "correct": false, "output": "ASTM D3744"}
+{"task": "domain_qa", "id": "qa-0051", "correct": false, "output": "15"}
+{"task": "domain_qa", "id": "qa-0052", "correct": true, "output": "60%"}
+{"task": "domain_qa", "id": "qa-0053", "correct": false, "output": "6.10.4.2.2"}
+{"task": "domain_qa", "id": "qa-0054", "correct": false, "output": "Do nothing"}
+{"task": "domain_qa", "id": "qa-0055", "correct": false, "output": "50 km"}
+{"task": "domain_qa", "id": "qa-0056", "correct": true, "output": "L/500"}
+{"task": "domain_qa", "id": "qa-0057", "correct": false, "output": "0.01 ft"}
+{"task": "domain_qa", "id": "qa-0058", "correct": false, "output": "0.2 s"}
+{"task": "domain_qa", "id": "qa-0059", "correct": false, "output": "0.40"}
+{"task": "domain_qa", "id": "qa-0501", "correct": false, "output": "0.6%"}
+{"task": "domain_qa", "id": "qa-0502", "correct": true, "output": "25%"}
+{"task": "domain_qa", "id": "qa-0503", "correct": false, "output": "135 degrees"}
+{"task": "domain_qa", "id": "qa-0504", "correct": false, "output": "5%"}
+{"task": "domain_qa", "id": "qa-0505", "correct": false, "output": "6 inches"}
+{"task": "domain_qa", "id": "qa-0506", "correct": false, "output": "20"}
+{"task": "domain_qa", "id": "qa-0507", "correct": false, "output": "5.4.2.3"}
+{"task": "domain_qa", "id": "qa-0508", "correct": false, "output": "17.2.4.4"}
+{"task": "domain_qa", "id": "qa-0509", "correct": true, "output": "Whole Community"}
+{"task": "domain_qa", "id": "qa-0510", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-0511", "correct": true, "output": "4.6.2.1.8"}
+{"task": "domain_qa", "id": "qa-0512", "correct": true, "output": "2 ft"}
+{"task": "domain_qa", "id": "qa-0513", "correct": false, "output": "35 g/L"}
+{"task": "domain_qa", "id": "qa-0514", "correct": false, "output": "3 ft"}
+{"task": "domain_qa", "id": "qa-0515", "correct": false, "output": "0.23 in²"}
+{"task": "domain_qa", "id": "qa-0516", "correct": false, "output": "0.75"}
+{"task": "domain_qa", "id": "qa-0517", "correct": false, "output": "6.7.7"}
+{"task": "domain_qa", "id": "qa-0518", "correct": false, "output": "1.0"}
+{"task": "domain_qa", "id": "qa-0519", "correct": false, "output": "6.10.1.1.1b"}
+{"task": "domain_qa", "id": "qa-0520", "correct": true, "output": "120 ksi"}
+{"task": "domain_qa", "id": "qa-0521", "correct": false, "output": "C35 (Rockwell)"}
+{"task": "domain_qa", "id": "qa-0522", "correct": false, "output": "15-30 minutes"}
+{"task": "domain_qa", "id": "qa-0523", "correct": true, "output": "5"}
+{"task": "domain_qa", "id": "qa-0524", "correct": false, "output": "5–10 years"}
+{"task": "domain_qa", "id": "qa-0525", "correct": false, "output": "Silt"}
+{"task": "domain_qa", "id": "qa-0526", "correct": false, "output": "0.4"}
+{"task": "domain_qa", "id": "qa-0527", "correct": true, "output": "1.5 in."}
+{"task": "domain_qa", "id": "qa-0528", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-0529", "correct": false, "output": "Tp-based method"}
+{"task": "domain_qa", "id": "qa-0530", "correct": false, "output": "12.10.3"}
+{"task": "domain_qa", "id": "qa-0531", "correct": false, "output": "0.6 g"}
+{"task": "domain_qa", "id": "qa-0532", "correct": true, "output": "0.6 g"}
+{"task": "domain_qa", "id": "qa-0533", "correct": false, "output": "15%"}
+{"task": "domain_qa", "id": "qa-0534", "correct": false, "output": "4 d_strand"}
+{"task": "domain_qa", "id": "qa-0535", "correct": true, "output": "2√(f'c) b₀d"}
+{"task": "domain_qa", "id": "qa-0536", "correct": false, "output": "300"}
+{"task": "domain_qa", "id": "qa-0537", "correct": false, "output": "Triangular"}
+{"task": "domain_qa", "id": "qa-0538", "correct": false, "output": "5.0 ksi"}
+{"task": "domain_qa", "id": "qa-0539", "correct": false, "output": "140"}
+{"task": "domain_qa", "id": "qa-0540", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-0541", "correct": false, "output": "0.7"}
+{"task": "domain_qa", "id": "qa-0542", "correct": false, "output": "5:1"}
+{"task": "domain_qa", "id": "qa-0543", "correct": true, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-0544", "correct": false, "output": "0.5 psi"}
+{"task": "domain_qa", "id": "qa-0545", "correct": false, "output": "130"}
+{"task": "domain_qa", "id": "qa-0546", "correct": false, "output": "0.01 W"}
+{"task": "domain_qa", "id": "qa-0547", "correct": true, "output": "3.6.1.3.3"}
+{"task": "domain_qa", "id": "qa-0548", "correct": false, "output": "Design discharge"}
+{"task": "domain_qa", "id": "qa-0549", "correct": true, "output": "17%"}
+{"task": "domain_qa", "id": "qa-0550", "correct": false, "output": "50%"}
+{"task": "domain_qa", "id": "qa-0551", "correct": false, "output": "Annually"}
+{"task": "domain_qa", "id": "qa-0552", "correct": true, "output": "75%"}
+{"task": "domain_qa", "id": "qa-0553", "correct": false, "output": "2.0"}
+{"task": "domain_qa", "id": "qa-0554", "correct": true, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-0555", "correct": false, "output": "√3 / 3"}
+{"task": "domain_qa", "id": "qa-0556", "correct": true, "output": "12 inches on center"}
+{"task": "domain_qa", "id": "qa-0557", "correct": true, "output": "EM 1110-2-2906"}
+{"task": "domain_qa", "id": "qa-0558", "correct": false, "output": "12 inches"}
+{"task": "domain_qa", "id": "qa-0559", "correct": false, "output": "0.10%"}
+{"task": "domain_qa", "id": "qa-0560", "correct": false, "output": "CORPS"}
+{"task": "domain_qa", "id": "qa-0561", "correct": false, "output": "0.4"}
+{"task": "domain_qa", "id": "qa-0562", "correct": false, "output": "5.0"}
+{"task": "domain_qa", "id": "qa-0563", "correct": false, "output": "6.10.10.4.2"}
+{"task": "domain_qa", "id": "qa-0564", "correct": false, "output": "5 mm + 1 ppm"}
+{"task": "domain_qa", "id": "qa-0565", "correct": true, "output": "SSPC-SP 10 / NACE No. 2"}
+{"task": "domain_qa", "id": "qa-0566", "correct": false, "output": "1-year"}
+{"task": "domain_qa", "id": "qa-0567", "correct": false, "output": "72 hours"}
+{"task": "domain_qa", "id": "qa-0568", "correct": false, "output": "30 cm"}
+{"task": "domain_qa", "id": "qa-0569", "correct": true, "output": "11.4.1"}
+{"task": "domain_qa", "id": "qa-0570", "correct": false, "output": "0.80"}
+{"task": "domain_qa", "id": "qa-0571", "correct": false, "output": "10 years"}
+{"task": "domain_qa", "id": "qa-1001", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1002", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-1003", "correct": false, "output": "12 inches"}
+{"task": "domain_qa", "id": "qa-1004", "correct": true, "output": "FEMA P-50"}
+{"task": "domain_qa", "id": "qa-1005", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1006", "correct": false, "output": "0.3"}
+{"task": "domain_qa", "id": "qa-1007", "correct": true, "output": "12 in."}
+{"task": "domain_qa", "id": "qa-1008", "correct": false, "output": "10%"}
+{"task": "domain_qa", "id": "qa-1009", "correct": false, "output": "13.2.1"}
+{"task": "domain_qa", "id": "qa-1010", "correct": false, "output": "2.0"}
+{"task": "domain_qa", "id": "qa-1011", "correct": false, "output": "0.7"}
+{"task": "domain_qa", "id": "qa-1012", "correct": true, "output": "40%"}
+{"task": "domain_qa", "id": "qa-1013", "correct": true, "output": "10-year"}
+{"task": "domain_qa", "id": "qa-1014", "correct": true, "output": "Spencer's Method"}
+{"task": "domain_qa", "id": "qa-1015", "correct": false, "output": "0.6"}
+{"task": "domain_qa", "id": "qa-1016", "correct": false, "output": "100 kips/in"}
+{"task": "domain_qa", "id": "qa-1017", "correct": false, "output": "1000 ft"}
+{"task": "domain_qa", "id": "qa-1018", "correct": true, "output": "23 CFR 650.305(c)"}
+{"task": "domain_qa", "id": "qa-1019", "correct": true, "output": "5%"}
+{"task": "domain_qa", "id": "qa-1020", "correct": false, "output": "7.4.2"}
+{"task": "domain_qa", "id": "qa-1021", "correct": false, "output": "Section 7.3"}
+{"task": "domain_qa", "id": "qa-1022", "correct": false, "output": "0.025"}
+{"task": "domain_qa", "id": "qa-1023", "correct": false, "output": "PRELIMINARY DATA SUBJECT TO REVISION"}
+{"task": "domain_qa", "id": "qa-1024", "correct": true, "output": "15 km"}
+{"task": "domain_qa", "id": "qa-1025", "correct": false, "output": "15 km"}
+{"task": "domain_qa", "id": "qa-1026", "correct": true, "output": "ASTM C1138"}
+{"task": "domain_qa", "id": "qa-1027", "correct": false, "output": "0.85"}
+{"task": "domain_qa", "id": "qa-1028", "correct": false, "output": "Basic Structural Hazard Score (BSHS)"}
+{"task": "domain_qa", "id": "qa-1029", "correct": false, "output": "1.5 in."}
+{"task": "domain_qa", "id": "qa-1030", "correct": false, "output": "B"}
+{"task": "domain_qa", "id": "qa-1031", "correct": true, "output": "EM 1110-2-2906"}
+{"task": "domain_qa", "id": "qa-1032", "correct": false, "output": "0.0018"}
+{"task": "domain_qa", "id": "qa-1033", "correct": false, "output": "0.35"}
+{"task": "domain_qa", "id": "qa-1034", "correct": true, "output": "6.10.10"}
+{"task": "domain_qa", "id": "qa-1035", "correct": true, "output": "FEMA P-1100"}
+{"task": "domain_qa", "id": "qa-1036", "correct": false, "output": "ASTM D7091"}
+{"task": "domain_qa", "id": "qa-1037", "correct": true, "output": "1 inch"}
+{"task": "domain_qa", "id": "qa-1038", "correct": true, "output": "FEMA P-750"}
+{"task": "domain_qa", "id": "qa-1039", "correct": true, "output": "10 to 15 feet"}
+{"task": "domain_qa", "id": "qa-1040", "correct": false, "output": "75%"}
+{"task": "domain_qa", "id": "qa-1041", "correct": true, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1042", "correct": false, "output": "3.76 * sqrt(E/F_yc)"}
+{"task": "domain_qa", "id": "qa-1043", "correct": true, "output": "6.10.1.9.1"}
+{"task": "domain_qa", "id": "qa-1044", "correct": false, "output": "0.5 d_c"}
+{"task": "domain_qa", "id": "qa-1045", "correct": false, "output": "75%"}
+{"task": "domain_qa", "id": "qa-1046", "correct": false, "output": "ASTM E330"}
+{"task": "domain_qa", "id": "qa-1047", "correct": true, "output": "50%"}
+{"task": "domain_qa", "id": "qa-1048", "correct": false, "output": "80%"}
+{"task": "domain_qa", "id": "qa-1049", "correct": false, "output": "3,000 ohm-cm"}
+{"task": "domain_qa", "id": "qa-1050", "correct": true, "output": "100%"}
+{"task": "domain_qa", "id": "qa-1051", "correct": false, "output": "1.0"}
+{"task": "domain_qa", "id": "qa-1052", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-1053", "correct": false, "output": "0.30"}
+{"task": "domain_qa", "id": "qa-1054", "correct": false, "output": "0.15"}
+{"task": "domain_qa", "id": "qa-1055", "correct": true, "output": "EM 1110-2-2904"}
+{"task": "domain_qa", "id": "qa-1056", "correct": true, "output": "12.11.2.1"}
+{"task": "domain_qa", "id": "qa-1057", "correct": false, "output": "Building Owner's Agreement"}
+{"task": "domain_qa", "id": "qa-1058", "correct": false, "output": "Ω₀ = 2.5 (for most systems)"}
+{"task": "domain_qa", "id": "qa-1059", "correct": true, "output": "0.40"}
+{"task": "domain_qa", "id": "qa-1060", "correct": true, "output": "EM 1110-2-1615"}
+{"task": "domain_qa", "id": "qa-1061", "correct": false, "output": "EM 1110-1-1804"}
+{"task": "domain_qa", "id": "qa-1062", "correct": true, "output": "EM 1110-2-4300"}
+{"task": "domain_qa", "id": "qa-1063", "correct": true, "output": "ASTM C512"}
+{"task": "domain_qa", "id": "qa-1064", "correct": false, "output": "Preventive measures"}
+{"task": "domain_qa", "id": "qa-1065", "correct": false, "output": "0.7"}
+{"task": "domain_qa", "id": "qa-1066", "correct": false, "output": "Dredging Operations Technical Support (DOTS) Program"}
+{"task": "domain_qa", "id": "qa-1067", "correct": true, "output": "ASTM A820/A820M"}
+{"task": "domain_qa", "id": "qa-1068", "correct": true, "output": "Phreatophytes"}
+{"task": "domain_qa", "id": "qa-1069", "correct": false, "output": "5 to 30 seconds"}
+{"task": "domain_qa", "id": "qa-1070", "correct": false, "output": "FEMA 154"}
+{"task": "domain_qa", "id": "qa-1071", "correct": false, "output": "1.0"}
+{"task": "domain_qa", "id": "qa-1072", "correct": true, "output": "Vacuum grouting"}
+{"task": "domain_qa", "id": "qa-1073", "correct": false, "output": "Longitudinal heats"}
+{"task": "domain_qa", "id": "qa-1074", "correct": false, "output": "3.4.2"}
+{"task": "domain_qa", "id": "qa-1075", "correct": true, "output": "14"}
+{"task": "domain_qa", "id": "qa-1076", "correct": true, "output": "50 ± 5 % RH"}
+{"task": "domain_qa", "id": "qa-1077", "correct": false, "output": "13.2.6"}
+{"task": "domain_qa", "id": "qa-1078", "correct": false, "output": "AISI S310"}
+{"task": "domain_qa", "id": "qa-1079", "correct": false, "output": "0.35"}
+{"task": "domain_qa", "id": "qa-1080", "correct": true, "output": "0.2"}
+{"task": "domain_qa", "id": "qa-1081", "correct": false, "output": "ER 1110-2-1701"}
+{"task": "domain_qa", "id": "qa-1082", "correct": false, "output": "5000 psi"}
+{"task": "domain_qa", "id": "qa-1083", "correct": false, "output": "2.5"}
+{"task": "domain_qa", "id": "qa-1084", "correct": true, "output": "5 lb/ft"}
+{"task": "domain_qa", "id": "qa-1085", "correct": false, "output": "Adhesive bonding"}
+{"task": "domain_qa", "id": "qa-1086", "correct": true, "output": "0.80"}
+{"task": "domain_qa", "id": "qa-1087", "correct": false, "output": "150 ft"}
+{"task": "domain_qa", "id": "qa-1088", "correct": false, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1089", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-1091", "correct": false, "output": "Mean High Water (MHW)"}
+{"task": "domain_qa", "id": "qa-1092", "correct": false, "output": "12.2.5.1"}
+{"task": "domain_qa", "id": "qa-1093", "correct": true, "output": "12 inches"}
+{"task": "domain_qa", "id": "qa-1094", "correct": false, "output": "28 days"}
+{"task": "domain_qa", "id": "qa-1095", "correct": true, "output": "48 in."}
+{"task": "domain_qa", "id": "qa-1096", "correct": false, "output": "0.5"}
+{"task": "domain_qa", "id": "qa-1097", "correct": true, "output": "6.14.4"}
+{"task": "domain_qa", "id": "qa-1098", "correct": false, "output": "2"}
+{"task": "domain_qa", "id": "qa-1099", "correct": false, "output": "0.5"}
+{"task": "domain_qa", "id": "qa-1100", "correct": false, "output": "3 ft"}
+{"task": "domain_qa", "id": "qa-1101", "correct": true, "output": "3"}
+{"task": "domain_qa", "id": "qa-1102", "correct": true, "output": "±0.1 ft"}
+{"task": "domain_qa", "id": "qa-1103", "correct": false, "output": "Operational Nonstructural Performance Level (N-C)"}
+{"task": "domain_qa", "id": "qa-1104", "correct": false, "output": "15 minutes"}
+{"task": "domain_qa", "id": "qa-1106", "correct": false, "output": "3.6.1.3"}
+{"task": "domain_qa", "id": "qa-1107", "correct": false, "output": "6.10.10.4.3"}
+{"task": "domain_qa", "id": "qa-1108", "correct": false, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1109", "correct": false, "output": "ER 1105-2-100"}
+{"task": "domain_qa", "id": "qa-1110", "correct": false, "output": "300 ft"}
+{"task": "domain_qa", "id": "qa-1111", "correct": true, "output": "AISC Design Guide 33"}
+{"task": "domain_qa", "id": "qa-1112", "correct": false, "output": "15%"}
+{"task": "domain_qa", "id": "qa-1113", "correct": true, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1114", "correct": true, "output": "3"}
+{"task": "domain_qa", "id": "qa-1115", "correct": true, "output": "2 ft"}
+{"task": "domain_qa", "id": "qa-1116", "correct": false, "output": "±10 %"}
+{"task": "domain_qa", "id": "qa-1117", "correct": false, "output": "10 ksi"}
+{"task": "domain_qa", "id": "qa-1118", "correct": false, "output": "70-90%"}
+{"task": "domain_qa", "id": "qa-1119", "correct": false, "output": "2"}
+{"task": "domain_qa", "id": "qa-1121", "correct": true, "output": "0.5"}
+{"task": "domain_qa", "id": "qa-1122", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1123", "correct": false, "output": "0.06 s"}
+{"task": "domain_qa", "id": "qa-1124", "correct": true, "output": "3.6.1.1.2"}
+{"task": "domain_qa", "id": "qa-1125", "correct": false, "output": "EM 1110-2-1416"}
+{"task": "domain_qa", "id": "qa-1127", "correct": false, "output": "13.3.2"}
+{"task": "domain_qa", "id": "qa-1128", "correct": false, "output": "14.1.2.3"}
+{"task": "domain_qa", "id": "qa-1129", "correct": false, "output": "3 feet"}
+{"task": "domain_qa", "id": "qa-1130", "correct": false, "output": "6.10.1.1.1b"}
+{"task": "domain_qa", "id": "qa-1131", "correct": false, "output": "R > 3"}
+{"task": "domain_qa", "id": "qa-1132", "correct": false, "output": "14 days"}
+{"task": "domain_qa", "id": "qa-1133", "correct": false, "output": "7 days"}
+{"task": "domain_qa", "id": "qa-1134", "correct": false, "output": "125 pcf"}
+{"task": "domain_qa", "id": "qa-1135", "correct": false, "output": "12%"}
+{"task": "domain_qa", "id": "qa-1136", "correct": false, "output": "80 psi"}
+{"task": "domain_qa", "id": "qa-1137", "correct": false, "output": "24"}
+{"task": "domain_qa", "id": "qa-1138", "correct": false, "output": "0.3"}
+{"task": "domain_qa", "id": "qa-1140", "correct": false, "output": "0.5"}
+{"task": "domain_qa", "id": "qa-1141", "correct": false, "output": "FEMA P-2012"}
+{"task": "domain_qa", "id": "qa-1142", "correct": false, "output": "NIST GCR 17-917-46v3"}
+{"task": "domain_qa", "id": "qa-1143", "correct": false, "output": "6.13.2.7"}
+{"task": "domain_qa", "id": "qa-1144", "correct": false, "output": "0.05"}
+{"task": "domain_qa", "id": "qa-1145", "correct": false, "output": "75%"}
+{"task": "domain_qa", "id": "qa-1146", "correct": false, "output": "70%"}
+{"task": "domain_qa", "id": "qa-1147", "correct": true, "output": "4:1"}
+{"task": "domain_qa", "id": "qa-1148", "correct": false, "output": "5"}
+{"task": "domain_qa", "id": "qa-1149", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1150", "correct": true, "output": "Peristaltic pump"}
+{"task": "domain_qa", "id": "qa-1151", "correct": false, "output": "200 lbs"}
+{"task": "domain_qa", "id": "qa-1153", "correct": false, "output": "Tier 2"}
+{"task": "domain_qa", "id": "qa-1155", "correct": false, "output": "90%"}
+{"task": "domain_qa", "id": "qa-1156", "correct": true, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1157", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1158", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1160", "correct": false, "output": "1 inch"}
+{"task": "domain_qa", "id": "qa-1163", "correct": false, "output": "Riprap"}
+{"task": "domain_qa", "id": "qa-1165", "correct": false, "output": "90%"}
+{"task": "domain_qa", "id": "qa-1166", "correct": false, "output": "1%"}
+{"task": "domain_qa", "id": "qa-1167", "correct": true, "output": "±25%"}
+{"task": "domain_qa", "id": "qa-1169", "correct": false, "output": "1 per 1,000 cu yd"}
+{"task": "domain_qa", "id": "qa-1170", "correct": true, "output": "144 years"}
+{"task": "domain_qa", "id": "qa-1172", "correct": false, "output": "1.4"}
+{"task": "domain_qa", "id": "qa-1173", "correct": false, "output": "4.0"}
+{"task": "domain_qa", "id": "qa-1181", "correct": false, "output": "20%"}
+{"task": "domain_qa", "id": "qa-1182", "correct": false, "output": "5%"}
+{"task": "domain_qa", "id": "qa-1184", "correct": true, "output": "0.80"}
+{"task": "domain_qa", "id": "qa-1185", "correct": false, "output": "10 mV"}
+{"task": "domain_qa", "id": "qa-1186", "correct": false, "output": "Standard project flood (SPF)"}
+{"task": "domain_qa", "id": "qa-1187", "correct": false, "output": "Annually"}
+{"task": "domain_qa", "id": "qa-1188", "correct": false, "output": "8 hours"}
+{"task": "domain_qa", "id": "qa-1190", "correct": false, "output": "±30%"}
+{"task": "domain_qa", "id": "qa-1191", "correct": false, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1192", "correct": false, "output": "Sustainable development and management of water resources"}
+{"task": "domain_qa", "id": "qa-1193", "correct": false, "output": "Same as feedstock"}
+{"task": "domain_qa", "id": "qa-1194", "correct": false, "output": "0.1%"}
+{"task": "domain_qa", "id": "qa-1195", "correct": false, "output": "5 degrees"}
+{"task": "domain_qa", "id": "qa-1197", "correct": false, "output": "Local buckling"}
+{"task": "domain_qa", "id": "qa-1199", "correct": false, "output": "Monument"}
+{"task": "domain_qa", "id": "qa-1200", "correct": false, "output": "10 degrees"}
+{"task": "domain_qa", "id": "qa-1201", "correct": false, "output": "20 ft"}
+{"task": "domain_qa", "id": "qa-1202", "correct": false, "output": "4 feet"}
+{"task": "domain_qa", "id": "qa-1204", "correct": true, "output": "6 inches"}
+{"task": "domain_qa", "id": "qa-1206", "correct": true, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1208", "correct": false, "output": "50%"}
+{"task": "domain_qa", "id": "qa-1209", "correct": false, "output": "40 ft"}
+{"task": "domain_qa", "id": "qa-1210", "correct": false, "output": "1/10"}
+{"task": "domain_qa", "id": "qa-1212", "correct": false, "output": "0.7 f_pu"}
+{"task": "domain_qa", "id": "qa-1213", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1214", "correct": true, "output": "V-load method"}
+{"task": "domain_qa", "id": "qa-1215", "correct": false, "output": "25%"}
+{"task": "domain_qa", "id": "qa-1216", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1217", "correct": false, "output": "1.5"}
+{"task": "domain_qa", "id": "qa-1218", "correct": false, "output": "1.5 degrees"}
+{"task": "domain_qa", "id": "qa-1219", "correct": false, "output": "10%"}
+{"task": "domain_qa", "id": "qa-1220", "correct": false, "output": "Kaplan-Meier"}
+{"task": "domain_qa", "id": "qa-1221", "correct": false, "output": "500 ft"}
+{"task": "domain_qa", "id": "qa-1222", "correct": false, "output": "Dogbone connection"}
+{"task": "domain_qa", "id": "qa-1223", "correct": false, "output": "Impact Echo"}

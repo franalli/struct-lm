@@ -29,16 +29,16 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | metric | base-8b-hf | cpt-8b | cpt-8b-seed1 | cpt-8b-replay10 | cpt-8b-full | noise |
 |---|---|---|---|---|---|---|
 | domain val perplexity | 6.88 | -2.33% | -2.35% | -2.33% | -2.15% | 0.02% |
+| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 | general val perplexity | 8.15 | +0.40% | +0.17% | -2.24% | +1.19% | 0.23% |
 | train slice perplexity | 6.18 | -8.28% | -8.05% | -8.71% | -22.15% | 0.23% |
 | MMLU | 0.767 | -0.4 | -0.2 | -0.1 | -0.5 | 0.3 |
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
-| qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
-| grounded_acc | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
+| closed-book gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
+| closed-book qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+| grounded_acc (with passages) | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
-| gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
-| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 
 Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose weights were deleted, has none.

@@ -370,29 +370,76 @@ def update_readme(path: Path, name: str, block: str) -> None:
     print(f"-> {path} ({name})")
 
 
+RESULT_BLOCKS = (
+    (
+        (
+            "Closed-book knowledge: no retrieval, no passage in the prompt; questions about facts "
+            "on specific pages of the manuals (gold_lp: nats per answer, higher is better)"
+        ),
+        [
+            "gold_lp",
+            "gold_lp_seen",
+            "gold_lp_unseen",
+            "qa_acc",
+            "qa_num",
+            "qa_ident",
+            "qa_term",
+            "qa_seen",
+            "qa_unseen",
+        ],
+    ),
+    (
+        (
+            "With the passages: grounded answers and citations (4 passages given), abstention "
+            "when the passages lack the answer (halluc_rate, lower is better), and definitions"
+        ),
+        [
+            "grounded_acc",
+            "cite_valid",
+            "cite_supported",
+            "halluc_rate",
+            "vocab_recall",
+            "vocab_seen",
+            "vocab_unseen",
+        ],
+    ),
+    (
+        "General benchmarks (5-shot, no chat template) and perplexity (lower is better)",
+        [
+            "mmlu",
+            "mmlu_stem",
+            "mmlu_hum",
+            "mmlu_soc",
+            "mmlu_other",
+            "gsm8k",
+            "hellaswag",
+            "ppl_train",
+            "ppl_domain_val",
+            "ppl_general_val",
+            "ppl_postcutoff",
+        ],
+    ),
+)
+
+
 def results_table(path: Path = Path("results/table.md")) -> str:
-    """results/table.md without its smoke-test rows, as three tables (the task scores, the
-    gold-answer log-probabilities, then lm-eval and perplexity), since one table of 26 columns
-    doesn't fit a page. The table's first line records the task sizes it was scored on."""
+    """results/table.md without its smoke-test rows, as three tables: closed-book knowledge,
+    work with the passages given, and general benchmarks with perplexity. One table of 26 columns
+    doesn't fit a page, and a bare qa_acc next to grounded_acc invites reading 0.13 against 0.84
+    as a broken score rather than closed-book vs open-book. The table's first line records the
+    task sizes it was scored on."""
     lines = path.read_text().splitlines()
     tag, lines = lines[0], [ln for ln in lines[1:] if not ln.startswith("| smoke ")]
     sizes = tag.removeprefix("<!-- items: ").removesuffix(" -->").split()
     cells = [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in lines]
     head = cells[0]
     out = [f"Items per task: {', '.join(s.replace('=', ' ') for s in sizes)}."]
-    for title, first, last in (
-        ("Task scores", "qa_acc", "halluc_rate"),
-        (
-            "Gold-answer log-probability (nats per item, higher is better)",
-            "gold_lp",
-            "gold_lp_unseen",
-        ),
-        ("Benchmarks and perplexity", "mmlu", head[-1]),
-    ):
-        cols = slice(head.index(first), head.index(last) + 1)
-        rows = [[row[0], *row[cols]] for row in cells]
-        if all(not c for row in rows[2:] for c in row[1:]):
-            continue  # a block with no numbers yet (gold_lp before any run computed it)
+    for title, names in RESULT_BLOCKS:
+        idx = [head.index(n) for n in names if n in head]
+        rows = [[row[0], *(row[i] for i in idx)] for row in cells]
+        rows = [rows[0], rows[1]] + [r for r in rows[2:] if any(r[1:])]  # rows with numbers here
+        if len(rows) == 2:
+            continue
         out.append(f"**{title}**\n\n" + "\n".join("| " + " | ".join(r) + " |" for r in rows))
     return "\n\n".join(out)
 
@@ -402,17 +449,17 @@ SEED_PAIR = ("cpt-8b", "cpt-8b-seed1")
 DELTA_RUNS = ["cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"]
 DELTA_ROWS = [  # (label, metrics.json key, kind, lm-eval task and stderr key or KPI task)
     ("domain val perplexity", "ppl_domain_val", "ppl", None),
+    ("2026-report perplexity", "ppl_postcutoff", "ppl", None),
     ("general val perplexity", "ppl_general_val", "ppl", None),
     ("train slice perplexity", "ppl_train", "ppl", None),
     ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
     ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
     ("HellaSwag", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
-    ("qa_acc", "qa_acc", "kpi", "domain_qa"),
-    ("grounded_acc", "grounded_acc", "kpi", "grounded"),
+    ("closed-book gold-answer log-prob (nats)", "gold_lp", "lp", None),
+    ("closed-book qa_acc", "qa_acc", "kpi", "domain_qa"),
+    ("grounded_acc (with passages)", "grounded_acc", "kpi", "grounded"),
     ("vocab_recall", "vocab_recall", "kpi", "vocab"),
     ("halluc_rate", "halluc_rate", "kpi", "adversarial"),
-    ("gold-answer log-prob (nats)", "gold_lp", "lp", None),
-    ("2026-report perplexity", "ppl_postcutoff", "ppl", None),
 ]
 
 

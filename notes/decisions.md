@@ -1530,3 +1530,33 @@ That made CPT look worse at knowing the answers. The fix:
   target for SFT's QA synthesis.
 - **Revises the Stage 2 conclusion "no detectable KPI change".** The change was there, in the
   probabilities, below accuracy's resolution.
+
+## 2026-10-04: Closed-book qa_acc kept as is, framed with a frontier reference (user decision)
+**Context:** qa_acc reads 0.12-0.15 for every checkpoint, which looks broken next to grounded_acc's
+0.84.
+
+**Chose:** keep the score and the scorer exactly as they are. The 169-miss audit showed the score
+is real, so loosening the match or dropping hard items to look respectable is out. Frame the score
+instead:
+- **README result blocks:** split into closed-book (gold_lp first, with the per-kind split),
+  with-passages, and benchmarks, each captioned with what it measures.
+- **Change table:** the closed-book rows are labelled as such.
+- **A paragraph** on reading the numbers next to the open-book ones.
+
+**Frontier reference (`eval/api_eval.py`):** Mistral Large 3 (mistral-large-2512, through the
+API) on the same 325 closed-book questions, same prompt, greedy, scored by the same code.
+- **qa_acc 0.280:** values 0.248, identifiers 0.446, terms 0.184. Its halves (seen 0.275, unseen
+  0.285) agree, as a null check should.
+- **gold_lp:** none, since the API returns no prompt log-probabilities.
+- **Grounded/vocab/adversarial:** blank via `--allow-partial`.
+- **Caveat:** Mistral Large 3 also wrote these questions from the passages; each call is
+  stateless, so that gives it no answers.
+
+**Reading:**
+- **The base 8B is where it should be:** at 0.12, it scores below a frontier model that answers
+  28% without the documents (SimpleQA's frontier range is 30-40% on far more common facts).
+- **The questions are not guessable;** a frontier score near 0.6 would have said they were.
+- **Identifiers are the frontier model's strongest kind** (45%), a pretraining-scale knowledge the
+  8B base lacks (8%).
+- **The number Stage 3 has to move is the seen-half accuracy,** from 0.13 toward the frontier
+  reference and beyond, with retrieval at ~0.85-0.90 alongside.

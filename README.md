@@ -76,14 +76,15 @@ the exact refusal phrase) decided by rule first.
 
 ### Where it starts
 
-Row zero, from [`results/table.md`](results/table.md) (27 September 2026, on the eval set frozen
-that day):
+Row zero, from [`results/table.md`](results/table.md) (eval v2, 4 October 2026; the original
+130-item scores are in [`results/table_v1.md`](results/table_v1.md)):
 
 - **The base model** finds the right answer in the passages 85% of the time but cites correctly only
   10% of the time, and answers 88% of unanswerable questions with something invented.
 - **The instruct model** has the behaviour (79% of answers correct and backed by their citations,
-  99% of unanswerable questions declined), but it knows no more of the domain closed-book: 12%
-  against the base model's 14%.
+  99% of unanswerable questions declined), but it knows no more of the domain closed-book: 9.9%
+  against the base model's 12.0% on the 325 questions (12% against 14% on the original 130). For
+  scale, Mistral Large 3 answers 28% of them closed-book.
 - **Closed-book domain accuracy is low for both.** That is the knowledge gap CPT is meant to close,
   while SFT and DPO bring citation and refusal behaviour up to the instruct model's level or beyond,
   and the general-capability columns stay flat.
@@ -348,17 +349,17 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | metric | base-8b-hf | cpt-8b | cpt-8b-seed1 | cpt-8b-replay10 | cpt-8b-full | noise |
 |---|---|---|---|---|---|---|
 | domain val perplexity | 6.88 | -2.33% | -2.35% | -2.33% | -2.15% | 0.02% |
+| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 | general val perplexity | 8.15 | +0.40% | +0.17% | -2.24% | +1.19% | 0.23% |
 | train slice perplexity | 6.18 | -8.28% | -8.05% | -8.71% | -22.15% | 0.23% |
 | MMLU | 0.767 | -0.4 | -0.2 | -0.1 | -0.5 | 0.3 |
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
-| qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
-| grounded_acc | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
+| closed-book gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
+| closed-book qa_acc | 0.120 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+| grounded_acc (with passages) | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
-| gold-answer log-prob (nats) | -6.78 | +0.59 | +0.58 | +0.52 |  | 0.08 |
-| 2026-report perplexity | 6.21 |  | -0.51% | -0.43% |  |  |
 
 Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose weights were deleted, has none.
 <!-- stage2-tables:end -->
@@ -503,6 +504,20 @@ Every scored checkpoint, from [`results/table.md`](results/table.md) (copied her
 Stage 2) and [`results/table_v1.1.md`](results/table_v1.1.md) (current scorer). Stage 2 rows are
 base models, scored without `--chat`.
 
+**Reading the closed-book numbers.** The `qa_*` and `gold_lp` columns ask for facts from specific
+pages of the manuals (a value, a document or article number, a term) with no retrieval and no
+passage in the prompt.
+- **The gap is the point.** With passages from the same documents in the prompt (the grounded
+  task), the base model answers 84% correctly; closed-book, 12%. That gap is the knowledge the
+  documents hold and the model doesn't, and these columns measure what training does to it.
+- **For scale:** Mistral Large 3 answers 28% of the same 325 questions closed-book (row
+  `mistral-large-3`, through the API, closed-book only): 45% of identifiers, 25% of values and 18%
+  of terms. On SimpleQA, whose facts are far more common, frontier models score 30-40%.
+- **The scores are knowledge, not scoring:** a hand audit of 169 wrong answers found 2 scoring
+  errors, both fixed.
+- **The column to watch is Stage 3's seen half.** SFT synthesis supplies exposures to those facts;
+  the unseen half shows whether anything transfers.
+
 - **Task scores** come from the frozen eval, with judge columns scored locally:
   - `qa_num`, `qa_ident` and `qa_term` split `qa_acc` by answer kind (`eval/qa_rules.py`):
     values, identifiers (document ids and article numbers) and terms, which include everything
@@ -523,31 +538,30 @@ base models, scored without `--chat`.
 <!-- results-table:start -->
 Items per task: domain_qa 325, grounded 108, vocab 210, adversarial 76, qa_number 222, qa_identifier 65, qa_term 38.
 
-**Task scores**
+**Closed-book knowledge: no retrieval, no passage in the prompt; questions about facts on specific pages of the manuals (gold_lp: nats per answer, higher is better)**
 
-| run | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen | grounded_acc | cite_valid | cite_supported | vocab_recall | vocab_seen | vocab_unseen | halluc_rate |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| base-8b-hf | 0.120 | 0.144 | 0.077 | 0.053 | 0.126 | 0.114 | 0.843 | 0.120 | 0.083 | 0.705 | 0.713 | 0.697 | 0.895 |
-| instruct-8b | 0.099 | 0.126 | 0.031 | 0.053 | 0.114 | 0.082 | 0.898 | 0.833 | 0.787 | 0.786 | 0.802 | 0.771 | 0.013 |
-| cpt-8b | 0.145 | 0.167 | 0.123 | 0.053 | 0.156 | 0.133 | 0.833 | 0.148 | 0.074 | 0.710 | 0.693 | 0.725 | 0.908 |
-| cpt-8b-seed1 | 0.129 | 0.144 | 0.123 | 0.053 | 0.132 | 0.127 | 0.796 | 0.102 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
-| cpt-8b-replay10 | 0.129 | 0.144 | 0.123 | 0.053 | 0.150 | 0.108 | 0.778 | 0.056 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
-| cpt-8b-full |  |  |  |  |  |  | 0.889 | 0.148 | 0.102 | 0.743 | 0.733 | 0.752 | 0.921 |
-| base-8b |  |  |  |  |  |  | 0.852 | 0.130 | 0.102 | 0.719 | 0.723 | 0.716 | 0.882 |
+| run | gold_lp | gold_lp_seen | gold_lp_unseen | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b-hf | -6.777 | -6.722 | -6.835 | 0.120 | 0.144 | 0.077 | 0.053 | 0.126 | 0.114 |
+| instruct-8b | -8.271 | -8.008 | -8.549 | 0.099 | 0.126 | 0.031 | 0.053 | 0.114 | 0.082 |
+| cpt-8b | -6.186 | -6.237 | -6.133 | 0.145 | 0.167 | 0.123 | 0.053 | 0.156 | 0.133 |
+| cpt-8b-seed1 | -6.193 | -6.236 | -6.148 | 0.129 | 0.144 | 0.123 | 0.053 | 0.132 | 0.127 |
+| cpt-8b-replay10 | -6.262 | -6.356 | -6.162 | 0.129 | 0.144 | 0.123 | 0.053 | 0.150 | 0.108 |
+| mistral-large-3 |  |  |  | 0.280 | 0.248 | 0.446 | 0.184 | 0.275 | 0.285 |
 
-**Gold-answer log-probability (nats per item, higher is better)**
+**With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
-| run | gold_lp | gold_lp_seen | gold_lp_unseen |
-| --- | --- | --- | --- |
-| base-8b-hf | -6.777 | -6.722 | -6.835 |
-| instruct-8b | -8.271 | -8.008 | -8.549 |
-| cpt-8b | -6.186 | -6.237 | -6.133 |
-| cpt-8b-seed1 | -6.193 | -6.236 | -6.148 |
-| cpt-8b-replay10 | -6.262 | -6.356 | -6.162 |
-| cpt-8b-full |  |  |  |
-| base-8b |  |  |  |
+| run | grounded_acc | cite_valid | cite_supported | halluc_rate | vocab_recall | vocab_seen | vocab_unseen |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b-hf | 0.843 | 0.120 | 0.083 | 0.895 | 0.705 | 0.713 | 0.697 |
+| instruct-8b | 0.898 | 0.833 | 0.787 | 0.013 | 0.786 | 0.802 | 0.771 |
+| cpt-8b | 0.833 | 0.148 | 0.074 | 0.908 | 0.710 | 0.693 | 0.725 |
+| cpt-8b-seed1 | 0.796 | 0.102 | 0.037 | 0.934 | 0.700 | 0.713 | 0.688 |
+| cpt-8b-replay10 | 0.778 | 0.056 | 0.037 | 0.934 | 0.700 | 0.713 | 0.688 |
+| cpt-8b-full | 0.889 | 0.148 | 0.102 | 0.921 | 0.743 | 0.733 | 0.752 |
+| base-8b | 0.852 | 0.130 | 0.102 | 0.882 | 0.719 | 0.723 | 0.716 |
 
-**Benchmarks and perplexity**
+**General benchmarks (5-shot, no chat template) and perplexity (lower is better)**
 
 | run | mmlu | mmlu_stem | mmlu_hum | mmlu_soc | mmlu_other | gsm8k | hellaswag | ppl_train | ppl_domain_val | ppl_general_val | ppl_postcutoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -606,7 +620,7 @@ Mistral's native vLLM path, `base-8b-hf` and `cpt-8b` the HF path with the YaRN 
   exists. Seen measures knowledge injection, unseen measures transfer. One pooled number would be
   as uninterpretable as Stage 2's single held-out perplexity.
 - **The bar is `instruct-8b`:** grounded 0.898, cite_valid 0.833, cite_supported 0.787, halluc
-  0.013, vocab 0.786, qa 0.123. Match it on grounding and beat it on both qa halves. Read
+  0.013, vocab 0.786, qa 0.099 (eval v2). Match it on grounding and beat it on both qa halves. Read
   halluc_rate next to grounded_acc, so a low hallucination rate means abstaining on unanswerable
   questions and not refusing across the board.
 - **Knowledge of a 20M-token corpus needs repetition or augmentation,** such as paraphrased

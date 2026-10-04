@@ -103,6 +103,10 @@ $M run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-
 $M run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-8B-Instruct-2512-BF16 --run-name instruct-8b
 ```
 
+Frontier closed-book reference (Mistral API, no GPU, ~15 min at 30 requests a minute; domain_qa only):
+`.venv/bin/python eval/api_eval.py --model mistral-large-2512 --run-name mistral-large-3`, then
+`run_eval.py --run-name mistral-large-3 --rescore --chat --allow-partial --model "mistral-large-2512 (Mistral API)"`.
+
 ### Pull results, then score locally
 
 **Always pull every Modal run's results into the repo as soon as it finishes** (training logs,

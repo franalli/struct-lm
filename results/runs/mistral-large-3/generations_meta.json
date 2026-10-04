@@ -1,0 +1,9 @@
+{
+  "domain_qa": {
+    "date": "2026-10-04",
+    "model": "mistral-large-2512 (Mistral API)",
+    "chat": true,
+    "n": 325,
+    "prompts_sha256": "871281bd764075375397cc2077d7977f762cb3f456bfc3a0bae68e3b0f6d7f07"
+  }
+}
