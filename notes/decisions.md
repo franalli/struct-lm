@@ -1560,3 +1560,141 @@ API) on the same 325 closed-book questions, same prompt, greedy, scored by the s
   8B base lacks (8%).
 - **The number Stage 3 has to move is the seen-half accuracy,** from 0.13 toward the frontier
   reference and beyond, with retrieval at ~0.85-0.90 alongside.
+
+## 2026-10-04: Contamination checks (13-gram overlap): no leak; the within-series gain is neither copied text nor genre
+**Context:** the splits were checked only at the document level: exact and paragraph-MinHash
+dedup ran before a document-level split. Four overlaps were never measured:
+- train vs domain val below the paragraph (boilerplate, quoted provisions, front matter);
+- the corpus and the replay slice vs the regression benchmarks (the corpus card's open caveat);
+- train vs the 2026 reports: "never seen" must also mean "not a revision of a seen manual";
+- the domain_qa few-shot items vs the scored items.
+
+**Method** (`eval/contamination.py`, CPU, ~1 min; every table in `results/contamination.md`):
+- **Overlap measure:** token 13-gram overlap on Tekken tokens (GPT-3 appendix C, counted on model
+  tokens as in Llama 2). Each text is tokenised as `train/packing.py` feeds it to the model.
+- **Benchmark splits:** the ones lm-eval scores (MMLU test, GSM8K test, HellaSwag validation).
+- **Positive control:** excerpts of train and replay documents, tokenised on their own as a
+  benchmark item is, come back 99.1% and 98.9% covered.
+- **Sensitivity:** an 8-gram run was made alongside. It is not committed: it reruns with
+  `--n 8 --out <path>`.
+
+**Results:**
+- **Val vs train.** 1.49% of val's 13-grams occur in train (3.25% of tokens). That is below what a
+  train document shares with the other 233 (median 2.0%, 90th percentile 9.4%).
+  - **Above 5%:** three val documents, each next to a sibling in train: FHWA HIF-18-044 (20.0%;
+    HIF-18-043), FEMA P-1100-2A (18.0%; P-1100-2B) and HIF-17-020 (5.7%; HIF-17-019). The longest
+    shared run in any val document is 290 tokens.
+  - **Without them:** they are 7% of val tokens, and the val gain is unchanged: `cpt-8b-replay10`
+    -2.33% -> -2.33%, `cpt-8b` -2.33% -> -2.32%.
+- **Where the val gain sits.** Per perplexity window, the gain grows with the share of tokens
+  inside a 13-gram seen in train (Spearman -0.57 over 296 windows; `cpt-8b-replay10`, seed 1
+  agrees):
+
+  | window tokens shared with train | val | 2026 reports |
+  |---|---|---|
+  | under 1% | -1.70% [-2.25, -1.24] (157 windows) | -0.11% [-0.46, +0.22] (56) |
+  | 1-5% | -2.54% (86) | -0.90% (21) |
+  | 5-20% | -3.56% (44) | -2.00% (5) |
+  | over 20% | -5.21% (9) | none |
+
+  At 8-grams the bins keep the same order: val -1.62 / -2.79 / -4.53 against 2026 -0.25 / -0.92 /
+  -1.31 for 1-5%, 5-20% and over 20%.
+- **2026 reports vs train.** At most 1.35% of a report's 13-grams (FHWA-HRT-26-057). No single
+  train document holds more than 0.72% of a report, so none is a revision of a corpus document.
+- **Benchmarks.**
+  - GSM8K and HellaSwag: no 13-gram in train or replay.
+  - MMLU: 21 of 14,042 items share a 13-gram, all stock phrases or digit runs ("in the 1960s and
+    1970s", "1, 2, 3, 4, 5, 6"), and none is half covered.
+  - At 8-grams the hits are digit strings ("800,000 to 200,000 years ago"), because Tekken gives
+    each digit its own token. That is why 13 is the measure.
+- **general_val vs replay.** 0.017% of tokens, longest shared run 15 tokens: disjoint. Replay's
+  -2.2% on general val is in-distribution training, not overlap.
+- **Few-shot.**
+  - **Disjoint where it matters:** no shot is a scored question, and the shots share no 13-gram
+    with each other.
+  - **Two shared passages:** two of the three shots come from a passage that also produced a
+    scored item, because `make_tasks.py:814` splits the shots off by item, not by passage:
+    - qa-0003 (NIST GCR 22-917-51 p167): 0.95 d_b in the shot, 75% scored;
+    - qa-0056 (GCR 17-917-45 p45): 4 fiber elements in the shot, L/500 scored.
+
+    The 58% 13-gram share with qa-0056 is the question template ("...a brace in a steel
+    concentrically braced frame per NIST GCR 17-917-45?"). No answer is given away.
+  - **Coincidental values:** answer values recur only by coincidence ("4", "0.9" on unrelated
+    items).
+
+**Genre check (user request):** val is mostly manuals and the 2026 set mostly research reports, so
+"new documents" could mean "a different genre".
+- **Labels:** each document was labelled from the purpose stated in its front matter, before any
+  pooling.
+  - **Val guidance (10):** the five USACE EMs; NASA-STD-5002B ("defines the methodologies,
+    practices, and requirements"); FEMA P-1100-2A (a prescriptive plan set); FEMA P-2018 (an
+    evaluation methodology); FHWA HIF-17-020 ("This manual..."); HIF-18-044 (a design example).
+  - **Val research reports (2):** HIF-18-047 ("This report documents a study...") and NIST GCR
+    12-917-21 (a NEHRP Consultants research synthesis).
+  - **2026 guidance (2):** ERDC/GSL SR-26-1 ("provides technical guidance for the load rating")
+    and FHWA-HRT-26-056 (a procurement guide with sample contract language).
+  - **2026 research and workshop reports (11):** the rest.
+- **Results:** pooled per-document sums against `base-8b-hf`, with `eval/ppl_compare.py
+  base-8b-hf <run> --set domain_val|postcutoff --docs <slugs>`:
+
+  | | guidance | research reports |
+  |---|---|---|
+  | val (series in train) | -2.23% (10) | -3.64% (2) |
+  | 2026 (series not in train) | -0.89% (2) | -0.32% (11) |
+
+  The numbers are for `cpt-8b-replay10`. Seed 1 gives -2.23 / -3.77 / -0.87 / -0.43, and `cpt-8b`
+  gives -2.22 / -3.67 on val.
+- **Series in train:** none of the 2026 reports' series has a document in train (NIST TN 0, ERDC 0,
+  FHWA-HRT 0). The two NIST GCRs are workshop reports from the Forward-Looking Codes and
+  Standards programme, not the 917 series in train (26 documents).
+- **Caveat:** small cells. NIST GCR 12-917-21 is 92% of the val reports' tokens, and HIF-18-047
+  alone gains -2.54%.
+
+**Reading:**
+1. **No overlap changes a reported number.** The val documents above 5% don't move the gain. The
+   regression benchmarks have nothing in train or replay beyond stock phrases. The 2026 set is new
+   text.
+2. **The within-series finding stands, and it is not shared strings.**
+   - **About a quarter of the held-out gain sits on shared text:** -2.33% against the -1.70% floor
+     on windows that share almost nothing. This is an association, since those windows are also
+     more formulaic (base perplexity 5.6 against 7.2).
+   - **The rest of the gap survives at zero overlap:** 1.6 of the 1.9 points between val (-2.33%)
+     and the 2026 reports (-0.43%) remain on windows sharing almost no 13-gram, and it holds at
+     8-grams.
+   - **So "series" is shared conventions below copied text:** terms, notation, layout, a
+     publisher's house style.
+   - **Within the 2026 set too,** windows that share more text with train gain more. Resemblance to
+     the training text is what CPT pays off on, at every level.
+   - **The gradient is the shape of a learning effect, not a leak:** the gain rises smoothly from
+     -1.70% (under 1% shared) to -5.21% (over 20%) across all 296 windows. A leak would sit in a few
+     copied windows instead.
+3. **Genre is not the explanation.**
+   - **Within val:** the research reports gain more than the manuals.
+   - **New guidance documents** gain -0.9%, 40% of what val's manuals gain and closer to the new
+     reports than to them.
+   - **What separates the gain is whether the document's series is in train,** so the honest
+     sentence is: CPT transfers within a document series, across genre, and barely to a new series.
+   - **What genre may still add** is -0.89% against -0.32% within the 2026 set. That is two
+     documents, an order of magnitude below the series gap.
+
+**Chose (user decision):** keep qa-0003 and qa-0056 in the frozen v2 set, and close the gap three
+ways:
+- **Why keep them:** no answer leaks, and the prompt is identical for every checkpoint, so no delta
+  moves. Dropping them would re-freeze the table for 2 of 325 items.
+- **Tag:** `make_tasks.py` (v2) writes `fewshot_passage_overlap: true` on the scored items that
+  share a shot's passage, exactly these two, so per-item analyses can exclude them.
+  - The committed `domain_qa.jsonl` changes on those two lines only; every other task file
+    rebuilds byte-identical.
+  - Rescoring `cpt-8b-replay10` with it reproduces its `table.md` row exactly.
+- **Fix:** `--task-version 3` = v2 with the shots split off by passage, for the next from-scratch
+  rebuild. The default stays 2.
+  - It filters after ids are assigned, so every v3 item keeps its v2 id.
+  - It only removes items: 322 = 325 minus the two, minus one identifier (qa-1143) that the 20%
+    cap holds back once the set shrinks.
+  - The other tasks are byte-identical.
+- **Guard:** `tests/test_fewshot.py` pins the shared set and the tag. `tests/test_make_tasks_v1.py`
+  rebuilds v1 (frozen), v2 (the committed 325, tags included) and v3 (removal only, same ids, no
+  shot passage) from the LLM cache.
+
+**Revisit if:** the corpus or the replay slice changes (rerun the script). Before Stage 3, run the
+SFT/DPO data through the same check against every eval task (rule 10).

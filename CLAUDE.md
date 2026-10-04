@@ -70,13 +70,15 @@ make data                                       # all steps below, in order
 set -a; . ./.env; set +a
 .venv/bin/python eval/make_tasks.py           # -> eval/tasks/*.jsonl (Mistral API, disk-cached)
 .venv/bin/python eval/sft_split.py            # -> eval/tasks/sft_seen_chunks.txt (seen/unseen halves)
-.venv/bin/python -m pytest tests/             # qa_rules + --task-version 1 reproduces the frozen set
+.venv/bin/python -m pytest tests/             # qa_rules, few-shot guard; with .env loaded, v1/v2/v3 rebuild from the LLM cache
 ```
 
 - `--task-version 1` rebuilds the 2026-09-27 eval (130-item domain_qa, `results/table_v1.md`) byte
   for byte. `2` (default) is the grown set: after rejects it tags `answer_kind`, removes layout
   locators (`qa_rules.is_locator` -> `locators.jsonl`) and holds identifiers to 20% of the set
-  (`held_back.jsonl`). Reviewer tag corrections live in `eval/tasks/answer_kinds.jsonl`.
+  (`held_back.jsonl`). Reviewer tag corrections live in `eval/tasks/answer_kinds.jsonl`. v2 tags
+  `fewshot_passage_overlap` on qa-0003 / qa-0056 (same passage as a few-shot item, other facts);
+  `3` is v2 with the few-shot split off by passage (322 items, v2 ids kept), for the next rebuild.
 
 `chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt` (the 234
 train documents when the eval was frozen), so corpus expansion can't resample the reviewed tasks;
@@ -183,6 +185,8 @@ $M volume get --force struct-lm results/ppl/<run>.json results/ppl/
   --ppl-dir results/ppl --model /vol/checkpoints/cpt-8b
 .venv/bin/python train/report.py   # -> results/train_runs.md, results/curves/cpt.png, cpt_ppl.png
 .venv/bin/python eval/ppl_compare.py base-8b cpt-8b   # paired bootstrap CIs, nats and % ppl
+.venv/bin/python eval/contamination.py   # 13-gram overlap: val/2026 vs train, benchmarks vs train+replay,
+                                         # few-shot vs domain_qa -> results/contamination.md (rerun after data changes)
 # noise floor and LR-up (decisions.md, ablation rules): same config, one change each
 $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-seed1 --overrides "training.seed=1"
 $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-lr2x --overrides "training.learning_rate=2.0e-4"

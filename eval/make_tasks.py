@@ -9,6 +9,7 @@ Output: eval/tasks/
           vocab.jsonl         {id, term, definition, source_chunk}
           adversarial.jsonl   {id, question, context:[{chunk_id,text}x3], why_unanswerable}
           fewshot.jsonl       3 QA pairs used in the domain_qa prompt, excluded from domain_qa
+                              (v3: with every item from their passages)
           eval_chunk_ids.txt  every chunk id an eval item was built from (Stage 3 must not
                               generate SFT data from these, except the "seen" half that
                               eval/sft_split.py lists in sft_seen_chunks.txt: run it after this)
@@ -715,10 +716,11 @@ def main() -> None:
     ap.add_argument(
         "--task-version",
         type=int,
-        choices=(1, 2),
+        choices=(1, 2, 3),
         default=2,
         help="1: the 130-item domain_qa frozen 2026-09-27 (no second supplement, no locator "
-        "filter, kinds or cap; results/table_v1.md); 2: the grown set (finalize_qa_v2)",
+        "filter, kinds or cap; results/table_v1.md); 2: the grown set (finalize_qa_v2); 3: v2 "
+        "with the few-shot split off by passage, for the next from-scratch rebuild",
     )
     ap.add_argument(
         "--only",
@@ -809,12 +811,17 @@ def main() -> None:
     print(f"  {len(qa)} after dedup ({n - len(qa)} near-duplicate facts)")
     qa = apply_rejects(out, "domain_qa", qa)
     # The first 3 verified items become the few-shot examples in every domain_qa prompt, and are
-    # removed from the scored set so no scored item has its answer in the prompt.
+    # removed from the scored set so no scored item has its answer in the prompt. v1/v2 split them
+    # off by item, which left two scored items from a shot's passage (qa-0003, qa-0056: other facts,
+    # eval/contamination.py); v3 also drops the shots' passages from the scored set.
     rng.shuffle(qa)
     fewshot, qa = qa[:3], qa[3:]
     for n, i in enumerate(qa, 1):
         i["id"] = f"qa-{n:04d}"
         i["tolerance"] = 0.02
+    shot_chunks = {s["source_chunk"] for s in fewshot}
+    if args.task_version >= 3:  # after the ids, so every v3 item keeps its v2 id
+        qa = [i for i in qa if i["source_chunk"] not in shot_chunks]
     write_jsonl(out / "domain_qa.jsonl", qa)
     write_jsonl(out / "fewshot.jsonl", fewshot)
 
@@ -951,9 +958,13 @@ def main() -> None:
             i["id"] = f"qa-{n:04d}"
             i["tolerance"] = 0.02
         write_jsonl(out / "domain_qa.jsonl", qa + more + more2)
-    if args.task_version == 2:
+    if args.task_version >= 2:
         # every item, the frozen 130 included: v2 is a new set, v1 stays reproducible
-        write_jsonl(out / "domain_qa.jsonl", finalize_qa_v2(out, qa + more + more2))
+        final = finalize_qa_v2(out, qa + more + more2)
+        for i in final:  # v2 only: v3 has no such item. Per-item analyses can exclude these.
+            if i["source_chunk"] in shot_chunks:
+                i["fewshot_passage_overlap"] = True
+        write_jsonl(out / "domain_qa.jsonl", final)
 
     n = len(grounded)
     grounded = [g for g in grounded if not is_nonprose(text_of[g["gold_chunk_ids"][0]])]

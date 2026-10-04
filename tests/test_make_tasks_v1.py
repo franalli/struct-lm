@@ -1,9 +1,11 @@
 """make_tasks.py --task-version 1 still rebuilds the eval frozen on 2026-09-27 byte for byte (the
-130-item domain_qa behind results/table_v1.md), and --task-version 2 (the default) rebuilds the
-committed eval/tasks/. Runs from the LLM disk cache, so it makes no API calls when the cache is
+130-item domain_qa behind results/table_v1.md), --task-version 2 (the default) rebuilds the
+committed eval/tasks/, and --task-version 3 only removes items from it (the few-shot passages).
+Runs from the LLM disk cache, so it makes no API calls when the cache is
 complete; skipped where the cache, chunks or key aren't available."""
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -55,6 +57,24 @@ def test_task_version_1_reproduces_frozen_set(tmp_path):
     build(tmp_path, 1)
     for name, digest in V1.items():
         assert sha(tmp_path / name) == digest, name
+
+
+def load(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+@NEEDS
+def test_task_version_3_only_drops_shot_passages(tmp_path):
+    """v3 = v2 with the few-shot split off by passage: removal only, so every v3 item is a reviewed
+    v2 item under the same id, and none comes from a shot's passage."""
+    build(tmp_path, 3)
+    v2 = {d["id"]: d for d in load(FROZEN / "domain_qa.jsonl")}
+    v3 = load(tmp_path / "domain_qa.jsonl")
+    shots = {s["source_chunk"] for s in load(tmp_path / "fewshot.jsonl")}
+    assert not [d["id"] for d in v3 if d["source_chunk"] in shots]
+    assert all(d == v2[d["id"]] for d in v3)
+    tagged = {i for i, d in v2.items() if d.get("fewshot_passage_overlap")}
+    assert tagged and not tagged & {d["id"] for d in v3}
 
 
 @NEEDS

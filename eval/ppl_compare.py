@@ -33,9 +33,19 @@ def sums(res: dict, set_name: str, unit: str) -> dict[str, tuple[float, float]]:
     return {k: tuple(v) for k, v in res["sums"]["docs"].get(set_name, {}).items()}
 
 
-def compare(a: dict, b: dict, set_name: str, unit: str, n: int = 10_000, seed: int = 0) -> dict:
+def compare(
+    a: dict,
+    b: dict,
+    set_name: str,
+    unit: str,
+    n: int = 10_000,
+    seed: int = 0,
+    docs: set[str] | None = None,
+) -> dict:
     sa, sb = sums(a, set_name, unit), sums(b, set_name, unit)
     keys = sorted(set(sa) & set(sb))
+    if docs is not None:  # windows carry no document, so a document subset has no window unit
+        keys = [k for k in keys if k in docs] if unit == "documents" else []
     if not keys:
         return {}
     A = np.array([sa[k] for k in keys])
@@ -74,7 +84,9 @@ def main() -> None:
     ap.add_argument("--set", choices=SETS, action="append", help="default: all three")
     ap.add_argument("--dir", default="results/ppl")
     ap.add_argument("--n", type=int, default=10_000, help="bootstrap resamples")
+    ap.add_argument("--docs", help="comma-separated slugs: compare only these documents")
     args = ap.parse_args()
+    docs = set(args.docs.split(",")) if args.docs else None
     a, b = (json.loads((Path(args.dir) / f"{r}.json").read_text()) for r in (args.a, args.b))
     for r, res in ((args.a, a), (args.b, b)):
         if "sums" not in res:
@@ -82,7 +94,7 @@ def main() -> None:
     print(f"{args.b} vs {args.a} (b - a; 95% bootstrap intervals, paired)")
     for set_name in args.set or SETS:
         for unit in ("windows", "documents"):
-            if c := compare(a, b, set_name, unit, args.n):
+            if c := compare(a, b, set_name, unit, args.n, docs=docs):
                 print(f"  {set_name:<12} {unit:<9} {fmt(c)}")
 
 
