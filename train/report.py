@@ -135,9 +135,13 @@ def scaling(runs: dict, name: str, ref: str) -> str:
         ra, rb = dict(zip(xa, ya)), dict(zip(xb, yb))
         step_gap = [abs(ra[x] / rb[x] - 1) for x in np.intersect1d(xa, xb)]
         ratio = s["tokens_per_s"] / r_s["tokens_per_s"]
+        per_gpu = s["tokens_per_s"] / s["gpus"], r_s["tokens_per_s"] / r_s["gpus"]
         out.append(
             f"- **{name} vs {ref}:** {s['gpus']} GPUs give {ratio:.2f}x the tokens/s "
-            f"({s['tokens_per_s']:,.0f} vs {r_s['tokens_per_s']:,.0f}); per-step losses differ "
+            f"({s['tokens_per_s']:,.0f} vs {r_s['tokens_per_s']:,.0f}), so per GPU "
+            f"{per_gpu[0] / per_gpu[1] - 1:+.0%} at the same micro-batch and per-layer "
+            f"checkpointing (peak memory {s['peak_mem_gb']:.0f} vs {r_s['peak_mem_gb']:.0f} GB): "
+            f"the FSDP2 code path, not scaling (finding 6 below); per-step losses differ "
             f"by {np.median(step_gap):.3%} (median) / {max(step_gap):.3%} (max) over "
             f"{len(step_gap)} steps, the {SMOOTH}-step moving averages by {gap:.2%} on average."
         )
@@ -366,9 +370,124 @@ def update_readme(path: Path, name: str, block: str) -> None:
 
 
 def results_table(path: Path = Path("results/table.md")) -> str:
-    """results/table.md without its smoke-test rows: the README's copy of the results."""
+    """results/table.md without its smoke-test rows, as three tables (the task scores, the
+    gold-answer log-probabilities, then lm-eval and perplexity), since one table of 26 columns
+    doesn't fit a page. The table's first line records the task sizes it was scored on."""
     lines = path.read_text().splitlines()
-    return "\n".join(line for line in lines if not line.startswith("| smoke "))
+    tag, lines = lines[0], [ln for ln in lines[1:] if not ln.startswith("| smoke ")]
+    sizes = tag.removeprefix("<!-- items: ").removesuffix(" -->").split()
+    cells = [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in lines]
+    head = cells[0]
+    out = [f"Items per task: {', '.join(s.replace('=', ' ') for s in sizes)}."]
+    for title, first, last in (
+        ("Task scores", "qa_acc", "halluc_rate"),
+        (
+            "Gold-answer log-probability (nats per item, higher is better)",
+            "gold_lp",
+            "gold_lp_unseen",
+        ),
+        ("Benchmarks and perplexity", "mmlu", head[-1]),
+    ):
+        cols = slice(head.index(first), head.index(last) + 1)
+        rows = [[row[0], *row[cols]] for row in cells]
+        if all(not c for row in rows[2:] for c in row[1:]):
+            continue  # a block with no numbers yet (gold_lp before any run computed it)
+        out.append(f"**{title}**\n\n" + "\n".join("| " + " | ".join(r) + " |" for r in rows))
+    return "\n\n".join(out)
+
+
+REF = "base-8b-hf"  # Stage 2 rows are read against the base evaluated through the same vLLM path
+SEED_PAIR = ("cpt-8b", "cpt-8b-seed1")
+DELTA_RUNS = ["cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"]
+DELTA_ROWS = [  # (label, metrics.json key, kind, lm-eval task and stderr key or KPI task)
+    ("domain val perplexity", "ppl_domain_val", "ppl", None),
+    ("general val perplexity", "ppl_general_val", "ppl", None),
+    ("train slice perplexity", "ppl_train", "ppl", None),
+    ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
+    ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
+    ("HellaSwag", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
+    ("qa_acc", "qa_acc", "kpi", "domain_qa"),
+    ("grounded_acc", "grounded_acc", "kpi", "grounded"),
+    ("vocab_recall", "vocab_recall", "kpi", "vocab"),
+    ("halluc_rate", "halluc_rate", "kpi", "adversarial"),
+]
+
+
+def delta_table() -> str:
+    """Each Stage 2 run's change vs base-8b-hf next to the noise it has to beat: max(the seed gap
+    between two runs of the same config, the metric's own standard error). Perplexity changes in
+    %, the rest in points. Empty when the reference or the seed pair isn't scored yet."""
+    runs = {}
+    for r in [REF, *DELTA_RUNS]:
+        f = RUNS / r / "metrics.json"
+        if f.exists():
+            runs[r] = json.loads(f.read_text())
+    if REF not in runs or not all(r in runs for r in SEED_PAIR):
+        return ""
+    ref = runs[REF]
+    lm_files = sorted((Path("results/lm_eval") / REF).glob("**/results*.json"))
+    lm = json.loads(lm_files[-1].read_text())["results"] if lm_files else {}
+    names = [r for r in DELTA_RUNS if r in runs]
+    head = ["metric", "base-8b-hf", *names, "noise"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra in DELTA_ROWS:
+        if ref.get(key) is None:
+            continue
+
+        change = {}
+        for r, metrics in runs.items():
+            v = metrics.get(key)
+            if v is not None:
+                change[r] = (v / ref[key] - 1) * 100 if kind == "ppl" else (v - ref[key]) * 100
+        seed = abs(change.get(SEED_PAIR[0], 0) - change.get(SEED_PAIR[1], 0))
+        if kind == "lm" and extra[0] in lm:
+            se = lm[extra[0]].get(extra[1], 0) * 100
+        elif kind == "kpi":
+            n = ref.get("n", {}).get(extra, 0)
+            se = math.sqrt(ref[key] * (1 - ref[key]) / n) * 100 if n else 0
+        else:
+            se = 0
+        unit = "%" if kind == "ppl" else " pt"
+        base = f"{ref[key]:.2f}" if kind == "ppl" else f"{ref[key]:.3f}"
+        cells = [label, base]
+        for r in names:
+            v = change.get(r)
+            cells.append("" if v is None else f"{v:+.2f}{unit}" if kind == "ppl" else f"{v:+.1f}")
+        noise = max(seed, se)
+        cells.append(f"{noise:.2f}{unit}" if kind == "ppl" else f"{noise:.1f}")
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def serving_table() -> str:
+    """results/bench/<run>.json (serve/bench_latency.py): p50 at 1 concurrent request, and
+    throughput at 1, 8 and 32. base-8b runs Mistral's native vLLM path, the rest the HF path."""
+    rows = []
+    for r in ["base-8b", "instruct-8b", "base-8b-hf", "cpt-8b"]:
+        f = Path("results/bench") / f"{r}.json"
+        if not f.exists():
+            continue
+        d = {x["concurrency"]: x for x in json.loads(f.read_text())}
+        rows.append(
+            [
+                r,
+                f"{d[1]['ttft_p50_ms']:.1f}",
+                f"{d[1]['itl_p50_ms']:.1f}",
+                f"{d[1]['e2e_p50_ms']:,.0f}",
+                *(f"{d[c]['tok_per_s']:,.0f}" for c in (1, 8, 32)),
+            ]
+        )
+    head = [
+        "run",
+        "TTFT p50 (ms)",
+        "ITL p50 (ms)",
+        "E2E p50 (ms)",
+        "tok/s @1",
+        "tok/s @8",
+        "tok/s @32",
+    ]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    return "\n".join([*lines, *("| " + " | ".join(r) + " |" for r in rows)])
 
 
 def main() -> None:
@@ -397,12 +516,19 @@ def main() -> None:
     }
     if BASE in ppl and len(ppl) > 1:
         md += f"\n## Perplexity vs {BASE}\n\n" + ppl_table(ppl) + "\n"
+    if deltas := delta_table():
+        md += (
+            f"\n## Change vs {REF}, next to the noise\n\n{deltas}\n\nPerplexity in %, the rest in "
+            "points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error "
+            "for base-8b-hf): a change smaller than it is not a result.\n"
+        )
     Path("results/train_runs.md").write_text(md)
     print(md)
     if args.readme:
         # the README nests these under "#### Stage 2": its own headings go two levels down
         update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
         update_readme(Path(args.readme), "results-table", results_table())
+        update_readme(Path(args.readme), "serving-table", serving_table())
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
     plot_loss(runs, base_val, Path("results/curves/cpt.png"))
     if BASE in ppl and len(ppl) > 1:

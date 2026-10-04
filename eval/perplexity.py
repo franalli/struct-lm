@@ -15,6 +15,11 @@ trainer's eval_loss. Each is exp(mean NLL per predicted token), token-weighted:
   ppl_val_slice    the SLICE_WINDOWS val windows cpt.py evaluates on: should match
                    exp(final eval_loss) of the run to within ~1% (a merge check)
   ppl_general_val  general_val.jsonl, held-out FineWeb-Edu (the forgetting side)
+  ppl_postcutoff   data/exposure/postcutoff.jsonl, the 13 federal reports published after the base
+                   model (eval/exposure_sources.csv, built by eval/memorization.py build): domain
+                   transfer to documents outside the corpus's own series, on the same footing as
+                   ppl_domain_val. Skipped if the file is absent; --only postcutoff adds it to an
+                   existing results/ppl/<run>.json without recomputing the other sets
 
 ppl_domain_val / ppl_train - 1 is the train/val gap in the Stage 2 decision rule
 (notes/decisions.md). One tokenizer for every model: the checkpoint's own tekken.json, which for
@@ -77,6 +82,33 @@ def nats(nll, cnt) -> float:
     return round(float(np.sum(nll) / np.sum(cnt)), 5)
 
 
+def add_postcutoff(result: dict, model, args) -> None:
+    """ppl_postcutoff and its by-document, token and bootstrap-sum fields, added to result."""
+    pc = pack([args.postcutoff], args.model)
+    if len(pc.ids) != pc.expected:
+        raise SystemExit(f"postcutoff: {len(pc.ids)} windows, n_tokens imply {pc.expected}")
+    print(f"{args.run_name}: postcutoff ({len(pc.ids)} windows)")
+    po = nll_sums(model, pc, np.arange(len(pc.ids)), args.batch)
+    result["ppl_postcutoff"] = ppl(po["win"][:, 0], po["win"][:, 1])
+    result["nats"]["postcutoff"] = nats(po["win"][:, 0], po["win"][:, 1])
+    result["tokens"]["postcutoff"] = int(po["win"][:, 1].sum())
+    result["by_doc_postcutoff"] = {
+        name: {
+            "publisher": pc.sources[pc.doc_source[k]],
+            "ppl": ppl(po["doc_nll"][k], po["doc_cnt"][k]),
+            "tokens": int(po["doc_cnt"][k]),
+        }
+        for k, name in enumerate(pc.doc_names)
+        if po["doc_cnt"][k] > 0
+    }
+    result["sums"]["windows"]["postcutoff"] = po["win"].round(4).tolist()
+    result["sums"]["docs"]["postcutoff"] = {
+        n: [round(float(po["doc_nll"][k]), 4), int(po["doc_cnt"][k])]
+        for k, n in enumerate(pc.doc_names)
+        if po["doc_cnt"][k] > 0
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True, help="HF id or merged checkpoint dir")
@@ -84,13 +116,23 @@ def main() -> None:
     ap.add_argument("--data-dir", default=DATA)
     ap.add_argument("--out", default="results/ppl")
     ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--postcutoff", default="data/exposure/postcutoff.jsonl")
+    ap.add_argument("--only", choices=["postcutoff"], help="add one set to the run's existing json")
     args = ap.parse_args()
     d = Path(args.data_dir)
+    out = Path(args.out) / f"{args.run_name}.json"
 
     model = auto_model_class(args.model).from_pretrained(
         args.model, dtype=torch.bfloat16, attn_implementation="sdpa"
     )
     model.to("cuda" if torch.cuda.is_available() else "cpu").eval()  # CPU: local tests only
+
+    if args.only == "postcutoff":
+        result = json.loads(out.read_text())
+        add_postcutoff(result, model, args)
+        out.write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps({"ppl_postcutoff": result["ppl_postcutoff"]}))
+        return
 
     train = pack([str(d / "train.jsonl")], args.model)
     val = pack([str(d / "val.jsonl")], args.model)
@@ -164,7 +206,8 @@ def main() -> None:
         },
     }
     result["train_val_gap"] = round(result["ppl_domain_val"] / result["ppl_train"] - 1, 4)
-    out = Path(args.out) / f"{args.run_name}.json"
+    if Path(args.postcutoff).exists():
+        add_postcutoff(result, model, args)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + "\n")
     print(

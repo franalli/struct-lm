@@ -20,12 +20,14 @@ training:
   gradient_accumulation_steps: 8
   learning_rate: 5.0e-6          # DPO wants ~10-50x lower LR than SFT
   lr_scheduler_type: cosine
-  warmup_ratio: 0.1
+  warmup_steps: 0.1  # transformers 5: a float in [0, 1) is a ratio of total steps
   beta: 0.1                      # KL strength to the reference; lower = drift further
   loss_type: sigmoid
   max_length: 4096
-  max_prompt_length: 2048
+  # no max_prompt_length: TRL 0.29 removed it (DPO bounds prompt + completion with max_length,
+  # GRPO the completion with max_completion_length); keep prompts short in the data
   bf16: true
+  tf32: true  # fp32 matmuls on TF32 tensor cores (decisions.md, numeric precision)
   gradient_checkpointing: true
   logging_steps: 10
   eval_strategy: steps

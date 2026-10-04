@@ -25,7 +25,9 @@ model-agnostic). Regression numbers come from run_lm_eval.sh and are merged in w
 """
 
 import argparse
+import datetime
 import glob
+import hashlib
 import json
 import pathlib
 import statistics
@@ -35,27 +37,51 @@ import sys
 # eval/, or as /root/eval/run_eval.py inside the Modal container.
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from prompts import ABSTAIN_PHRASE, CHAT_GEN, GEN, grounded_prompt, qa_prompt, vocab_prompt
+from qa_rules import answer_kind
 from scorers import abstained, answer_line, citations, citations_valid, qa_correct, substance
 
 # Task order: files are read, generated and scored in this order.
 TASKS = ["domain_qa", "grounded", "vocab", "adversarial"]
-# Columns of results/table.md, in order. The first six are the KPIs computed in score():
+# Columns of results/table.md, in order. The first twelve are the KPIs computed in score():
 #   qa_acc          domain_qa: fraction answered correctly (exact or numeric match)
+#   qa_num, qa_ident, qa_term  the same, by answer kind (qa_rules.answer_kind, or the item's
+#                     answer_kind field from make_tasks --task-version 2): values, identifiers
+#                     (document ids, article numbers: arbitrary strings, the slowest to learn),
+#                     and terms plus everything else
+#   qa_seen, qa_unseen  the same, split by whether the item's source chunk is in
+#                     eval/tasks/sft_seen_chunks.txt, the half SFT synthesis may draw on
+#                     (eval/sft_split.py). Seen measures knowledge injection, unseen transfer;
+#                     before Stage 3 nothing is seen, so the halves are a null check
 #   grounded_acc    grounded: fraction the judge finds correct, citations ignored
 #   cite_valid      grounded: fraction whose citations are all provided ids (rule-based)
 #   cite_supported  grounded: fraction the judge finds correct AND supported by cited passages
 #   vocab_recall    vocab: fraction of definitions the judge accepts
+#   vocab_seen, vocab_unseen  vocab_recall split the same way as qa_seen / qa_unseen
 #   halluc_rate     adversarial: fraction that answered instead of abstaining (lower is better)
+#   gold_lp, gold_lp_seen, gold_lp_unseen  domain_qa: mean log-probability, in nats per item, of
+#                     the gold answer (eval/gold_lp.py; higher is better), all items and by half;
+#                     computed in the generation engine, so blank for runs generated earlier
 # The next seven come from lm-eval via merge_lm_eval() (MMLU overall, then its four groups), and
-# the last three from eval/perplexity.py via merge_ppl() (lower is better); either set goes blank
-# if its directory isn't given or has nothing for the run.
+# the last four from eval/perplexity.py via merge_ppl() (lower is better; ppl_postcutoff is the
+# 13 federal reports published after the base model, eval/exposure_sources.csv); either set goes
+# blank if its directory isn't given or has nothing for the run.
 COLUMNS = [
     "qa_acc",
+    "qa_num",
+    "qa_ident",
+    "qa_term",
+    "qa_seen",
+    "qa_unseen",
     "grounded_acc",
     "cite_valid",
     "cite_supported",
     "vocab_recall",
+    "vocab_seen",
+    "vocab_unseen",
     "halluc_rate",
+    "gold_lp",
+    "gold_lp_seen",
+    "gold_lp_unseen",
     "mmlu",
     "mmlu_stem",
     "mmlu_hum",
@@ -66,8 +92,9 @@ COLUMNS = [
     "ppl_train",
     "ppl_domain_val",
     "ppl_general_val",
+    "ppl_postcutoff",
 ]
-PPL = ("ppl_train", "ppl_domain_val", "ppl_general_val")
+PPL = ("ppl_train", "ppl_domain_val", "ppl_general_val", "ppl_postcutoff")
 
 
 def load_jsonl(path: pathlib.Path) -> list[dict]:
@@ -84,7 +111,7 @@ def write_jsonl(path: pathlib.Path, rows: list[dict]) -> None:
 
 
 # ------------------------------------------------------------ build prompts ---
-def build_items(tasks_dir: pathlib.Path, limit: int | None) -> list[dict]:
+def build_items(tasks_dir: pathlib.Path, limit: int | None, tasks: list[str] = TASKS) -> list[dict]:
     """One work item per task row: {task, id, prompt, ref}.
 
     `ref` is the untouched task row (gold answer, context, gold ids...), which score() reads.
@@ -93,7 +120,7 @@ def build_items(tasks_dir: pathlib.Path, limit: int | None) -> list[dict]:
     with saved generations by (task, id)."""
     fewshot = load_jsonl(tasks_dir / "fewshot.jsonl")
     items = []
-    for task in TASKS:
+    for task in tasks:
         rows = load_jsonl(tasks_dir / f"{task}.jsonl")
         if limit:
             rows = rows[:limit]
@@ -110,7 +137,13 @@ def build_items(tasks_dir: pathlib.Path, limit: int | None) -> list[dict]:
 
 # ---------------------------------------------------------------- generate ---
 def generate(
-    items: list[dict], model: str, chat: bool, tp: int, max_model_len: int, tokenizer_mode: str
+    items: list[dict],
+    model: str,
+    chat: bool,
+    tp: int,
+    max_model_len: int,
+    tokenizer_mode: str,
+    config_format: str = "hf",
 ) -> None:
     """Fill it["output"] for every item with vLLM, greedy, one batch per task.
 
@@ -133,8 +166,10 @@ def generate(
         # HF-format weights and config for every checkpoint: a hub repo that also ships Mistral's
         # native params.json + consolidated.safetensors is otherwise loaded through vLLM's native
         # implementation (PixtralForConditionalGeneration), a merged checkpoint through the HF one
-        # (Mistral3ForConditionalGeneration), and their deltas would mix training with the path
-        config_format="hf",
+        # (Mistral3ForConditionalGeneration), and their deltas would mix training with the path.
+        # "auto" (the hub's native path) only to extend a run that generated that way: Stage 0's
+        # base-8b and instruct-8b; config_format=hf can't load a hub repo's consolidated weights.
+        config_format=config_format,
         dtype="bfloat16",
         tensor_parallel_size=tp,
         max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
@@ -159,10 +194,36 @@ def generate(
                 it["raw_output"], it["output"] = it["output"], answer_line(it["output"])
         print(f"generated {len(batch):4d} {task}")
 
+    # Gold-answer log-probability for domain_qa (eval/gold_lp.py), in the same engine: the
+    # prompt + gold answer as one sequence, summing the answer tokens' prompt logprobs.
+    qa = [it for it in items if it["task"] == "domain_qa"]
+    if qa:
+        from gold_lp import gold_token_ids
+        from vllm.inputs import TokensPrompt
+
+        encoded, failed = gold_token_ids(model, chat, qa)
+        if failed:
+            print(f"gold_lp: prompt not a token prefix of prompt + answer, left out: {failed}")
+        ids = [it["id"] for it in qa if it["id"] in encoded]
+        outs = llm.generate(
+            [TokensPrompt(prompt_token_ids=encoded[i][0]) for i in ids],
+            SamplingParams(max_tokens=1, prompt_logprobs=0),
+            use_tqdm=False,
+        )
+        by_id = {it["id"]: it for it in qa}
+        for i, o in zip(ids, outs):
+            full, n = encoded[i]
+            lp = sum(o.prompt_logprobs[k][full[k]].logprob for k in range(n, len(full)))
+            by_id[i]["gold_lp"], by_id[i]["gold_tokens"] = round(lp, 4), len(full) - n
+        print(f"gold_lp {len(ids):4d} domain_qa ({len(failed)} left out)")
+
 
 # ------------------------------------------------------------------- score ---
-def score(items: list[dict], judge) -> tuple[list[dict], dict]:
+def score(items: list[dict], judge, seen: set[str] | None = None) -> tuple[list[dict], dict]:
     """Score every item; return (per-item records, aggregate metrics).
+
+    `seen` is the set of source chunks SFT synthesis may use (sft_seen_chunks.txt); with it,
+    domain_qa and vocab are also scored in seen / unseen halves. None leaves those columns blank.
 
     `judge` is a judge.Judge or None (--no-judge). Without a judge, the judged metrics
     (grounded_acc, cite_supported, vocab_recall) are left out of metrics entirely rather than
@@ -178,6 +239,12 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
 
     scored, buckets = [], {c: [] for c in COLUMNS}
     n_failed = 0
+
+    def split(prefix: str, ref: dict, value) -> None:
+        """Also count a domain_qa / vocab score in its seen or unseen half."""
+        if seen is not None:
+            buckets[f"{prefix}_{'seen' if ref['source_chunk'] in seen else 'unseen'}"].append(value)
+
     for it in items:
         r, out, rec = it["ref"], it["output"], {"task": it["task"], "id": it["id"]}
         if it["task"] == "domain_qa":
@@ -186,6 +253,14 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
                 out, r["answer"], r["answer_type"], r.get("tolerance", 0.02)
             )
             buckets["qa_acc"].append(rec["correct"])
+            kind = r.get("answer_kind") or answer_kind(r["answer"], r["answer_type"])
+            col = {"number": "qa_num", "identifier": "qa_ident"}.get(kind, "qa_term")
+            buckets[col].append(rec["correct"])
+            split("qa", r, rec["correct"])
+            if it.get("gold_lp") is not None:
+                rec["gold_lp"] = it["gold_lp"]
+                buckets["gold_lp"].append(it["gold_lp"])
+                split("gold_lp", r, it["gold_lp"])
         elif it["task"] == "grounded":
             # Three scores: citation format (rules), correctness alone (judge), then
             # correctness plus support by the cited passages (judge).
@@ -227,6 +302,7 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
             if not answer_line(out):
                 rec["correct"], rec["judge_reason"] = 0, "no definition in the output"
                 buckets["vocab_recall"].append(0)
+                split("vocab", r, 0)
             elif judge:
                 v = judge("vocab", vocab_rubric(r["term"], r["definition"], out))
                 if v is None:
@@ -234,6 +310,7 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
                 else:
                     rec["correct"], rec["judge_reason"] = v["score"], v["reason"]
                     buckets["vocab_recall"].append(v["score"])
+                    split("vocab", r, v["score"])
         elif it["task"] == "adversarial":
             # The exact abstain phrase is scored without a judge call; any other wording goes
             # to the judge, which also accepts paraphrased refusals.
@@ -260,6 +337,9 @@ def score(items: list[dict], judge) -> tuple[list[dict], dict]:
     # append_table() writes a blank cell instead of a misleading 0.
     metrics: dict = {c: round(statistics.fmean(v), 4) for c, v in buckets.items() if v}
     metrics["n"] = {t: sum(1 for it in items if it["task"] == t) for t in TASKS}
+    if buckets["gold_lp"]:  # a few long gold strings can dominate the mean
+        metrics["gold_lp_median"] = round(statistics.median(buckets["gold_lp"]), 4)
+        metrics["gold_lp_n"] = len(buckets["gold_lp"])
     if n_failed:
         metrics["judge_failed"] = n_failed
     return scored, metrics
@@ -320,22 +400,70 @@ def merge_ppl(metrics: dict, ppl_dir: str | None, run_name: str) -> None:
         metrics[c] = res.get(c)
 
 
-def append_table(table: pathlib.Path, run_name: str, metrics: dict) -> None:
-    """Append one row to results/table.md, writing the header first if the file is new.
-    Append-only: re-scoring a run adds a second row, so delete the stale one by hand."""
+def item_counts(tasks_dir: pathlib.Path) -> dict[str, int]:
+    """Items per task, then domain_qa items per answer kind (the qa_num / qa_ident / qa_term
+    denominators), for the table's first line."""
+    counts = {t: len(load_jsonl(tasks_dir / f"{t}.jsonl")) for t in TASKS}
+    kinds = {"number": 0, "identifier": 0, "term": 0}
+    for r in load_jsonl(tasks_dir / "domain_qa.jsonl"):
+        kind = r.get("answer_kind") or answer_kind(r["answer"], r["answer_type"])
+        kinds["term" if kind == "other" else kind] += 1
+    return counts | {f"qa_{k}": n for k, n in kinds.items()}
+
+
+def append_table(table: pathlib.Path, run_name: str, metrics: dict, items: dict[str, int]) -> None:
+    """Append one row to results/table.md, writing the item-count line and header first if the
+    file is new. Append-only: re-scoring a run adds a second row, so delete the stale one by hand.
+
+    The first line records the task sizes the table was started on. A row must have scored every
+    item of a task or none (--allow-partial blanks a task): a table never mixes item sets in one
+    column. When a task file changes, freeze the table (results/table_vN.md) and start a new one."""
+    tag = "<!-- items: " + " ".join(f"{t}={n}" for t, n in items.items()) + " -->"
     header = "| run | " + " | ".join(COLUMNS) + " |\n|" + "---|" * (len(COLUMNS) + 1) + "\n"
     if not table.exists():
-        table.write_text(header)
-    elif table.read_text().splitlines()[0] != header.splitlines()[0]:
+        table.write_text(tag + "\n" + header)
+    lines = table.read_text().splitlines()
+    if lines[0] != tag:
+        raise SystemExit(
+            f"{table} was started on {lines[0]!r}, the task files now hold {tag!r}: freeze it as "
+            "results/table_vN.md and start a new table"
+        )
+    if lines[1] != header.splitlines()[0]:
         # COLUMNS changed since the table was started; appending would misalign every cell.
         # metrics.json is already written by then, so stopping here loses nothing.
         raise SystemExit(f"{table}: header doesn't match COLUMNS; update its header row first")
+    partial = {t: n for t, n in metrics["n"].items() if n not in (0, items[t])}  # tasks only
+    if partial:
+        raise SystemExit(f"{run_name} scored part of a task {partial} of {items}: not tabled")
     cells = [
         "" if metrics.get(c) is None else f"{metrics[c]:.2f}" if c in PPL else f"{metrics[c]:.3f}"
         for c in COLUMNS
     ]
     with table.open("a") as f:
         f.write(f"| {run_name} | " + " | ".join(cells) + " |\n")
+
+
+def write_provenance(run_dir: pathlib.Path, new: dict[str, list[dict]], args) -> None:
+    """generations_meta.json: per task, the run that produced its rows in generations.jsonl."""
+    import vllm
+
+    path = run_dir / "generations_meta.json"
+    meta = json.loads(path.read_text()) if path.exists() else {}
+    for t in TASKS:
+        meta.setdefault(t, {"note": "generated before provenance was recorded (2026-10-04)"})
+    for t, rows in new.items():
+        meta[t] = {
+            "date": datetime.datetime.now(datetime.UTC).date().isoformat(),
+            "model": args.model,
+            "chat": args.chat,
+            "config_format": args.config_format,
+            "vllm": vllm.__version__,
+            "n": len(rows),
+            "prompts_sha256": hashlib.sha256(
+                "\n".join(r["prompt"] for r in rows).encode()
+            ).hexdigest(),
+        }
+    path.write_text(json.dumps(meta, indent=2) + "\n")
 
 
 # -------------------------------------------------------------------- main ---
@@ -365,7 +493,36 @@ def main() -> None:
         "--lm-eval-dir", help="e.g. results/lm_eval; merges <dir>/<run-name>/**/results*.json"
     )
     ap.add_argument("--ppl-dir", help="e.g. results/ppl; merges <dir>/<run-name>.json")
+    ap.add_argument(
+        "--seen-chunks",
+        help="source chunks SFT synthesis used (default <tasks-dir>/sft_seen_chunks.txt)",
+    )
+    ap.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="--rescore when saved generations miss items now in a task file: that task's "
+        "columns are left blank (never scored on the subset)",
+    )
+    ap.add_argument(
+        "--tasks",
+        default=",".join(TASKS),
+        help="tasks to generate (comma-separated); the rest of generations.jsonl is kept",
+    )
+    ap.add_argument(
+        "--config-format",
+        default="hf",
+        choices=("hf", "auto"),
+        help="vLLM config format; auto only to extend Stage 0's native-path hub runs",
+    )
+    ap.add_argument(
+        "--judge-cache",
+        help="judge verdict cache (default <results-dir>/judge_cache.jsonl, required when "
+        "--results-dir isn't the repo's results/: results/judge_cache.jsonl reuses it)",
+    )
     args = ap.parse_args()
+    tasks = [t for t in args.tasks.split(",") if t]
+    if unknown := set(tasks) - set(TASKS):
+        ap.error(f"unknown tasks {sorted(unknown)}; choose from {TASKS}")
     if args.model and "instruct" in args.model.lower() and not args.chat:
         # KPI eval always runs chat checkpoints in chat format (notes/decisions.md).
         raise SystemExit("an Instruct checkpoint must be evaluated with --chat")
@@ -378,21 +535,47 @@ def main() -> None:
     if args.rescore:
         # Re-attach saved outputs to freshly built items by (task, id). Items with no saved
         # generation are dropped, so --rescore with --limit scores that subset only.
-        saved = {(r["task"], r["id"]): r["output"] for r in load_jsonl(gen_path)}
+        saved = {(r["task"], r["id"]): r for r in load_jsonl(gen_path)}
         items = build_items(pathlib.Path(args.tasks_dir), args.limit)
+        missing = {}
+        for it in items:
+            if (it["task"], it["id"]) not in saved:
+                missing[it["task"]] = missing.get(it["task"], 0) + 1
+        if missing and not args.limit:
+            # A task file grew after this run generated (domain_qa did, 2026-10-04). Scoring
+            # the old subset would put a different item set under the same column name.
+            if not args.allow_partial:
+                raise SystemExit(
+                    f"{gen_path} has no generation for {missing} items now in {args.tasks_dir}: "
+                    "regenerate those tasks (--tasks), or --allow-partial to leave them blank"
+                )
+            print(f"--allow-partial: {sorted(missing)} not fully generated, columns left blank")
+            items = [it for it in items if it["task"] not in missing]
         items = [it for it in items if (it["task"], it["id"]) in saved]
         for it in items:
-            it["output"] = saved[(it["task"], it["id"])]
+            row = saved[(it["task"], it["id"])]
+            it["output"] = row["output"]
+            if "gold_lp" in row:
+                it["gold_lp"] = row["gold_lp"]
     else:
         if not args.model:
             ap.error("--model is required unless --rescore")
-        items = build_items(pathlib.Path(args.tasks_dir), args.limit)
-        generate(items, args.model, args.chat, args.tp, args.max_model_len, args.tokenizer_mode)
+        items = build_items(pathlib.Path(args.tasks_dir), args.limit, tasks)
+        generate(
+            items,
+            args.model,
+            args.chat,
+            args.tp,
+            args.max_model_len,
+            args.tokenizer_mode,
+            args.config_format,
+        )
         # Save before scoring: GPU time is the expensive part, so a judge or scoring failure
-        # never costs a regeneration (fix it and --rescore).
-        write_jsonl(
-            gen_path,
-            [
+        # never costs a regeneration (fix it and --rescore). Tasks not regenerated keep their
+        # saved rows, keyed by (task, id), so one file can hold generations from two dates;
+        # generations_meta.json records, per task, which run produced them.
+        new = {
+            t: [
                 {
                     "task": it["task"],
                     "id": it["id"],
@@ -400,11 +583,22 @@ def main() -> None:
                     "output": it["output"],
                     # chat one-line tasks: the full reply before scorers.answer_line
                     **({"raw_output": it["raw_output"]} if "raw_output" in it else {}),
+                    **(
+                        {"gold_lp": it["gold_lp"], "gold_tokens": it["gold_tokens"]}
+                        if "gold_lp" in it
+                        else {}
+                    ),
                 }
                 for it in items
-            ],
-        )
-        print(f"saved {len(items)} generations -> {gen_path}")
+                if it["task"] == t
+            ]
+            for t in tasks
+        }
+        old = [r for r in load_jsonl(gen_path) if r["task"] not in tasks]
+        rows = [r for t in TASKS for r in new.get(t, old) if r["task"] == t]
+        write_jsonl(gen_path, rows)
+        write_provenance(run_dir, new, args)
+        print(f"saved {sum(map(len, new.values()))} generations ({', '.join(tasks)}) -> {gen_path}")
         if args.generate_only:
             return
 
@@ -413,9 +607,22 @@ def main() -> None:
     if not args.no_judge:
         from judge import Judge
 
-        judge = Judge(results / "judge_cache.jsonl")
+        repo_results = pathlib.Path(__file__).resolve().parents[1] / "results"
+        if args.judge_cache:
+            cache = pathlib.Path(args.judge_cache)
+        elif results.resolve() == repo_results.resolve():
+            cache = results / "judge_cache.jsonl"
+        else:
+            # A scratch --results-dir has no verdicts cached: every judged item would be paid for
+            # again (50 calls, 2026-10-04). Name the cache explicitly.
+            ap.error("--results-dir isn't the repo's results/: pass --judge-cache")
+        judge = Judge(cache)
 
-    scored, metrics = score(items, judge)
+    seen_path = pathlib.Path(
+        args.seen_chunks or pathlib.Path(args.tasks_dir) / "sft_seen_chunks.txt"
+    )
+    seen = set(seen_path.read_text().split()) if seen_path.exists() else None
+    scored, metrics = score(items, judge, seen)
     merge_lm_eval(metrics, args.lm_eval_dir, args.run_name)
     merge_ppl(metrics, args.ppl_dir, args.run_name)
     # On --rescore, keep the model/chat recorded by the generating run unless given again.
@@ -429,7 +636,12 @@ def main() -> None:
     metrics["chat"] = args.chat or prev.get("chat", False)
     write_jsonl(run_dir / "scored.jsonl", scored)
     (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
-    append_table(results / "table.md", args.run_name, metrics)
+    if args.limit:  # a smoke subset isn't a result; the table holds full task sets only
+        print(f"--limit: {results / 'table.md'} not updated")
+    else:
+        append_table(
+            results / "table.md", args.run_name, metrics, item_counts(pathlib.Path(args.tasks_dir))
+        )
     if judge:
         print(f"judge calls this run: {judge.calls}")  # cache misses only; hits are free
         if judge.failures:

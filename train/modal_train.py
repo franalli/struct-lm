@@ -177,14 +177,13 @@ def merge(run_name: str, source: str = "") -> str:
 
 
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
-def perplexity(model: str, run_name: str) -> None:
-    """eval/perplexity.py -> /vol/results/ppl/<run>.json."""
+def perplexity(model: str, run_name: str, only: str = "") -> None:
+    """eval/perplexity.py -> /vol/results/ppl/<run>.json. only="postcutoff" adds the post-cutoff
+    set to an existing json (needs /vol/data/exposure/postcutoff.jsonl):
+      modal run train/modal_train.py::perplexity --model ... --run-name ... --only postcutoff"""
     vol.reload()
-    subprocess.run(
-        [sys.executable, "/root/eval/perplexity.py", "--model", model, "--run-name", run_name],
-        check=True,
-        cwd="/vol",
-    )
+    cmd = [sys.executable, "/root/eval/perplexity.py", "--model", model, "--run-name", run_name]
+    subprocess.run(cmd + (["--only", only] if only else []), check=True, cwd="/vol")
     vol.commit()
 
 

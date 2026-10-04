@@ -13,8 +13,15 @@ Current baselines: `results/table.md`.
 - Claude Code's shell has no `python` on PATH: use `.venv/bin/python` (and `.venv/bin/modal`).
 - Keys live in `.env` (gitignored): `MISTRAL_API_KEY`, `HF_TOKEN`. Scripts don't read `.env`, so
   load it first: `set -a; . ./.env; set +a`. Never print key values.
+- The Mistral key allows 30 requests a minute (tokens are no constraint), shared by `make_tasks.py`
+  (paced: `--rpm`), the judge and any synthesis, so ~1,800 calls an hour in total; don't run two
+  API-heavy jobs at once.
 - Modal: volume `struct-lm` (mounted at `/vol`, results under `/vol/results`), secrets
   `huggingface` and `mistral`.
+- GPU work: always ask the user before launching any Modal GPU job (`modal run` of
+  `train/modal_train.py` or `eval/modal_app.py`, smoke tests included), even when a plan or the
+  next step calls for it. Say which command, how many GPUs, and the rough duration. An approval
+  covers that launch only, not later ones. `modal volume get/put` needs no confirmation.
 - Git: never create or check out a new branch unless the user says to. Commit on the current
   branch (`main`) when asked.
 
@@ -62,14 +69,24 @@ make data                                       # all steps below, in order
 .venv/bin/python data/scripts/extract.py --chunks   # -> data/processed/chunks.jsonl (eval pool only; frozen)
 set -a; . ./.env; set +a
 .venv/bin/python eval/make_tasks.py           # -> eval/tasks/*.jsonl (Mistral API, disk-cached)
+.venv/bin/python eval/sft_split.py            # -> eval/tasks/sft_seen_chunks.txt (seen/unseen halves)
+.venv/bin/python -m pytest tests/             # qa_rules + --task-version 1 reproduces the frozen set
 ```
+
+- `--task-version 1` rebuilds the 2026-09-27 eval (130-item domain_qa, `results/table_v1.md`) byte
+  for byte. `2` (default) is the grown set: after rejects it tags `answer_kind`, removes layout
+  locators (`qa_rules.is_locator` -> `locators.jsonl`) and holds identifiers to 20% of the set
+  (`held_back.jsonl`). Reviewer tag corrections live in `eval/tasks/answer_kinds.jsonl`.
 
 `chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt` (the 234
 train documents when the eval was frozen), so corpus expansion can't resample the reviewed tasks;
 `--chunks` must stay byte-identical (`cmp`). `split.py` keeps every pinned document in train.
 Sampling caps source chunks at `--per-doc 6` per document per task.
 After any edit to `make_tasks.py`, rerun it and diff `eval/tasks/` against the reviewed version.
-Byte-identical output needs no re-review; any changed item must be reviewed (rule 9).
+Byte-identical output needs no re-review; any changed item must be reviewed (rule 9) against
+`notes/eval_review_rubric.md`. A task file that grows makes every earlier run stale for that task:
+`run_eval.py --rescore` refuses generations that miss items (`--allow-partial` scores the subset
+and must not go into `table.md`), so regenerate the affected task for every compared checkpoint.
 
 ### Generation, lm-eval, latency (Modal)
 
@@ -110,15 +127,25 @@ set -a; . ./.env; set +a
 
 - Always pass `--model` (and `--chat` for chat checkpoints) when scoring: generate-only runs write
   no `metrics.json`, so otherwise the row records `model: null`.
-- `table.md` is append-only: delete the superseded row for that run by hand.
+- `table.md` is append-only: delete the superseded row for that run by hand. Its first line
+  records the task sizes it was started on; `run_eval.py` refuses rows scored on other sizes or on
+  part of a task. When a task file changes, freeze the table as `results/table_vN.md` (v1 = the
+  Stage 2 write-up's 130-item table) and start a new one.
+- Regenerate one task with `--tasks domain_qa` (Modal `--tasks domain_qa`): the run's other
+  generations are kept, keyed by (task, id), and `generations_meta.json` records which run produced
+  each task. Push the local `generations.jsonl` to the volume first and diff the pulled file's
+  other tasks against it. A run that can't be regenerated gets that task blank with
+  `--allow-partial`.
+- A `--results-dir` other than `results/` needs `--judge-cache` (normally
+  `results/judge_cache.jsonl`), or every judged item is paid for again.
 - If the output reports `judge_failed` (Mistral 429s), rerun the same command: failed verdicts
   aren't cached, and cached ones are free.
 - Never delete `results/judge_cache.jsonl`. Editing a rubric re-judges everything it grades.
 - **Then update the README's figures and tables every time new results land:** rerun the stage's
   report (Stage 2: `train/report.py` -> `results/curves/cpt.png`, `cpt_ppl.png`,
   `results/train_runs.md`), which overwrites the plots in place and rewrites the README's generated
-  blocks (`<!-- stage2-tables:... -->` in Training, `<!-- results-table:... -->` in Results: never
-  edit inside them by hand). Embed any new figure in the README's write-up and update the prose
+  blocks (`<!-- stage2-tables:... -->` in Training, `<!-- results-table:... -->` in Results,
+  `<!-- serving-table:... -->` in Serving: never edit inside them by hand). Embed any new figure in the README's write-up and update the prose
   findings next to it. Every stage shows its train/val loss curves and its headline metric
   (perplexity for CPT) as plots, not only tables.
 
@@ -155,6 +182,13 @@ $M volume get --force struct-lm results/ppl/<run>.json results/ppl/
 # noise floor and LR-up (decisions.md, ablation rules): same config, one change each
 $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-seed1 --overrides "training.seed=1"
 $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-lr2x --overrides "training.learning_rate=2.0e-4"
+# memorisation probe: corpus vs post-cutoff documents (eval/exposure_sources.csv, PDFs curl'd into
+# data/exposure/, gitignored), base plus the CPT checkpoint as positive control
+.venv/bin/python eval/memorization.py build            # -> data/exposure/docs.jsonl
+$M volume put --force struct-lm data/exposure/docs.jsonl data/exposure/docs.jsonl
+$M run --detach eval/modal_app.py::memorization --model /vol/checkpoints/base-8b-hf --run-name base-8b-hf
+mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/base-8b-hf.json results/exposure/base-8b-hf.json
+.venv/bin/python eval/memorization.py report base-8b-hf cpt-8b-replay10
 ```
 
 - Override values go through YAML: write floats with a dot (`2.0e-4`; PyYAML reads `2e-4` as a
@@ -199,21 +233,28 @@ $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name 
 6. **Chat models on the one-line tasks** (`domain_qa`, `vocab`): `prompts.CHAT_GEN` drops the `"\n"`
    stop and `scorers.answer_line` keeps the first line with content (Instruct opens with a
    `**Term: x**` header). Base models keep `GEN`.
-7. **Metrics:** `qa_acc` (rules), `grounded_acc` (judge, correct per gold, citations ignored),
+7. **Metrics:** `qa_acc` (rules; also `qa_num` / `qa_text` by answer type, and `qa_seen` /
+   `qa_unseen`, `vocab_seen` / `vocab_unseen` by `sft_seen_chunks.txt`: report Stage 3+ knowledge
+   gains per half, never pooled), `grounded_acc` (judge, correct per gold, citations ignored),
    `cite_valid` (rules), `cite_supported` (judge, correct and backed by cited passages),
    `vocab_recall` (judge), `halluc_rate` (answered an unanswerable question; lower is better),
    plus `mmlu` and its four groups / `gsm8k` (strict-match) / `hellaswag` (acc_norm), and from
    Stage 2 `ppl_train` / `ppl_domain_val` / `ppl_general_val` (`eval/perplexity.py`, lower is
-   better; `ppl_train` is measured on a train slice, for base too).
+   better; `ppl_train` is measured on a train slice, for base too) and `ppl_postcutoff` (the 13
+   2026 reports, `--only postcutoff`). `gold_lp` / `gold_lp_seen` / `gold_lp_unseen`: mean
+   log-probability of the gold QA answer in nats per item (`eval/gold_lp.py`, computed in the
+   generation engine; Instruct in chat format, not comparable to base rows).
 8. **Judge:** decide by rule anything a rule can decide, before the judge sees it: empty or
    citation-only answers, answers citing no provided passage, the exact abstain phrase, and vocab
    outputs with no definition line. Give the judge only what the verdict depends on (the
    adversarial rubric sees no passages). After any rubric change, hand-check verdicts against the
    gold text before trusting the numbers.
-9. **Eval tasks** (524 items + 3 few-shot, every one reviewed; frozen 2026-09-27 before Stage 2,
+9. **Eval tasks** (v2, 2026-10-04: domain_qa 325, grounded 108, vocab 210, adversarial 76 = 719 items +
+   3 few-shot, every one reviewed; v1 of 2026-09-27 had domain_qa 130, frozen before Stage 2,
    sampled from the 234 train documents pinned in `eval/tasks/eval_docs.txt`): filters run post-cap
    and only remove items; per-task RNG streams; supplementary grounded/adversarial/domain_qa items
-   have ids >= 501 and are sampled after every other task; rejects live in
+   have ids >= 501 and are sampled after every other task, and the second domain_qa supplement
+   (2026-10-04) ids >= 1001 after that; rejects live in
    `eval/tasks/rejects.jsonl` (task + match + reason). Review rejects only for defects (wrong gold,
    correct answer scored wrong, wrong answer scored right, general knowledge/trivia/one example's
    value), never for difficulty, and finishes before any model generation.
@@ -222,22 +263,31 @@ $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name 
     (BOS + document + EOS as ids, 4,096-token windows), never TRL's packing, which truncates each
     document and appends EOS as text. Effective batch: the 150-step rule. `train/merge.py` copies
     the base's non-weight files (never `params.json` / `consolidated.safetensors`) and checks the
-    weight names match the base. SFT/DPO/GRPO data and chat template work are deferred until the
+    weight names match the base. SFT data may draw on eval chunks only from
+    `eval/tasks/sft_seen_chunks.txt` (`eval/sft_split.py`), never on any other chunk in
+    `eval_chunk_ids.txt`, and never reuses an eval question. SFT/DPO/GRPO data and chat template work are deferred until the
     user asks.
 11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
     reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
     GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
     from the previous stage, not from the base. Drift from the base shows only in the eval rows.
     `grpo.yaml` has `beta: 0.0` (no KL term, no reference) until raised.
+12. **Checkpoints:** no checkpoint with a row in a results table is deleted until that stage's
+    write-up is frozen, and adapters (`checkpoints/_train/<run>`) are never deleted; merged LoRA
+    checkpoints are reproducible from them, full-parameter ones are not.
 
 ## Known gaps
 
+- The `gen_qa` prompt still shows the chunk id (`slug:p12:c0`), so the generator sees the page.
+  The locator rule removes page/table/figure items at assembly, and none came from the page so
+  far. Drop the id from the prompt only in a from-scratch rebuild, since it changes every cached
+  generation, the frozen items included.
 - Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/`, and about
   `common` / `packing` / `modal_app` imports in `train/`, are false positives (`sys.path` imports;
   vLLM and lm-eval are only installed in the Modal image).
-- `train/configs/sft.yaml` and `dpo.yaml` still use `warmup_ratio`, which transformers 5 removed
-  (`warmup_steps` takes a float in [0, 1) as a ratio), and none of sft/dpo/grpo sets `tf32: true`
-  yet (on from Stage 3; Stage 2 runs without it for uniformity); fix both when those stages start.
+- SFT/DPO/GRPO are not wired into `train/modal_train.py` yet, and their configs still say
+  `report_to: wandb` (no W&B secret exists; Stage 2 logs to `results/runs/<run>/train_log.jsonl`).
+  `sft.yaml` starts from `checkpoints/cpt-8b-replay10`; `tf32: true` is on from Stage 3.
 - Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
   modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

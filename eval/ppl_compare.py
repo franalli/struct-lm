@@ -22,13 +22,14 @@ from pathlib import Path
 
 import numpy as np
 
-SETS = ("domain_val", "general_val", "train_slice")
+SETS = ("domain_val", "general_val", "train_slice", "postcutoff")
 
 
 def sums(res: dict, set_name: str, unit: str) -> dict[str, tuple[float, float]]:
     """{key: (summed NLL, predicted tokens)} for one slice, keyed by window index or document."""
     if unit == "windows":
-        return {str(i): tuple(w) for i, w in enumerate(res["sums"]["windows"][set_name])}
+        # .get: postcutoff exists only for runs measured after 2026-10-04
+        return {str(i): tuple(w) for i, w in enumerate(res["sums"]["windows"].get(set_name, []))}
     return {k: tuple(v) for k, v in res["sums"]["docs"].get(set_name, {}).items()}
 
 

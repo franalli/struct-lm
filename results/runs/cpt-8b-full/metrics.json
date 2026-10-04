@@ -1,9 +1,16 @@
 {
-  "qa_acc": 0.1769,
+  "qa_acc": 0.1846,
+  "qa_num": 0.2198,
+  "qa_ident": 0.1154,
+  "qa_term": 0.0769,
+  "qa_seen": 0.1385,
+  "qa_unseen": 0.2308,
   "grounded_acc": 0.8889,
   "cite_valid": 0.1481,
   "cite_supported": 0.1019,
   "vocab_recall": 0.7429,
+  "vocab_seen": 0.7327,
+  "vocab_unseen": 0.7523,
   "halluc_rate": 0.9211,
   "n": {
     "domain_qa": 130,
@@ -21,6 +28,7 @@
   "ppl_train": 4.8152,
   "ppl_domain_val": 6.7321,
   "ppl_general_val": 8.2481,
+  "ppl_postcutoff": null,
   "model": "/vol/checkpoints/cpt-8b-full",
   "chat": false
 }

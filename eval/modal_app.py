@@ -92,8 +92,12 @@ def kpi_eval(
     no_judge: bool,
     tokenizer_mode: str,
     generate_only: bool = False,
+    tasks: str = "",
+    config_format: str = "hf",
 ) -> None:
     """The domain KPI eval: run_eval.py with container paths. Arguments map 1:1 to its flags.
+    `tasks` (comma-separated, "" = all) regenerates only those tasks; the run's other saved
+    generations on the volume are kept, so push the local generations.jsonl first.
 
     Writes /vol/results/runs/<run_name>/ and, unless generate_only, a row in
     /vol/results/table.md. --lm-eval-dir points at lm_eval()'s output, so if that ran first
@@ -122,6 +126,9 @@ def kpi_eval(
         cmd.append("--no-judge")
     if generate_only:
         cmd.append("--generate-only")
+    if tasks:
+        cmd += ["--tasks", tasks]
+    cmd += ["--config-format", config_format]
     subprocess.run(cmd, check=True, cwd="/root")  # check=True: a failed eval fails the Modal call
     vol.commit()  # persist results; without this, writes to /vol are lost when the container exits
 
@@ -213,6 +220,28 @@ def vllm_ppl(model: str, config_format: str = "hf", no_yarn_scale: bool = False)
     vol.commit()
 
 
+@app.function(**COMMON)
+def memorization(model: str, run_name: str, config_format: str = "hf") -> None:
+    """eval/memorization.py run: verbatim recall and per-document perplexity for the train, val
+    and post-cutoff documents in /vol/data/exposure/docs.jsonl. Writes
+    /vol/results/exposure/<run_name>.json.
+      modal run eval/modal_app.py::memorization --model /vol/checkpoints/base-8b-hf --run-name base-8b-hf"""
+    vol.reload()
+    cmd = [
+        sys.executable,
+        "/root/eval/memorization.py",
+        "run",
+        "--model",
+        model,
+        "--run-name",
+        run_name,
+        "--config-format",
+        config_format,
+    ]
+    subprocess.run(cmd, check=True, cwd="/vol")
+    vol.commit()
+
+
 WHICH = ("lm", "kpi", "both", "latency")
 
 
@@ -226,6 +255,8 @@ def main(
     generate_only: bool = False,
     which: str = "both",
     tokenizer_mode: str = "mistral",  # "auto" for non-Mistral-3 checkpoints
+    tasks: str = "",  # KPI only: e.g. "domain_qa" regenerates that task and keeps the others
+    config_format: str = "hf",  # KPI only: "auto" to extend Stage 0's native-path hub runs
 ) -> None:
     """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
     bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi) or
@@ -243,7 +274,15 @@ def main(
         lm_eval.remote(model, run_name, tokenizer_mode)  # first, so kpi_eval can merge its numbers
     if which in ("kpi", "both"):
         kpi_eval.remote(
-            model, run_name, chat, limit or None, no_judge, tokenizer_mode, generate_only
+            model,
+            run_name,
+            chat,
+            limit or None,
+            no_judge,
+            tokenizer_mode,
+            generate_only,
+            tasks,
+            config_format,
         )
     if which == "latency":
         latency.remote(model, run_name, tokenizer_mode)

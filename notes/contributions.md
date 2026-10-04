@@ -188,6 +188,9 @@ Nothing warns.
 **Repro:** `eval/vllm_ppl.py --model <HF-only copy of Ministral-3-8B-Base-2512> --config-format hf`,
 with and without `--no-yarn-scale`; compare with `--config-format mistral` on the hub id.
 **Here:** `train/merge.py` adds `"apply_yarn_scaling": false` to merged configs.
+**Culprit:** vLLM's reading of the config. Mistral's own hub `config.json` (Base-2512, snapshot
+d4883f9) ships `rope_parameters` with `mscale: 1.0, mscale_all_dim: 1.0`, so neither transformers'
+re-serialisation nor `merge.py` introduces the keys vLLM drops (checked 2026-10-04).
 **Upstream:** in the `"yarn"` branch, honour mscale / mscale_all_dim the way transformers does
 (attention factor = get_mscale(factor, mscale) / get_mscale(factor, mscale_all_dim)), or map them
 to `apply_yarn_scaling`. A strong first vLLM issue with a one-line repro. Not filed.

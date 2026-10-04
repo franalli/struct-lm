@@ -16,7 +16,9 @@ import re
 
 # First number in a string: optional sign, digits with thousands commas ("1,200"), an optional
 # decimal part, and optional scientific notation ("2.9e4"). Units and trailing text are ignored.
-_NUM = re.compile(r"-?\d[\d,]*\.?\d*(?:[eE][-+]?\d+)?")
+# A hyphen glued to a letter or digit is part of an id, not a minus sign: "FEMA P-361" is 361
+# (it read as -361, so a correct "FEMA P-361" failed against a gold "FEMA 361").
+_NUM = re.compile(r"(?:(?<![A-Za-z0-9])-)?\d[\d,]*\.?\d*(?:[eE][-+]?\d+)?")
 # English articles, dropped so "the plastic moment" matches "plastic moment".
 _ARTICLES = re.compile(r"\b(the|a|an)\b")
 # Everything except word characters, whitespace and the symbols that carry meaning in engineering
@@ -110,9 +112,15 @@ def numeric_match(pred: str, gold: str, rel_tol: float = 0.02) -> bool:
     return abs(p - g) / abs(g) <= rel_tol
 
 
+# A ratio gold "10:1" (or "4 : 1"): two numbers, so make_tasks labels it exact, but its value is
+# the first one. "aspect ratio 10" is a correct answer that exact match failed (qa-0542, audit
+# 2026-10-04).
+_RATIO_TO_ONE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*:\s*1\s*$")
+
+
 def qa_correct(pred: str, gold: str, answer_type: str, tolerance: float = 0.02) -> bool:
     """domain_qa score for one item: numeric answers by value, everything else by text."""
-    if answer_type == "numeric":
+    if answer_type == "numeric" or _RATIO_TO_ONE.match(gold):
         return numeric_match(pred, gold, tolerance)
     return exact_match(pred, gold)
 

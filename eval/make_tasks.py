@@ -10,7 +10,12 @@ Output: eval/tasks/
           adversarial.jsonl   {id, question, context:[{chunk_id,text}x3], why_unanswerable}
           fewshot.jsonl       3 QA pairs used in the domain_qa prompt, excluded from domain_qa
           eval_chunk_ids.txt  every chunk id an eval item was built from (Stage 3 must not
-                              generate SFT data from these)
+                              generate SFT data from these, except the "seen" half that
+                              eval/sft_split.py lists in sft_seen_chunks.txt: run it after this)
+
+domain_qa grows in three samples, each taken after everything before it so no earlier item moves:
+the main set (ids from 1), --n-qa-extra (from 501) and --n-qa-extra2 (from 1001, 2026-10-04).
+Every item is hand-reviewed before any model generates on it (notes/eval_review_rubric.md).
 
 Everything is seeded; re-running regenerates the same sample of chunks. Generated items are
 verified by a second GEN_MODEL pass. Hand-check ~30 QA items afterwards; if more than
@@ -32,6 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from mistralai.client import Mistral
 from prompts import VOCAB_SHOTS
+from qa_rules import answer_kind, is_locator
 
 GEN_MODEL = "mistral-large-2512"  # Mistral Large 3, pinned; must match judge.JUDGE_MODEL
 client = Mistral(
@@ -70,12 +76,54 @@ def llm_json(prompt: str, retries: int = 6) -> dict:
     return out
 
 
+class Pacer:
+    """Client-side pacing shared by every worker: calls start at least `interval` seconds apart.
+    main() pins the interval (and its floor) just under the key's requests-per-minute limit
+    (--rpm); a 429 still stretches it x1.25, at most once per 10 s, and 10 successes in a row
+    shrink it back toward the floor. Without pacing, workers burst into the limit together and all
+    sleep 15-30 s (2026-10-04: 299 retries in 37 minutes, ~3/4 of worker time asleep)."""
+
+    def __init__(self, interval: float = 1.0, floor: float = 0.25, ceiling: float = 4.0):
+        self.interval, self.floor, self.ceiling = interval, floor, ceiling
+        self.next_start, self.ok, self.last_slow, self.calls = 0.0, 0, 0.0, 0
+        self.lock = threading.Lock()
+
+    def wait(self) -> None:
+        with self.lock:
+            now = time.monotonic()
+            start = max(now, self.next_start)
+            self.next_start = start + self.interval
+        time.sleep(start - now)
+
+    def result(self, throttled: bool) -> None:
+        with self.lock:
+            now = time.monotonic()
+            if throttled:
+                self.ok = 0
+                if now - self.last_slow > 10:
+                    self.interval, self.last_slow = min(self.ceiling, self.interval * 1.25), now
+            else:
+                self.ok, self.calls = self.ok + 1, self.calls + 1
+                if self.calls % 50 == 0:
+                    print(f"  pacer: {self.calls} calls, interval {self.interval:.2f} s")
+                if self.ok >= 10:
+                    self.interval, self.ok = max(self.floor, self.interval * 0.9), 0
+
+
+# Mistral's limit for this key is 30 requests a minute (x-ratelimit-limit-req-minute, checked
+# 2026-10-04; tokens are 800k a minute, never the constraint). Pace just under it: every 429 is a
+# request spent for nothing. --rpm overrides when the limit changes.
+RPM = 30
+PACER = Pacer(interval=60 / RPM * 1.03, floor=60 / RPM * 1.03)
+
+
 def _llm_json_uncached(prompt: str, retries: int) -> dict:
     """The API call itself, with retries. Every failure mode (rate limit, network error, invalid
     JSON) is retried the same way; after the last one, the failure is counted in FAILED_CALLS
     and reported at the end of the run by report_failures()."""
     global FAILED_CALLS
     for attempt in range(retries):
+        PACER.wait()
         try:
             r = client.chat.complete(
                 model=GEN_MODEL,
@@ -89,16 +137,20 @@ def _llm_json_uncached(prompt: str, retries: int) -> dict:
             content = message.content if message else None
             if not isinstance(content, str):  # empty or non-text reply: retry like any error
                 raise TypeError(f"model returned no text content: {content!r}")
+            PACER.result(throttled=False)
             return json.loads(content)
         except Exception as e:  # noqa: BLE001  any failure (rate limit, network, bad JSON) is retried
             print(f"  retry {attempt + 1}: {str(e)[:160]}")
-            # rate limits need a real cool-down, not a 1-2 s blip
-            time.sleep(15 * (attempt + 1) if "429" in str(e) else 2**attempt)
+            if "429" in str(e):
+                PACER.result(throttled=True)  # the pacer slows every worker; a short pause here
+                time.sleep(2 * (attempt + 1))
+            else:
+                time.sleep(2**attempt)
     FAILED_CALLS += 1
     return {}
 
 
-WORKERS = 4  # Mistral Large 3 rate-limits 8 parallel workers into 5th retries; --workers overrides
+WORKERS = 8  # enough calls in flight for the Pacer's rate (each call takes seconds); --workers
 
 
 def pmap(fn, items, workers=None):
@@ -558,6 +610,55 @@ def apply_rejects(out: pathlib.Path, task: str, items: list[dict]) -> list[dict]
     return kept
 
 
+IDENTIFIER_CAP = 0.20
+YEAR = re.compile(r"^\s*(1[6-9]|20)\d{2}\s*$")  # a bare year: 1917, 2014
+
+
+def finalize_qa_v2(out: pathlib.Path, items: list[dict]) -> list[dict]:
+    """--task-version 2, after rejects (removal only, so no unreviewed item can enter):
+      1. answer_kind on every item: qa_rules.answer_kind, or the reviewers' correction in
+         eval/tasks/answer_kinds.jsonl ({"match": question, "kind"});
+      2. layout locators removed (qa_rules.is_locator) -> locators.jsonl, with the reason;
+      3. identifiers held to IDENTIFIER_CAP of the final set, keeping them in id order (main set
+         first, then the supplements) -> the surplus to held_back.jsonl, not deleted.
+    Identifier recall (which EM, which article) is the hardest closed-book knowledge and the
+    least useful to a user, so a set dominated by it would test a card catalogue."""
+    path = out / "answer_kinds.jsonl"
+    fixes = [json.loads(line) for line in path.open()] if path.exists() else []
+    for i in items:
+        i["answer_kind"] = next(
+            (f["kind"] for f in fixes if f["match"].lower().strip() in i["question"].lower()),
+            answer_kind(i["answer"], i["answer_type"]),
+        )
+    # A numeric gold is scored within 2%, which for an id or a year accepts its neighbours:
+    # FEMA P-2055 would pass P-2090, 1917 would pass 1928 and 1936 (review 2026-10-04). Those
+    # are matched exactly.
+    exact = 0
+    for i in items:
+        if i["answer_type"] == "numeric" and (
+            i["answer_kind"] == "identifier" or YEAR.match(i["answer"])
+        ):
+            i["tolerance"], exact = 0.0, exact + 1
+    print(f"  domain_qa v2: {exact} numeric ids and years scored exactly (tolerance 0)")
+    locators = [{**i, "reason": r} for i in items if (r := is_locator(i["question"], i["answer"]))]
+    items = [i for i in items if not is_locator(i["question"], i["answer"])]
+    others = [i for i in items if i["answer_kind"] != "identifier"]
+    idents = [i for i in items if i["answer_kind"] == "identifier"]
+    keep = int(
+        len(others) * IDENTIFIER_CAP / (1 - IDENTIFIER_CAP)
+    )  # idents <= cap of the final set
+    held = idents[keep:]
+    held_ids = {i["id"] for i in held}
+    items = [i for i in items if i["id"] not in held_ids]
+    write_jsonl(out / "locators.jsonl", locators)
+    write_jsonl(out / "held_back.jsonl", held)
+    print(
+        f"  domain_qa v2: {len(locators)} locators removed, {len(held)} identifiers held back "
+        f"(cap {IDENTIFIER_CAP:.0%}: {len(idents) - len(held)} of {len(items)})"
+    )
+    return items
+
+
 def report_failures() -> None:
     """Warn if any LLM call gave up: those chunks produced nothing, so the task set is smaller than
     intended and missing whatever those chunks covered. Failures aren't cached, so a rerun retries
@@ -600,10 +701,25 @@ def main() -> None:
         help="supplementary domain_qa chunks, sampled after all tasks (ids from 501)",
     )
     ap.add_argument(
+        "--n-qa-extra2",
+        type=int,
+        default=1300,  # ~all unused numeric-rich chunks under --per-doc; ~24% survive review
+        help="second domain_qa supplement, sampled after everything else (ids from 1001)",
+    )
+    ap.add_argument(
         "--per-doc", type=int, default=6, help="max source chunks per document, per task"
     )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--workers", type=int, default=WORKERS, help="parallel LLM calls")
+    ap.add_argument("--rpm", type=int, default=RPM, help="the API key's requests-per-minute limit")
+    ap.add_argument(
+        "--task-version",
+        type=int,
+        choices=(1, 2),
+        default=2,
+        help="1: the 130-item domain_qa frozen 2026-09-27 (no second supplement, no locator "
+        "filter, kinds or cap; results/table_v1.md); 2: the grown set (finalize_qa_v2)",
+    )
     ap.add_argument(
         "--only",
         choices=["qa"],
@@ -613,6 +729,9 @@ def main() -> None:
     )
     args = ap.parse_args()
     WORKERS = args.workers
+    PACER.interval = PACER.floor = 60 / args.rpm * 1.03
+    if args.task_version == 1:
+        args.n_qa_extra2 = 0
 
     # One stream per task: QA keeps Random(seed) (unchanged sample); the others get their own, so a
     # change in one task (e.g. QA rejects shrinking the list before its shuffle) can't resample the rest.
@@ -804,6 +923,8 @@ def main() -> None:
         )
         print(f"generating {len(extra)} supplementary adversarial questions...")
         adversarial += build_adversarial(extra, 501)
+    more: list[dict] = []
+    more2: list[dict] = []
     if args.n_qa_extra:
         # Same pipeline and same stream rule; dedup runs against the main set (already deduped,
         # so it keeps all of it), so a supplementary item never repeats a fact asked there.
@@ -816,6 +937,23 @@ def main() -> None:
             i["id"] = f"qa-{n:04d}"
             i["tolerance"] = 0.02
         write_jsonl(out / "domain_qa.jsonl", qa + more)
+    if args.n_qa_extra2:
+        # Second supplement (2026-10-04, user decision): 130 items gave qa_acc a 3.1-point standard
+        # error, wider than any Stage 2 effect, and too few for seen/unseen halves. Same pipeline,
+        # its own stream, the last take(), so no earlier sample moves; deduped against every
+        # earlier item, the few-shot included.
+        extra = take(with_numbers, args.n_qa_extra2, random.Random(f"{args.seed}-qa-extra2"))
+        print(f"generating QA from {len(extra)} second-supplement chunks...")
+        earlier = fewshot + qa + more
+        more2 = dedup_questions(earlier + build_qa(extra))[len(earlier) :]
+        more2 = apply_rejects(out, "domain_qa", more2)
+        for n, i in enumerate(more2, 1001):
+            i["id"] = f"qa-{n:04d}"
+            i["tolerance"] = 0.02
+        write_jsonl(out / "domain_qa.jsonl", qa + more + more2)
+    if args.task_version == 2:
+        # every item, the frozen 130 included: v2 is a new set, v1 stays reproducible
+        write_jsonl(out / "domain_qa.jsonl", finalize_qa_v2(out, qa + more + more2))
 
     n = len(grounded)
     grounded = [g for g in grounded if not is_nonprose(text_of[g["gold_chunk_ids"][0]])]

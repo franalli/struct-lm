@@ -1,3 +1,4 @@
+<!-- frozen 2026-10-04: the 130-item domain_qa (eval v1) rescored with the current scorer (hyphen and N:1 ratio fixes, per-kind and seen/unseen columns). results/table_v1.md is the table as published in the Stage 2 write-up; results/table.md is eval v2 (325 items). -->
 <!-- items: domain_qa=130 grounded=108 vocab=210 adversarial=76 qa_number=91 qa_identifier=26 qa_term=13 -->
 | run | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen | grounded_acc | cite_valid | cite_supported | vocab_recall | vocab_seen | vocab_unseen | halluc_rate | gold_lp | gold_lp_seen | gold_lp_unseen | mmlu | mmlu_stem | mmlu_hum | mmlu_soc | mmlu_other | gsm8k | hellaswag | ppl_train | ppl_domain_val | ppl_general_val | ppl_postcutoff |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

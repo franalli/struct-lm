@@ -106,9 +106,10 @@ def strip_boilerplate_lines(
     return out, removed
 
 
-def extract_doc(src: dict, encode) -> tuple[dict, dict]:
+def extract_doc(src: dict, encode, path: Path | None = None) -> tuple[dict, dict]:
+    """path defaults to data/raw/<slug>.pdf; eval/memorization.py passes PDFs kept outside it."""
     raw, has_image = [], []
-    for part in pdf_parts(pdf_path(src["slug"])):
+    for part in pdf_parts(path or pdf_path(src["slug"])):
         with part:
             for page in part:
                 raw.append(page_blocks(page, keep_lines=True))

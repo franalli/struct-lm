@@ -8,6 +8,8 @@ data/processed/*
 !data/processed/stats.json
 !data/processed/tokenizer_coverage.md
 data/packed/
+# memorisation probe: post-cutoff PDFs (re-fetched from eval/exposure_sources.csv) and docs.jsonl
+data/exposure/
 
 # Training artifacts
 checkpoints/

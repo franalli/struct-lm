@@ -1,5 +1,7 @@
 model:
-  init_from: checkpoints/cpt-merged   # python train/merge.py --adapter checkpoints/cpt --out ...
+  # Stage 2's continuing checkpoint (notes/decisions.md: replay adopted by the ablation rule);
+  # a relative path, so /vol/checkpoints/cpt-8b-replay10 when run on Modal with cwd=/vol
+  init_from: checkpoints/cpt-8b-replay10
   dtype: bfloat16
 
 lora:
@@ -20,11 +22,12 @@ training:
   gradient_accumulation_steps: 4
   learning_rate: 2.0e-4
   lr_scheduler_type: cosine
-  warmup_ratio: 0.03
+  warmup_steps: 0.03  # transformers 5: a float in [0, 1) is a ratio of total steps
   max_length: 4096
   packing: false
   assistant_only_loss: true
   bf16: true
+  tf32: true  # fp32 matmuls on TF32 tensor cores (decisions.md, numeric precision)
   gradient_checkpointing: true
   logging_steps: 10
   eval_strategy: epoch

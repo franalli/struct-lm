@@ -1075,3 +1075,395 @@ E2E 187 ms, 1,922 tok/s; base-8b-hf (fixed) 15.3 / 6.6 / 180 ms / 1,967: parity 
 after ~28 tokens, on the fixed path too, so it is a CPT effect: the corpus holds one EOS per document
 (234 in 19.4M tokens, ~83k tokens apart), and CPT weakens the model's stopping. SFT's short answers
 should restore it; Stage 3 checks output length.
+
+## 2026-09-28: The replay rule fired on noise; kept anyway (critique of the pre-registration)
+**Context:** ablation A's rule adopted replay because its MMLU beat the main run's by more than the
+seed floor: +0.2 points (0.766 vs 0.764) against a floor of 0.1 (|cpt-8b - cpt-8b-seed1|).
+**The flaw:** one seed pair understates MMLU's sampling error. The benchmark's own standard error is
+~0.34 points (14,042 items), so a +0.2 difference is noise however small the seed gap happens to
+be. The rule should have compared against max(seed gap, benchmark standard error), and the same
+applies to GSM8K (SE ~1.1 points on 1,319 items) and to the KPIs (1-5 point seed swings on
+76-210-item tasks). The general-val criterion was void for A as well (in-distribution, see the A
+verdict).
+**Chose:** keep the verdict: Stage 3 starts from `cpt-8b-replay10`. Following a conservative rule
+you'd now write differently beats amending it after seeing the data, and the choice costs
+nothing: replay matches the main run on every metric outside the noise (domain val identical,
+MMLU / GSM8K / HellaSwag within their standard errors), at +10% training tokens.
+**For later stages:** a pre-registered comparison reads a difference against max(seed gap, the
+metric's own standard error), with bootstrap intervals for perplexity. The KPIs are Stage 3+
+metrics: the base model doesn't follow instructions, so Stage 2 can't move them measurably.
+
+## 2026-09-28: Memorisation probe: the base doesn't reproduce the corpus; CPT's gain stops at the corpus's own series
+**Context:** the prior-exposure check above was inconclusive and said to revisit with documents
+published after the base model's release (`-2512`, December 2025). The user asked for a
+memorisation probe.
+**Documents:** 234 train, 12 val, and 13 post-cutoff public-domain federal reports:
+- NIST: 6 (TN 2371, 2377, 2281, 2374; GCR 26-072, 26-073);
+- USACE ERDC: 5;
+- FHWA: 2.
+
+All were published February–August 2026 (title pages and catalogue records) and are listed with
+sha256 in `eval/exposure_sources.csv`. Each passed a rule-1 check: the only copyright hits are
+NIST's standard policy link. They went through the corpus's own cleaning (extract, then the paragraph
+filter).
+**Test** (`eval/memorization.py`, ~$0.5 on Modal):
+- 16 spans per document from its middle 80%, each a 64-token prompt and a 64-token greedy
+  continuation, scored by verbatim prefix (tokens reproduced before the first miss).
+- Perplexity over each document's first two 4,096-token windows.
+- Run on `base-8b-hf` and, as a positive control, on `cpt-8b-replay10`, which read the train
+  documents exactly once.
+
+**Results:**
+- **Base reproduces nothing.** 6 of 3,744 train spans reach 32+ verbatim tokens; 0 val and 0
+  post-cutoff spans do. All six are in-document patterns, not recall:
+  - incrementing list items (`Table D-11` -> `D-12`, `D5092.033f` -> `g`);
+  - figure captions repeated with one value changed;
+  - a sentence echoing the one before it.
+
+  Mean verbatim prefix: corpus 1.30 tokens, post-cutoff 1.24; the difference is +0.05 [-0.26, +0.34].
+- **Base perplexity:** corpus documents are no easier than post-cutoff ones. The geometric mean is
+  +3.0% [-8.5, +17.0], with unmatched document types; the sign varies by publisher.
+- **Control, per-document change (`cpt-8b-replay10` - base):**
+
+  | Documents | Verbatim prefix | Perplexity |
+  |---|---|---|
+  | Train | +0.13 [+0.08, +0.18] tokens | -8.3% [-8.6, -7.9] |
+  | Val | +0.07 [-0.03, +0.16] | -4.2% [-5.5, -3.0] |
+  | Post-cutoff | +0.07 [-0.03, +0.17] | -0.4% [-0.8, 0.0] |
+
+  Every val document improved (-1.6% to -8.7%). The post-cutoff documents ranged from +1.1% to
+  -1.5%. Val minus post-cutoff: -3.8% [-5.1, -2.5].
+
+**Reading:**
+1. **Heavy prior exposure is ruled out.** A model that had memorised these documents would continue
+   them verbatim, and this one doesn't. Light exposure is not ruled out. One epoch of our own CPT
+   moves the verbatim prefix by only 0.13 tokens, below the ±0.3-token resolution of a 245-vs-13
+   comparison, so the probe can't separate "seen once in pretraining" from "never seen". The prior-exposure
+   explanation for the small Stage 2 gain loses its direct support without being refuted.
+2. **New, and more important: CPT's gain doesn't reach new documents in the domain.** On the same
+   measurement and the same windows, perplexity fell 8.3% on the documents read, 4.2% on held-out
+   corpus documents and 0.4% on documents published afterwards. The val split is document-level, but
+   val documents are siblings of train documents: USACE EMs, FEMA P-series, NIST GCR 917 briefs, FHWA
+   HIF reports. They share structure, boilerplate and phrasing with them. So `ppl_domain_val`
+   measures generalisation within those series, not domain transfer, and it overstates what CPT
+   gives a new report.
+
+**Caveats:**
+- **Few documents, different genre.** There are 13 documents, mostly research reports, technical
+  notes and workshop reports, while the corpus is mostly manuals and guides.
+- **Topic.** Some post-cutoff topics sit at the edge of the domain (pavement, embodied carbon,
+  procurement). The near-core ones don't move either: ERDC/GSL SR-26-1 (bridge load rating) -0.5%,
+  ERDC/ITL TR-26-1 (corroded steel beams) -0.4%.
+- **Window choice.** Perplexity covers each document's first two windows only, which include front
+  matter shared within a series. That favours val: its first-window change is -4.2% against -2.3%
+  over whole documents (`perplexity.py`). Even the whole-document val gain is about 6x the
+  post-cutoff one.
+
+**Sources:** highways.dot.gov (FHWA's current publications) answers scripts with an Akamai 403.
+ROSA P serves PDFs to curl's default User-Agent but returns 403 to a browser one, which is the one
+`data/scripts/common.py` sends.
+
+**Consequences:**
+- The README's "why so small" finding now rests on this entry.
+- A post-cutoff perplexity column is the honest measure of domain transfer for later stages.
+- **Revisit if:** a stage claims domain transfer. Then measure whole-document perplexity on the
+  post-cutoff set and grow the set; FHWA's 2026 reports need a browser download.
+
+## 2026-10-04: Stage 2 conclusions; the -20% target was set for the wrong data scale (user decision)
+**Bottom line (user's reading, adopted):** at 20M tokens and one epoch, CPT learns the documents it
+reads (-8%) and almost nothing that transfers to unseen ones (-0.4% on 2026 documents). A higher
+learning rate and full-parameter training learn the documents harder, with 2-4x the forgetting and
+no held-out gain. LoRA with 10% replay is the carried-forward checkpoint, chosen by a pre-registered
+rule that fired at the noise edge (recorded above). The eval harness found a serving bug larger than
+any training effect.
+
+**Against the pre-registered rules:**
+
+| rule | result | verdict |
+|---|---|---|
+| domain val down at least 20% | -2.3% (both seeds, within 0.02%) | failed |
+| gap growth under ~10 points | base gap 11.2%; cpt-8b +7.2, seed 1 +6.9, replay +7.8, lr2x +12.1, full +28.6 | passes for LoRA at 1e-4; fails for lr2x; full is past the 25-point memorising line |
+| general val up under 3% | +0.17% to +1.19% | passed everywhere |
+
+**Reframe:**
+- Held-out perplexity measures domain transfer, which continued pre-training produces at the scale
+  of billions of tokens.
+- With a 20M-token client corpus the goal is knowledge of those documents, measured by closed-book
+  QA after SFT. It needs repetition or augmentation to stick.
+- So the -20% target was a metric pre-registered for the wrong data scale, not a target missed by a
+  bad run.
+
+**Corrections to the earlier write-up:**
+- **Replay's grounded (-6.5) and cite_valid (-6.4) "cost" is probably not real.** Both are measured
+  on a base model's citation formatting, which SFT overwrites. One seed alone moved grounded by 4.6
+  points.
+- **The 2-GPU speed-up is a code-path effect.** Ablation C's 2.23x is +11% per GPU at matched
+  micro-batch (4) and per-layer non-reentrant checkpointing. The 1-GPU run peaked at 51 GB of 80, so
+  it wasn't memory-bound. The difference is the FSDP2 code path (bf16 parameter casting, its own
+  checkpoint wrapper), not scaling, and no run isolates it.
+- **Full-parameter vs LoRA cost.** Full-parameter on 2 GPUs matched LoRA's GPU-hours despite about
+  1.33x the FLOPs per token: roughly 43% against 30% of H100 bf16 peak. LoRA's FLOP saving doesn't
+  turn into speed.
+- **The probe's perplexities aren't comparable to the main table.** They are per-document medians
+  over each document's first two windows; only ratios within the probe are meaningful.
+
+**Stage 3 eval (carried lesson):**
+- **Seen and unseen halves.** Report `domain_qa` and `vocab` in two halves: items whose source
+  chunk fed an SFT example, and items whose chunk did not. Hold a deliberate share of the eval's
+  source chunks out of SFT synthesis so the unseen half exists. A single pooled number is
+  uninterpretable, as Stage 2's held-out perplexity showed.
+- **The bar is `instruct-8b`** (grounded 0.898, cite_valid 0.833, cite_supported 0.787, halluc
+  0.013, vocab 0.786, qa 0.115). Match it on grounding and beat it on both qa halves. Read
+  halluc_rate next to grounded_acc, so that abstention isn't refusal.
+- **Latency.** `cpt-8b`'s end-to-end latency (runs to the cap: one EOS per manual) is CPT's known
+  side effect. It is not a serving result, and deployment latency is measured on the SFT'd
+  checkpoint.
+
+## 2026-10-04: qa_acc audit: binary stays, one parser fix, split columns, domain_qa grows (user decision)
+**Context:** qa_acc sits at 12-19% for every model. Is the task hard, or is the scorer losing
+correct answers? An outside review suggested a third of the score was the scorer: brittle text
+matching, a first-number rule that skips values, and a chat model cut off by the newline stop.
+
+**Audit** (saved generations, no GPU):
+- **Hard by construction.** 98 of 130 items are never answered by any of the six models. The 10
+  everyone answers are general knowledge (ASCE 7's ρ = 1.0 and 1.5 factors, the Bruun rule,
+  SSPC-SP 10).
+- **The scorer loses almost nothing:**
+  - **Hand read of `instruct-8b`'s misses:** all 35 text misses and 30 random numeric ones. 1 of
+    the 65 was correct.
+  - **First-number rule:** across three models, the gold number never appears later in an answer
+    line.
+  - **No truncation:** `instruct-8b`'s chat replies were never cut off. Chat runs drop the newline
+    stop and get 64 tokens, and all 130 replies are one bare value (median 7 characters).
+  - **`instruct-8b` below base:** that is 4 items, one standard error, and its misses are wrong
+    values.
+- **The one correct miss was a parser bug.** `_NUM` read the hyphen in "FEMA P-361" as a minus
+  sign (-361 against a gold "FEMA 361").
+
+**Chose:**
+- **Keep pass/fail.** TriviaQA and NQ score short answers the same way; a wrong load factor is
+  wrong.
+- **Fix the parser.** A hyphen glued to a letter or digit is no longer a sign. The rescore of
+  every row made no judge calls. Effect: `instruct-8b` qa_acc 0.115 -> 0.123 (so the Stage 3 bar is
+  0.123, not 0.115), `cpt-8b-full` 0.177 -> 0.185, every other cell unchanged.
+- **No judged qa column.** It would recover about one item per model, so it isn't worth its own
+  error (rule 8). Revisit if the first SFT checkpoint answers in sentences: rerun this audit on it.
+- **No chat-only prompt suffix.** The header already asks for the bare value and `instruct-8b`
+  complies, and any prompt change changes the benchmark.
+- **New columns:**
+  - `qa_num` / `qa_text`: by answer type, 93 numeric / 37 text.
+  - `qa_seen` / `qa_unseen`, `vocab_seen` / `vocab_unseen`: by
+    `eval/tasks/sft_seen_chunks.txt`. That list comes from `eval/sft_split.py`: a source chunk is
+    seen when the first byte of sha256("sft-seen:" + id) is even, so an item never changes half
+    as tasks grow. Grounded/adversarial context chunks and few-shot chunks are never seen.
+  - The split is 65/65 QA items and 101/109 vocab items. Stage 3 SFT synthesis may draw on the
+    seen chunks only (rule 10).
+  - Before Stage 3 the halves are a null check. For example `base-8b-hf` scores 0.123 seen vs 0.169
+    unseen: 8 vs 11 items of 65, inside the noise.
+- **Rescore guard.** `run_eval.py --rescore` refuses saved generations that miss items now in the
+  task files; `--allow-partial` overrides. Otherwise a grown task would put a different item set
+  under the same column name.
+- **`eval/answer_logprob.py` (+ Modal `answer_logprob`), written but not run (no GPU).** It gives
+  the gold answer's log-probability per item, a continuous companion to qa_acc. Prompt tokens are a
+  prefix of prompt + answer for all 130 items, in base and chat format.
+- **Grow domain_qa** with a second supplement (`make_tasks.py --n-qa-extra2 1300`): 1,300 unused
+  numeric-rich chunks under the same `--per-doc 6` cap, sampled after every other take, ids from
+  1001. With extras set to 0 the frozen files rebuild byte-identically. Target 400-500 items, for
+  a standard error under 2 points and halves big enough to read. Review follows
+  `notes/eval_review_rubric.md`, the rubric of 2026-09-27 written down.
+
+**Consequence:** every compared checkpoint has to regenerate domain_qa on the grown set (GPU, needs
+approval):
+- `base-8b`, `instruct-8b`, `base-8b-hf`, `cpt-8b` and `cpt-8b-replay10` can be run as they are;
+- `cpt-8b-seed1` needs re-merging from its adapter;
+- `cpt-8b-full`'s weights are gone, so its row stays on the 130-item set.
+
+**Same day, before the grown set is scored:**
+- **Audit extended to the base models' text misses.** `base-8b-hf`'s 35 and `cpt-8b-full`'s 34.
+  In total 169 misses were read by hand (`instruct-8b` 35 text + 30 numeric, plus these 69), and 2
+  were correct answers scored wrong:
+  - "FEMA P-361", the hyphen bug above;
+  - "10" against the gold "10:1" (qa-0542, a maximum aspect ratio).
+
+  `qa_correct` now scores an `N:1` ratio gold by its value. Effect: `base-8b`, `cpt-8b`,
+  `cpt-8b-seed1`, `base-8b-hf` and `cpt-8b-replay10` gain that one item (qa_acc +0.8, qa_text
+  +2.7, qa_unseen +1.5). `instruct-8b`'s "10:1" already matched and `cpt-8b-full` answered 3. No
+  judge calls, no other cell moved.
+
+  So the judged qa column stays out. 102 of 104 text misses are wrong document numbers, article
+  numbers or terms, which is knowledge, not exact-match brittleness. `cpt-8b-full`'s qa gain over
+  `base-8b-hf` is +3.1 against a noise of 3.2: at the edge, not past it.
+- **`results/table_v1.md` frozen.** The 130-item table behind the Stage 2 write-up, as of the
+  parser fix and before the ratio rule.
+- **`results/table.md` carries an item-count line.** It sits above the header, and
+  `run_eval.append_table` refuses a row whose task sizes differ from the line, or that scored part
+  of a task. `--allow-partial` now leaves a stale task's columns blank instead of scoring the
+  subset; this is how `cpt-8b-full` gets blank qa cells in the grown table. A `--limit` run no
+  longer writes a table row.
+- **`--tasks` (`run_eval.py`, Modal `kpi_eval`).** It regenerates only the named tasks and keeps
+  the other rows of `generations.jsonl` byte for byte, keyed by (task, id).
+  `generations_meta.json` records per task the date, model, chat flag, config format, vLLM version,
+  item count and prompt hash; older tasks are marked as generated before provenance existed.
+  `--config-format auto` exists only to extend Stage 0's native-path hub runs (`base-8b`,
+  `instruct-8b`).
+- **Gold-answer log-probability moved into the generation engine** (`eval/gold_lp.py`, one model
+  load per checkpoint). It is saved per item and gives `gold_lp`, `gold_lp_seen` and
+  `gold_lp_unseen` (mean nats per item, higher is better), with the median in `metrics.json` since
+  long gold strings can dominate a mean. The prompt/answer token boundary is checked for every item
+  in both formats, and failures are listed and left out, never summed. Instruct is scored in chat
+  format, so its value is not comparable to base-format rows.
+- **`ppl_postcutoff`** (`eval/perplexity.py`, `--only postcutoff` adds it to an existing json; Modal
+  `perplexity --only`). The 13 2026 reports as whole documents (`data/exposure/postcutoff.jsonl`,
+  82 windows), on the same footing as `ppl_domain_val`; `ppl_compare.py` bootstraps it.
+- **Judge cache.** A `--results-dir` outside the repo's `results/` must name `--judge-cache`: a
+  scratch run re-judged 50 items today.
+- **Rules (user decision):**
+  - No checkpoint with a row in a results table is deleted until that stage's write-up is frozen;
+    16 GB on the volume is cheaper than a hole in the table.
+  - Adapters are never deleted: merged LoRA checkpoints are reproducible from them. That is why
+    `cpt-8b-seed1` can be re-merged and `cpt-8b-full` (full-parameter, no adapter) cannot.
+- **`cpt-8b-seed1` comes back by re-merging its adapter** with the same CPU `merge` function as
+  the first time. Before the row is used as the noise floor again, perplexity has to reproduce
+  domain val 6.718 (`results/ppl/cpt-8b-seed1.json`). If it doesn't, the row is labelled
+  re-merged.
+- **Launch plan (each launch asked for first; none before the grown set is reviewed, rebuilds byte
+  for byte and is committed):**
+  1. First, the three rows Stage 3 needs, each a `domain_qa` regeneration with `gold_lp`:
+     `base-8b-hf` and `cpt-8b-replay10` (with `ppl_postcutoff`), and `instruct-8b`
+     (`--config-format auto`, the path its other tasks were generated on).
+  2. Then the history rows: `cpt-8b`, and `cpt-8b-seed1` after its re-merge and perplexity check.
+  3. `cpt-8b-full` and the Stage 0 native `base-8b` keep blank qa cells via `--allow-partial`.
+
+## 2026-10-04: Layout locators removed, answer kinds tagged, identifiers capped at 20%; task versions (user decision)
+**Context:** a closed-book item whose answer is a page, table, figure or equation number tests a
+document's layout, not its content. That layout changes between editions, and the page can leak
+from metadata. The generation prompt for domain_qa shows the passage as `Passage
+(slug:p12:c0):`, so the generator sees the page number. Separately, qa_text turned out to be
+identifier recall (document and article numbers), the hardest and least useful kind of closed-book
+knowledge, so how much of the set it takes up is a design choice.
+
+**Measured first:**
+- **Locators are rare.** `qa_rules.is_locator` flags none of the 130 kept items, the 3 few-shot
+  items or the 476 domain_qa rejects. Across all 4,317 QA candidates ever generated (the
+  2026-09-27 pools plus the in-flight second supplement) it flags 39 (0.9%), every one a real
+  locator: table, figure, equation and plate numbers, page counts, citation page numbers.
+- **No metadata leak.** None of those answers is the chunk's own page; the page items come from
+  reference-list text.
+- **Tuning.** The filter as first proposed also flagged named equations ("Manning's equation"),
+  "plate buckling" questions and the standard "PS2-10", and missed "Equation B-28". The rules were
+  tuned on these lists and are pinned by tests (`tests/test_qa_rules.py`: 10 locators, 10
+  non-locators including "According to Table 3.4.1-1, what is the load factor").
+
+**Chose:**
+- **`eval/qa_rules.py`.** It holds `is_locator` and `answer_kind` (number, identifier, term,
+  other; identifier wins over number, so "FEMA 361" is an identifier; "10:1" is a number).
+- **`make_tasks.py --task-version`:**
+  - `1` rebuilds the 2026-09-27 eval byte for byte (no second supplement, filter, kinds or cap;
+    `tests/test_make_tasks_v1.py`).
+  - `2` (default) is the grown set. After rejects, and removing items only, it tags
+    `answer_kind` (reviewer corrections in `eval/tasks/answer_kinds.jsonl`), removes locators
+    (`locators.jsonl`) and holds identifiers to 20% of the final set, keeping them in id order
+    (`held_back.jsonl`, not deleted). It applies to every item, the old 130 included.
+  - On the 130 alone, v2 removes 0 locators and holds back 0 identifiers (26 of 130, exactly
+    20%).
+- **The generator prompt is unchanged.** It keeps the chunk id, and the locator rule doesn't run
+  before verification. Changing the prompt changes every cached generation, which would
+  regenerate the frozen 130 and the 2,525 in-flight candidates and force re-review of all of them.
+  Filtering before verification would save about 50 of about 4,000 remaining API calls. The rule
+  runs at assembly instead, where it holds whatever the prompt does. A future from-scratch build
+  should drop the chunk id from the `gen_qa` prompt and ask for no locators.
+- **qa_text split by kind.** It becomes `qa_ident` and `qa_term` (term + other), with `qa_num`
+  now meaning kind number. On the 130 items (91 / 26 / 13): base-8b-hf 0.198 / 0.038 / 0.077, and
+  the CPT runs 0.176-0.220 / 0.077-0.115 / 0.077. Expect qa_ident to move slowest under SFT: an
+  arbitrary string needs many exposures, and a retriever supplies it anyway.
+- **Table line.** `table.md`'s first line now also carries the per-kind counts, so a row is
+  tabled only against the same mix.
+- **Rubric.** `notes/eval_review_rubric.md` gains reject clause 10 (layout locator), the
+  answer-kind tag with one example per kind, the cap, and the blind sample of 40 checking tags
+  as well as verdicts (n checked, n overturned, n tags corrected).
+- **API pacing (`make_tasks.Pacer`).** The key's limit is 30 requests a minute
+  (`x-ratelimit-limit-req-minute`; tokens 800k a minute, a call 0.7 s), not concurrency.
+  - **Before:** burst-then-sleep spent ~3/4 of worker time asleep.
+  - **First fix:** an adaptive pacer hovered just above the limit and still drew a 429 on about one
+    call in five.
+  - **Now:** `--rpm 30` paces at 2.06 s per call, with 8 workers. That gives 28-29 calls a minute
+    and zero 429s, the most this key allows one call per item.
+  - **Checking several items per request was declined (user decision).** The supplement stays
+    filtered the way the frozen 130 were, one check per item.
+
+## 2026-10-04: domain_qa v2 frozen: 325 items (130 + 195), reviewed; numeric ids and years scored exactly
+**Generation:** `make_tasks.py` second supplement, 1,300 chunks (pacing at the key's 30 requests a
+minute, no failed calls):
+
+| Step | Items |
+|---|---|
+| Candidates | 2,525 |
+| Pass the pre-filter | 2,138 |
+| Pass the closed-book check | 1,251 |
+| Pass answer verification | 1,191 |
+| New after dedup | 1,179 |
+| Locators removed by rule | 5 |
+| To review | 1,174 |
+
+**Review** (`notes/eval_review_rubric.md`, ten agents with the same brief, 112-118 items each):
+- **Agents:** 341 kept (29%), 833 rejected, 123 keeps flagged. Reject clauses:
+
+  | Clause | Rejects |
+  |---|---|
+  | 3, a correct answer would score wrong | 270 |
+  | 5, general knowledge | 218 |
+  | 2, not the only answer | 79 |
+  | 6, trivia | 58 |
+  | 1, wrong gold | 46 |
+  | 7, one example's value | 32 |
+  | 8, misframed | 23 |
+  | 4, a wrong answer would score right | 21 |
+  | 10, locator | 14 |
+  | 9, not standalone | 9 |
+  | mixed | the rest |
+
+- **Lead re-check of all 123 flags:** 6 kept, 117 rejected.
+  - **One rule across batches:** core AASHTO LRFD values a bridge engineer knows (7.0 in. deck,
+    Service II 1.30, Strength IV 1.5, eta 1.05 / 0.95, 600-kip collision, Service II for
+    deflection, the 70 ksi compact limit) are general code knowledge, as 0.85 f'c is.
+  - **AASHTO Section 5 articles** (renumbered in the 8th edition) cited without an edition: none
+    were kept.
+- **Lead duplicate pass** over all kept items, the old 130 and few-shot included: 5 later items
+  were rejected as the same fact (qa-1948, -1918, -1235, -2055, -2000).
+- **Blind check:** the lead reviewed 40 items, sampled with seed 20261004, before any agent
+  verdict existed.
+  - Agreement was 35 of 40, and the tags matched on all 5 shared keeps.
+  - All 5 disagreements were lead keeps the agents rejected (silica fume, JSC-28918, eta_R = 1.000,
+    blockholing, 100% uplift). On re-reading the agents were right each time.
+  - **Recorded:** 40 checked, 0 agent verdicts overturned, 0 tags corrected. As on 2026-09-27, the
+    agents are the stricter side.
+- **Kept:** 219 of 1,174 (19%). Rejects are appended to `eval/tasks/rejects.jsonl` (955 entries,
+  reviewed "2026-10-04 second-supplement review"; none matches a kept question). Tag corrections
+  are in `eval/tasks/answer_kinds.jsonl` (9).
+
+**A scoring flaw the review found:** a numeric gold is matched within 2%, which accepts a
+neighbouring id or year: 1917 passes 1928 and 1936, FEMA P-2055 passes P-2090, and an ASTM number
+passes its neighbours. Version 2 sets `tolerance` 0 on numeric items that are identifiers or bare
+years (16 items, 3 of them in the old 130). The scorer is unchanged.
+
+**Built (`make_tasks.py`, default `--task-version 2`):**
+- **domain_qa: 325 items.** That is the 130 old items plus 219 new ones, less the 24 newest
+  identifiers held back by the 20% cap (`held_back.jsonl`; all 24 are new items). 5 locators are
+  in `locators.jsonl`.
+- **Kinds:** number 222, identifier 65 (20%), term 37, other 1.
+- **By publisher:** USACE 122, FEMA 98, FHWA 64, NIST 31, NASA 10.
+- **Halves:** seen 167, unseen 158.
+- **Unchanged:** grounded, vocab, adversarial and few-shot are byte-identical.
+- **`eval_chunk_ids.txt`:** 2,854 chunks.
+- **Rebuild:** byte for byte (`tests/test_make_tasks_v1.py` pins v1's checksums and checks the v2
+  rebuild).
+
+**Short of the 400-500 target.** At p ≈ 0.15, 325 items give a standard error of about 2.0 points
+(130 gave 3.1), and the halves are ~160 items each. The review was strict, and the supplement
+used 1,300 of the 1,319 unused numeric-rich chunks the per-document cap allows. Growing further
+would need a higher cap, more items from the long manuals, and another review.
+
+**Next:**
+- Regenerate domain_qa for the compared checkpoints (pre-approved launch plan above).
+- Results go into a new `results/table.md`; the current 130-item table is frozen as
+  `results/table_v1.1.md` (the current scorer), next to `table_v1.md` (as published).

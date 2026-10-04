@@ -56,15 +56,18 @@ the first two rows.
 
 | # | What it measures | Task | Metrics |
 |---|---|---|---|
-| 1 | Closed-book domain knowledge | 130 questions with exact or numeric answers from the corpus | `qa_acc` |
+| 1 | Closed-book domain knowledge | 325 questions with exact or numeric answers from the corpus (130 until 2026-10-04) | `qa_acc`, by answer kind (`qa_num` / `qa_ident` / `qa_term`) and by SFT half (`qa_seen` / `qa_unseen`), plus the gold answer's log-probability (`gold_lp`) |
 | 2 | Answering from given passages, with citations | 108 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
 | 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
 | 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
 | 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot | `mmlu`, `gsm8k`, `hellaswag` |
 | 6 | Serving cost | vLLM at 1, 8 and 32 concurrent requests | time to first token, inter-token latency, throughput |
 
-Every task item was reviewed against its source passages before any model was run on it, and 524
-of 1,176 generated items survived. Items were rejected only for defects: a wrong or unsupported
+Every task item was reviewed against its source passages before any model was run on it: 524 of
+1,176 generated items survived the first review (2026-09-27), and 219 of 1,174 the second (195 in
+the set after the identifier cap), which grew the closed-book task to cut its noise (2026-10-04,
+[`notes/eval_review_rubric.md`](notes/eval_review_rubric.md)). Layout locators (page, table and
+figure numbers) are removed by rule, and identifiers are capped at 20% of the task. Items were rejected only for defects: a wrong or unsupported
 gold answer, a correct answer the scorer would mark wrong, or a question that tests general
 knowledge or trivia instead of the corpus. None was rejected for being hard. Tasks 2–4 are graded
 by a pinned judge (Mistral Large 3,
@@ -325,7 +328,7 @@ run lands):
 | cpt-8b-lr2x | 1 | 149 | 19.4M | 5,963 | 5,963 | 0.95 | 0.95 | 3.74 | 1.756 | 1.904 |
 | cpt-8b-seed1 | 1 | 149 | 19.4M | 5,914 | 5,914 | 0.97 | 0.97 | 3.82 | 1.753 | 1.906 |
 
-- **cpt-8b-fsdp2 vs cpt-8b:** 2 GPUs give 2.23x the tokens/s (13,221 vs 5,939); per-step losses differ by 0.038% (median) / 0.171% (max) over 100 steps, the 10-step moving averages by 0.01% on average.
+- **cpt-8b-fsdp2 vs cpt-8b:** 2 GPUs give 2.23x the tokens/s (13,221 vs 5,939), so per GPU +11% at the same micro-batch and per-layer checkpointing (peak memory 43 vs 51 GB): the FSDP2 code path, not scaling (finding 6 below); per-step losses differ by 0.038% (median) / 0.171% (max) over 100 steps, the 10-step moving averages by 0.01% on average.
 
 $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against modal.com/pricing); wall time includes tokenising and model load.
 
@@ -339,78 +342,227 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | cpt-8b-full | 6.732 | -2.15% | -0.0217 [-0.0357, -0.0104] | 8.248 | +1.19% | +0.0118 [+0.0091, +0.0143] | 4.815 | -22.15% |
 | cpt-8b-lr2x | 6.713 | -2.42% | -0.0245 [-0.0335, -0.0172] | 8.220 | +0.85% | +0.0085 [+0.0068, +0.0102] | 5.442 | -12.01% |
 | cpt-8b-seed1 | 6.718 | -2.35% | -0.0238 [-0.0307, -0.0180] | 8.165 | +0.17% | +0.0017 [+0.0002, +0.0030] | 5.687 | -8.05% |
+
+##### Change vs base-8b-hf, next to the noise
+
+| metric | base-8b-hf | cpt-8b | cpt-8b-seed1 | cpt-8b-replay10 | cpt-8b-full | noise |
+|---|---|---|---|---|---|---|
+| domain val perplexity | 6.88 | -2.33% | -2.35% | -2.33% | -2.15% | 0.02% |
+| general val perplexity | 8.15 | +0.40% | +0.17% | -2.24% | +1.19% | 0.23% |
+| train slice perplexity | 6.18 | -8.28% | -8.05% | -8.71% | -22.15% | 0.23% |
+| MMLU | 0.767 | -0.4 | -0.2 | -0.1 | -0.5 | 0.3 |
+| GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
+| HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
+| qa_acc | 0.154 | +0.8 | +0.0 | +0.0 | +3.1 | 3.2 |
+| grounded_acc | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
+| vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
+| halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
+
+Perplexity in %, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error for base-8b-hf): a change smaller than it is not a result.
 <!-- stage2-tables:end -->
 
-**Findings** (all Stage 2 runs). Every delta is against
-`base-8b-hf`, the base evaluated through the same vLLM path as the fine-tuned checkpoints, and is
-read against the seed floor (`cpt-8b` vs `cpt-8b-seed1`):
-- **Domain perplexity moved, but far less than planned.** Held-out documents: -2.3% (95% interval
-  over documents -3.0% to -1.8%; the second seed -2.35%), with all 12 val documents improving. The
-  pre-registered target was -20%, so this is the rule's "barely moved" branch.
-- **The model learns what it reads; a quarter of it transfers.** Perplexity on documents it trained
-  on fell 8.3%, on unseen ones 2.3%. By publisher: FEMA -4.3%, NIST -3.8%, FHWA -2.3%, USACE -2.0%,
-  NASA -1.3%; USACE is 76% of val tokens, so the pooled figure sits near its rate.
-- **A higher LR doesn't help.** At 2e-4 (the rule's prescribed fix), domain val moves another -0.1%
-  (interval covers 0), general-text perplexity rises +0.44% more, and the train slice drops 4.1%
-  more: more memorising and more forgetting, no transfer. 1e-4 stays.
-- **Almost no forgetting.** General-text perplexity +0.2% to +0.4% across the two seeds (bound +3%);
-  MMLU -0.2 to -0.3 points, GSM8K -0.7 to -0.8, HellaSwag unchanged.
-- **No detectable KPI change.** qa_acc +0.0 to +0.8 points and every other KPI move inside the seed
-  floor, which is several points at this eval size (76-210 items per task). 20M tokens of LoRA CPT
-  lowers domain perplexity without a knowledge gain large enough to show up in closed-book QA.
-- **B: full-parameter learns what it reads, and forgets more.** On the same model and tokens,
-  full-parameter CPT (2 x H100, FSDP2) cut perplexity on the documents it trained on by 22% (LoRA:
-  8%) and lifted closed-book QA +3.1 and vocab +3.8 points (every KPI item comes from a training
-  document), but gained nothing extra on unseen documents (domain val -2.15% vs LoRA's -2.33%) and
-  forgot about 3x as much: general-text perplexity +1.2% (LoRA +0.4%), GSM8K -3.0 points (LoRA
-  -0.8), MMLU -0.5 (LoRA -0.2/-0.3). Same GPU-hours as LoRA (0.91 vs 0.95). LoRA stays the default:
-  "LoRA learns less and forgets less".
-- **A: replay is free on the domain and erases the small forgetting, on thin evidence.** Mixing in
-  10% FineWeb-Edu left domain perplexity exactly where it was (0.00%) and turned the main run's small
-  dip into almost none (MMLU -0.1 instead of -0.3, GSM8K -0.2 instead of -0.8), all inside benchmark
-  noise; its general-text perplexity fell 2.2%, but that slice is FineWeb-Edu too, so it measures
-  in-distribution training, not protection. It cost 6 points of grounded and citation accuracy.
-  Adopted for later stages by the pre-registered rule, because it is cheap; revisited after SFT.
-- **Why so small, the working hypothesis:** these are public US federal documents on the open web,
-  very likely in the base model's pretraining data already. A first check finds no overall trend of
-  base perplexity with document date (51 dated documents, Spearman +0.07, p = 0.60,
-  `eval/exposure_check.py`); the four 2024-2026 documents are harder than their publishers' median
-  (+6.6%) and the newest two most of all (+10.5%, +15.1%), the direction exposure predicts but on
-  n = 4. Unresolved: the corpus has almost no post-cutoff documents to compare against.
-- **C: FSDP2 on two GPUs reproduces single-GPU training step for step** (per-step loss within 0.04%,
-  median; both runs see the same batches) at 2.23x the tokens/s. More than 2x means the FSDP code
-  path is also faster per GPU than the single-GPU one, not a scaling effect (not isolated by a run).
-- **An evaluation bug worth more than the training effect.** vLLM 0.29 runs any HF-format Ministral 3
-  checkpoint (every fine-tuned one) at the wrong attention temperature: it drops the YaRN config's
-  `mscale` keys and scales attention by 1.28. On the base weights that costs 4.8% perplexity, 3.1 MMLU
-  points, 6.1 GSM8K points and 19.5 points of grounded accuracy, and it first made CPT look like
-  it had wrecked MMLU and grounding. `merge.py` now writes `apply_yarn_scaling: false`, which
-  matches transformers and Mistral's native path to five decimals
-  ([`notes/contributions.md`](notes/contributions.md) has the repro).
+**Bottom line.** At 20M tokens and one epoch, CPT learns the documents it reads (-8% perplexity) and
+almost nothing that transfers to documents it hasn't seen (-0.4% on reports published in 2026).
+
+- **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
+  documents harder, with 2-4x the forgetting and no held-out gain.
+- **What goes forward.** LoRA with 10% replay is the carried-forward checkpoint. A pre-registered
+  rule chose it, the rule fired at the edge of the noise, and that is recorded.
+- **Why the eval harness matters.** It found a serving bug larger than any training effect.
+
+Every delta below is against `base-8b-hf`, the base evaluated through the same vLLM path as the
+fine-tuned checkpoints. Each is read against its noise: the larger of the seed gap (`cpt-8b` vs
+`cpt-8b-seed1`) and the metric's standard error.
+
+**Against the pre-registered rules** (`notes/decisions.md`, set before the main run):
+
+| rule | cpt-8b (seed 1) | cpt-8b-lr2x | cpt-8b-full | verdict |
+|---|---|---|---|---|
+| domain val perplexity down at least 20% | -2.33% (-2.35%) | -2.42% | -2.15% | failed everywhere |
+| train/val gap grows under ~10 points over base's 11.2% (over ~25 = memorising) | +7.2 (+6.9) | +12.1 | +28.6 | LoRA passes; lr2x fails; full is memorising |
+| general val perplexity up under 3% | +0.40% (+0.17%) | +0.85% | +1.19% | passed everywhere |
+
+**The target was set for the wrong data scale.** Held-out perplexity measures domain transfer, which
+continued pre-training produces at the scale of billions of tokens. With a 20M-token client corpus
+the realistic goal is knowledge of those documents. That is measured by closed-book QA after SFT,
+and it needs repetition or augmentation to stick.
+
+**What Stage 2 established:**
+1. **The learnable signal is the documents and their series, not the domain.** A probe
+   (`eval/memorization.py`) compared the 246 corpus documents with 13 federal reports published in
+   2026, after the base model's release:
+
+   | Documents | Spans the base continues for 32+ tokens verbatim | Base perplexity | Change after CPT (`cpt-8b-replay10`) |
+   |---|---|---|---|
+   | Train (read once in CPT) | 6 of 3,744, all in-document patterns | 6.00 | -8.3% [-8.6, -7.9] |
+   | Val (held out, same series) | 0 of 192 | 5.47 | -4.2% [-5.5, -3.0] |
+   | 2026 (never seen) | 0 of 208 | 6.27 | -0.4% [-0.8, 0.0] |
+
+   **How the probe's perplexity is measured.** It is the median over documents of each document's
+   first two 4,096-token windows, and the change is per document on the same windows. That is not
+   the measurement in the tables above (pooled over all val windows, and a 49-window train slice),
+   so only ratios within this table are comparable. On the probe's footing val comes out easier
+   than train, the reverse of the main table.
+
+   **What it shows:**
+   - **Gain stays within the series.** Every held-out document improves, but the 2026 reports barely
+     move, including the closest ones (bridge load rating -0.5%, corroded steel beams -0.4%). That
+     roughly 10x ratio between within-series gain and new-document gain is the finding.
+   - **What val measures.** The val documents are siblings of train documents (USACE EMs, FEMA
+     P-series, NIST 917 briefs, FHWA HIF reports) and share their structure, boilerplate and
+     phrasing. So domain val perplexity measures learning within those series; the 2026 set
+     measures transfer.
+   - **Little domain-general structure left.** The base already models this register well (domain
+     val 6.9 against 8.2 on web text), so there is little general structure left to learn at this
+     scale.
+   - **Caveats:** 13 documents, mostly research reports rather than manuals, and two windows per
+     document.
+2. **Pushing harder moves the wrong way.** The train slice fell -8% (`cpt-8b`), -12% (LR 2e-4) and
+   -22% (full-parameter), while held-out stayed flat each time, between -2.15% and -2.42%.
+   - **lr2x:** general-text perplexity rose about 2x as much as the main run's.
+   - **Full-parameter:** about 3x the main run's general-text rise, and about 4x its GSM8K loss
+     (-3.0 points against -0.7 to -0.8). That GSM8K drop is the one benchmark delta that clears the
+     noise (1.1) by a wide margin.
+   - **Full-parameter's task gains:** +3.1 qa_acc (noise 3.2) and +3.8 vocab (noise 3.1) sit at the noise edge, and
+     every one of those items comes from a training document. They are knowledge of what it read.
+
+   LoRA stays the default: "LoRA learns less and forgets less" (Biderman et al., 2024).
+3. **The base hadn't memorised the corpus.** The six "recalled" spans continue patterns set up in
+   the prompt, such as `Table D-11` followed by `D-12`. Corpus documents are no easier for the base
+   than 2026 documents it cannot have seen: geometric-mean perplexity +3.0%, interval [-8.5, +17.0].
+   So pretraining exposure doesn't explain the small gain. A single pass in pretraining can't be
+   ruled out: one epoch of our own CPT moves verbatim recall by 0.13 tokens, less than this
+   comparison resolves.
+4. **Task scores are Stage 3 metrics.** A base model doesn't follow instructions, and its task
+   scores swing 4-5 points between seeds: grounded_acc moves -0.9 for one seed and -4.6 for the
+   other. Only full-parameter moves outside that, and only at the edge.
+5. **Replay was adopted on a rule that fired at one noise unit; it's kept.** Mixing in 10%
+   FineWeb-Edu left domain perplexity identical and brought the MMLU dip to -0.1 from -0.4. That
+   margin is about one noise unit (0.3), so the pre-registered rule fired on noise; the flaw is
+   recorded in `notes/decisions.md`. Its general-text perplexity fell 2.2%, but that slice is also
+   FineWeb-Edu, so it measures in-distribution training, not protection. The 6.5 grounded and 6.4
+   cite_valid points it "cost" are probably not a real cost:
+   - they measure a base model's citation formatting, which SFT overwrites completely;
+   - one seed alone moved grounded accuracy by 4.6 points.
+6. **C: two GPUs reproduce one-GPU training step for step, at 2.23x the tokens/s.** Per-step loss
+   is within 0.04% (median), and both runs see the same batches. Per GPU that is 6,610 against
+   5,939 tokens/s (+11%).
+   - **Matched:** micro-batch 4, and every decoder layer checkpointed (non-reentrant).
+   - **Not memory-bound:** the one-GPU run peaked at 51 GB of 80.
+   - **Different, so the +11% is not isolated by a run:** the code path. FSDP2 casts parameters to
+     bf16 and uses its own checkpoint wrapper; the one-GPU run uses the Trainer's.
+   - **Full-parameter vs LoRA cost:** on two GPUs, full-parameter matched LoRA's GPU-hours (0.91 vs
+     0.95) despite about 1.33x the FLOPs per token. At roughly 8N against 6N FLOPs per token with
+     checkpointing (N ≈ 8B, attention ignored), that is about 43% of H100 bf16 peak for full against
+     about 30% for LoRA. LoRA's FLOP saving doesn't turn into speed; it is plausibly lost to the
+     adapters' many small kernels, which nobody has profiled.
+7. **The eval harness found a bug larger than any training effect.** vLLM 0.29 runs any HF-format
+   Ministral 3 checkpoint, which includes every fine-tuned one, at the wrong attention temperature.
+   - **Mechanism:** its YaRN code drops the config's `mscale` / `mscale_all_dim` keys and scales
+     attention by 1.28.
+   - **Cost:** on untouched base weights, 4.8% perplexity, 3.1 MMLU points, 6.1 GSM8K points and
+     19.5 grounded points. It first made CPT look like it had wrecked MMLU and grounding.
+   - **Culprit:** vLLM's reading of the config, not transformers' re-save or `merge.py`. Mistral's
+     own `config.json` ships those keys.
+   - **Fix:** `merge.py` writes `apply_yarn_scaling: false`, which matches transformers and
+     Mistral's native path to five decimals. The repro and the upstream fix are in
+     [`notes/contributions.md`](notes/contributions.md); the issue is not filed yet.
 
 ### 4. Results
 
 Every scored checkpoint, from [`results/table.md`](results/table.md) (copied here by
-`train/report.py`). The KPI columns come from the frozen eval (judge columns scored locally), the
-next seven from lm-eval (5-shot, never the chat template), the last three from
-`eval/perplexity.py` (lower is better). Stage 2 rows are base models, scored without `--chat`.
+`train/report.py`). Stage 2 rows are base models, scored without `--chat`.
+
+- **Task scores** come from the frozen eval, with judge columns scored locally:
+  - `qa_num`, `qa_ident` and `qa_term` split `qa_acc` by answer kind (`eval/qa_rules.py`):
+    values, identifiers and terms. Identifiers are document ids and article numbers, arbitrary
+    strings and the slowest kind to learn. Terms include everything else. A hand audit of 169
+    misses found 2 scoring errors, both fixed, so low text scores are genuine.
+  - The `_seen` / `_unseen` columns split `qa_acc` and `vocab_recall` by whether Stage 3's SFT
+    synthesis may use the item's source chunk (`eval/sft_split.py`). Before Stage 3 nothing is
+    seen, so the two halves are a null check, with about 65 items each for QA.
+- **Benchmarks** are from lm-eval: 5-shot, never with the chat template.
+- **Perplexity** is from `eval/perplexity.py` (lower is better).
 
 <!-- results-table:start -->
-| run | qa_acc | grounded_acc | cite_valid | cite_supported | vocab_recall | halluc_rate | mmlu | mmlu_stem | mmlu_hum | mmlu_soc | mmlu_other | gsm8k | hellaswag | ppl_train | ppl_domain_val | ppl_general_val |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| base-8b | 0.139 | 0.852 | 0.130 | 0.102 | 0.719 | 0.882 | 0.768 | 0.732 | 0.707 | 0.862 | 0.805 | 0.794 | 0.801 | 6.18 | 6.88 | 8.15 |
-| instruct-8b | 0.115 | 0.898 | 0.833 | 0.787 | 0.786 | 0.013 | 0.761 | 0.735 | 0.691 | 0.854 | 0.802 | 0.855 | 0.801 |  |  |  |
-| cpt-8b | 0.154 | 0.833 | 0.148 | 0.074 | 0.710 | 0.908 | 0.764 | 0.729 | 0.699 | 0.857 | 0.804 | 0.785 | 0.801 | 5.67 | 6.72 | 8.18 |
-| cpt-8b-seed1 | 0.146 | 0.796 | 0.102 | 0.037 | 0.700 | 0.934 | 0.765 | 0.727 | 0.699 | 0.861 | 0.809 | 0.786 | 0.800 | 5.69 | 6.72 | 8.17 |
-| base-8b-hf | 0.146 | 0.843 | 0.120 | 0.083 | 0.705 | 0.895 | 0.767 | 0.733 | 0.704 | 0.862 | 0.803 | 0.793 | 0.801 | 6.18 | 6.88 | 8.15 |
-| cpt-8b-full | 0.177 | 0.889 | 0.148 | 0.102 | 0.743 | 0.921 | 0.762 | 0.729 | 0.692 | 0.860 | 0.806 | 0.763 | 0.798 | 4.82 | 6.73 | 8.25 |
-| cpt-8b-replay10 | 0.146 | 0.778 | 0.056 | 0.037 | 0.700 | 0.934 | 0.766 | 0.730 | 0.707 | 0.856 | 0.806 | 0.791 | 0.800 | 5.65 | 6.72 | 7.97 |
+Items per task: domain_qa 130, grounded 108, vocab 210, adversarial 76, qa_number 91, qa_identifier 26, qa_term 13.
+
+**Task scores**
+
+| run | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen | grounded_acc | cite_valid | cite_supported | vocab_recall | vocab_seen | vocab_unseen | halluc_rate |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b | 0.146 | 0.187 | 0.038 | 0.077 | 0.123 | 0.169 | 0.852 | 0.130 | 0.102 | 0.719 | 0.723 | 0.716 | 0.882 |
+| instruct-8b | 0.123 | 0.154 | 0.038 | 0.077 | 0.123 | 0.123 | 0.898 | 0.833 | 0.787 | 0.786 | 0.802 | 0.771 | 0.013 |
+| cpt-8b | 0.162 | 0.198 | 0.077 | 0.077 | 0.139 | 0.185 | 0.833 | 0.148 | 0.074 | 0.710 | 0.693 | 0.725 | 0.908 |
+| cpt-8b-seed1 | 0.154 | 0.176 | 0.115 | 0.077 | 0.139 | 0.169 | 0.796 | 0.102 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
+| base-8b-hf | 0.154 | 0.198 | 0.038 | 0.077 | 0.123 | 0.185 | 0.843 | 0.120 | 0.083 | 0.705 | 0.713 | 0.697 | 0.895 |
+| cpt-8b-full | 0.185 | 0.220 | 0.115 | 0.077 | 0.139 | 0.231 | 0.889 | 0.148 | 0.102 | 0.743 | 0.733 | 0.752 | 0.921 |
+| cpt-8b-replay10 | 0.154 | 0.176 | 0.115 | 0.077 | 0.139 | 0.169 | 0.778 | 0.056 | 0.037 | 0.700 | 0.713 | 0.688 | 0.934 |
+
+**Benchmarks and perplexity**
+
+| run | mmlu | mmlu_stem | mmlu_hum | mmlu_soc | mmlu_other | gsm8k | hellaswag | ppl_train | ppl_domain_val | ppl_general_val | ppl_postcutoff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b | 0.768 | 0.732 | 0.707 | 0.862 | 0.805 | 0.794 | 0.801 | 6.18 | 6.88 | 8.15 |  |
+| instruct-8b | 0.761 | 0.735 | 0.691 | 0.854 | 0.802 | 0.855 | 0.801 |  |  |  |  |
+| cpt-8b | 0.764 | 0.729 | 0.699 | 0.857 | 0.804 | 0.785 | 0.801 | 5.67 | 6.72 | 8.18 |  |
+| cpt-8b-seed1 | 0.765 | 0.727 | 0.699 | 0.861 | 0.809 | 0.786 | 0.800 | 5.69 | 6.72 | 8.17 |  |
+| base-8b-hf | 0.767 | 0.733 | 0.704 | 0.862 | 0.803 | 0.793 | 0.801 | 6.18 | 6.88 | 8.15 |  |
+| cpt-8b-full | 0.762 | 0.729 | 0.692 | 0.860 | 0.806 | 0.763 | 0.798 | 4.82 | 6.73 | 8.25 |  |
+| cpt-8b-replay10 | 0.766 | 0.730 | 0.707 | 0.856 | 0.806 | 0.791 | 0.800 | 5.65 | 6.72 | 7.97 |  |
 <!-- results-table:end -->
 
-_Which stages earned their keep, and which didn't: after Stage 2's ablations and Stage 3._
+**Stage 2 (CPT) earned little.** Held-out perplexity fell 2.3%, documents published in 2026 gained
+0.4%, and no task score moved outside the noise. `cpt-8b-replay10` goes forward because LoRA with
+replay costs almost nothing in forgetting, not because CPT helped. _Stage 3 onward: to follow._
 
 ### 5. Serving
-_AWQ quality delta vs bf16; TTFT / ITL / throughput at 1 and 32 concurrent requests._
+
+vLLM on one H100, `serve/bench_latency.py` (64 streamed requests per concurrency level, 256 output
+tokens max; generated by `train/report.py` from `results/bench/`). `base-8b` and `instruct-8b` run
+Mistral's native vLLM path, `base-8b-hf` and `cpt-8b` the HF path with the YaRN fix:
+
+<!-- serving-table:start -->
+| run | TTFT p50 (ms) | ITL p50 (ms) | E2E p50 (ms) | tok/s @1 | tok/s @8 | tok/s @32 |
+|---|---|---|---|---|---|---|
+| base-8b | 17.7 | 6.6 | 187 | 143 | 875 | 1,922 |
+| instruct-8b | 17.7 | 6.6 | 320 | 139 | 677 | 1,144 |
+| base-8b-hf | 15.3 | 6.6 | 180 | 145 | 896 | 1,967 |
+| cpt-8b | 16.5 | 6.9 | 1,753 | 141 | 922 | 2,166 |
+<!-- serving-table:end -->
+
+- **The two paths serve the base at the same speed** once the YaRN fix is in: per-token latency
+  6.6 ms either way, end to end 180 vs 187 ms.
+- **`cpt-8b`'s end-to-end time is not a latency result.** It decodes at the same 6.6-6.9 ms per
+  token as the base. It runs to the 256-token cap, though, where the base stops after ~28 tokens,
+  hence the ~10x end-to-end time and the higher throughput (more tokens per request).
+  - **Cause:** the corpus holds one EOS per whole manual, 234 in 19.4M tokens. That is the correct
+    choice for CPT, and this is its known side effect.
+  - **Fix:** SFT's short answers restore stopping, and Stage 3 checks output length.
+  - **Use:** compare the row only with this note. Deployment latency is measured on the SFT'd
+    checkpoint.
+- _Stage 6 adds the AWQ checkpoint of the SFT'd model: its quality delta against bf16 and its
+  latency at 1 and 32 concurrent requests._
 
 ### 6. What I'd do next
-_Honest limitations: judge bias, eval set size, reward hacking observed in GRPO, etc._
+
+**From Stage 2:**
+- **Split Stage 3's eval into seen and unseen halves.** Report `domain_qa` and `vocab` in two
+  halves: items whose source chunk fed an SFT example (seen) and items whose chunk did not (unseen).
+  Hold a deliberate share of the eval's source chunks out of SFT synthesis so the unseen half
+  exists. Seen measures knowledge injection, unseen measures transfer. One pooled number would be
+  as uninterpretable as Stage 2's single held-out perplexity.
+- **The bar is `instruct-8b`:** grounded 0.898, cite_valid 0.833, cite_supported 0.787, halluc
+  0.013, vocab 0.786, qa 0.123. Match it on grounding and beat it on both qa halves. Read
+  halluc_rate next to grounded_acc, so a low hallucination rate means abstaining on unanswerable
+  questions and not refusing across the board.
+- **Knowledge of a 20M-token corpus needs repetition or augmentation,** such as paraphrased
+  restatements or QA rewrites of each document, rather than one pass of next-token training.
+- **Make the 2026 set a standing transfer measure.** Measure it with `eval/perplexity.py` over
+  whole documents, and grow it (FHWA's 2026 reports need a browser download).
+- **Use fused or chunked cross-entropy for single-GPU training.** The 131k-vocab logits are the
+  largest activation, and smaller logits memory allows larger micro-batches.
+- **File the vLLM YaRN issue** with the repro in `notes/contributions.md`.
+
+_Limitations from later stages (judge bias, eval set size, reward hacking in GRPO) follow as those
+stages land._

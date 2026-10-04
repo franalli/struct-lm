@@ -1,9 +1,16 @@
 {
-  "qa_acc": 0.1385,
+  "qa_acc": 0.1462,
+  "qa_num": 0.1868,
+  "qa_ident": 0.0385,
+  "qa_term": 0.0769,
+  "qa_seen": 0.1231,
+  "qa_unseen": 0.1692,
   "grounded_acc": 0.8519,
   "cite_valid": 0.1296,
   "cite_supported": 0.1019,
   "vocab_recall": 0.719,
+  "vocab_seen": 0.7228,
+  "vocab_unseen": 0.7156,
   "halluc_rate": 0.8816,
   "n": {
     "domain_qa": 130,
@@ -21,6 +28,7 @@
   "ppl_train": 6.1849,
   "ppl_domain_val": 6.88,
   "ppl_general_val": 8.1513,
+  "ppl_postcutoff": null,
   "model": "mistralai/Ministral-3-8B-Base-2512",
   "chat": false
 }

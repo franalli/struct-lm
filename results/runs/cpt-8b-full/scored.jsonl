@@ -19,7 +19,7 @@
 {"task": "domain_qa", "id": "qa-0019", "correct": false, "output": " 150 psi"}
 {"task": "domain_qa", "id": "qa-0020", "correct": false, "output": " EM 1110-1-1003"}
 {"task": "domain_qa", "id": "qa-0021", "correct": true, "output": " 0.2g"}
-{"task": "domain_qa", "id": "qa-0022", "correct": false, "output": " FEMA P-361"}
+{"task": "domain_qa", "id": "qa-0022", "correct": true, "output": " FEMA P-361"}
 {"task": "domain_qa", "id": "qa-0023", "correct": false, "output": " 10.4.2.2"}
 {"task": "domain_qa", "id": "qa-0024", "correct": false, "output": " 2.0"}
 {"task": "domain_qa", "id": "qa-0025", "correct": false, "output": " 15%"}

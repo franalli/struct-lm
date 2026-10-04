@@ -98,7 +98,7 @@
 {"task": "domain_qa", "id": "qa-0539", "correct": false, "output": " 100"}
 {"task": "domain_qa", "id": "qa-0540", "correct": false, "output": " 20%"}
 {"task": "domain_qa", "id": "qa-0541", "correct": false, "output": " 0.5"}
-{"task": "domain_qa", "id": "qa-0542", "correct": false, "output": " 10"}
+{"task": "domain_qa", "id": "qa-0542", "correct": true, "output": " 10"}
 {"task": "domain_qa", "id": "qa-0543", "correct": false, "output": " 1.2"}
 {"task": "domain_qa", "id": "qa-0544", "correct": false, "output": " 100 psi"}
 {"task": "domain_qa", "id": "qa-0545", "correct": false, "output": " 10"}
