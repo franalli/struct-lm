@@ -125,17 +125,17 @@ The 325 scored items against each other: 0 exact duplicate questions; 608 pairs 
 
 ## 6. SFT data (Stage 3) vs the eval and the benchmarks
 
-`data/sft/train.jsonl` (3,031 records; prompt + completion) as the reference. Chunk ids from eval_chunk_ids.txt outside the seen half: 0 (rule 10). Positive control: of 40 planted items (20 unseen domain_qa, 20 MMLU), 40 are found with >= 80% of their tokens covered.
+`data/sft/train.jsonl` (2,436 records; prompt + completion) as the reference. Chunk ids from eval_chunk_ids.txt outside the seen half: 0 (rule 10). Positive control: of 40 planted items (20 unseen domain_qa, 20 MMLU), 40 are found with >= 80% of their tokens covered.
 
 | eval items | items | checkable (>= 13 tokens) | any 13-gram | >= 50% | >= 80% | mean token share |
 |---|---|---|---|---|---|---|
-| domain_qa seen: questions | 167 | 166 | 79 | 18 | 2 | 21.5% |
+| domain_qa seen: questions | 167 | 166 | 83 | 20 | 2 | 22.5% |
 | domain_qa seen: answers | 167 | 5 | 4 | 4 | 4 | 2.4% |
-| vocab seen: definitions | 101 | 100 | 3 | 1 | 0 | 1.4% |
-| domain_qa unseen: questions | 158 | 158 | 51 | 8 | 0 | 13.8% |
-| domain_qa unseen: answers | 158 | 10 | 3 | 3 | 3 | 1.9% |
+| vocab seen: definitions | 101 | 100 | 6 | 3 | 0 | 3.2% |
+| domain_qa unseen: questions | 158 | 158 | 51 | 9 | 0 | 13.8% |
+| domain_qa unseen: answers | 158 | 10 | 4 | 4 | 4 | 2.5% |
 | vocab unseen: definitions | 109 | 109 | 0 | 0 | 0 | 0.0% |
-| grounded: questions | 108 | 108 | 4 | 3 | 0 | 1.8% |
+| grounded: questions | 108 | 108 | 4 | 3 | 0 | 1.9% |
 | adversarial: questions | 76 | 76 | 1 | 0 | 0 | 0.6% |
 
 Exact reuse (normalised text):
@@ -147,10 +147,10 @@ Exact reuse (normalised text):
 
 | eval half | items | term defined in SFT |
 |---|---|---|
-| vocab seen | 101 | 51 |
+| vocab seen | 101 | 89 |
 | vocab unseen | 109 | 0 |
 
-sft_val (95 records, question + completion) vs train: 39 share any 13-gram, 1 have >= 50% of their tokens covered, 0 >= 80%.
+sft_val (80 records, question + completion) vs train: 33 share any 13-gram, 0 have >= 50% of their tokens covered, 0 >= 80%.
 
 | benchmark | items | any 13-gram | >= 50% | >= 80% |
 |---|---|---|---|---|

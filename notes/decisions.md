@@ -308,7 +308,8 @@ sources.csv plus the scripts.
   reinforcement. The other two cover lifeline performance and a resilience-standards symposium.
 - FEMA: P-58-1/-2, P-695, P-751, P-1050-2, P-2006, P-795, NEHRP Design Examples vols. 2-3, and 35
   technical publications from the Building Science earthquake library (incl. P-58-4 to -7, P-2018,
-  P-2091, P-2355, E-74; brochures, checklists, posters and forms skipped).
+  P-2091, P-2335 (listed as P-2355 until 2026-10-05), E-74; brochures, checklists, posters and
+  forms skipped).
 - Four FEMA documents aren't fetchable from fema.gov, so they come from other hosts, all
   scriptable:
   - P-695: NIST's NEHRP clearinghouse (nehrpsearch.nist.gov); FEMA's copy returns 404.
@@ -1972,8 +1973,8 @@ Verdicts: ok / minor (correct, style only, kept) / defect (would teach something
 - **Closed-book filter, pass 2 (user decision):** the 518 pass-1 minors re-read with the stricter
   line. A wrong framing, overclaim, scope moved by a persona, example value or garbled symbol is a
   defect even when the answer value is right. Pass 2 found 176 defects and kept 342. Assembly
-  drops all 509 and refuses a closed-book record without a verdict (`data/sft/closed_book_filter.jsonl`,
-  pinned by `tests/test_sft_data.py`).
+  drops all 509 and refuses a closed-book record without a verdict (then
+  `data/sft/closed_book_filter.jsonl`, now `data/sft/read_filter.jsonl`; pinned by `tests/test_sft_data.py`).
 - **Round 3 (after pass 2):** closed-book 2/40 (5%; 1-17%), and no wrong answers. Both defects are
   framing (an unnamed document where another code differs; a "maximum" the passage never gives).
 
@@ -2024,3 +2025,326 @@ Verdicts: ok / minor (correct, style only, kept) / defect (would teach something
 - Stage 5 needs worked problems: generate them with a set-up check, not only an arithmetic one;
 - seen coverage matters more than v1 allows: the 16 lost facts can come back as new, faithful
   phrasings (a rebuild of A2/A4 for those chunks).
+
+## 2026-10-05: Retrospective on Stages 0-2: what I would do differently (user decision)
+**Context:** written before Stage 3's training launches, so it can't be fitted to Stage 3's results.
+Nine items, ordered by how much each would have changed Stage 2's result. Each gives what was done,
+the evidence (with the entry it comes from), the better choice and its cost. Where an item changes
+how later stages run, it names the rule it becomes; the rules are collected at the end. Costs are in
+H100-hours and API calls, since the $3.95/h price is unverified. None of this says Stage 2 was run
+badly; most of it is knowledge Stage 2 produced. The README's "What I would do differently" is the
+short form.
+
+1. **Build the sensitive metric before the intervention.**
+   - **Done:** Stage 2 was first read on the 130-item domain_qa (eval v1), pass/fail, standard error
+     3.1 points. The verdict was "no detectable KPI change" (2026-09-28 main-run verdict).
+   - **Evidence:** after the rebuild (325 items, `gold_lp`, seen/unseen halves; 2026-10-04),
+     `cpt-8b` moves gold_lp +0.59 nats [+0.45, +0.75] and seed 1 +0.58, with 70-71% of items up.
+     qa_acc on 325 items still moves by about one noise unit (+2.5 / +0.9 / +0.9 against 1.8). The
+     effect was in the probabilities all along, below accuracy's resolution.
+   - **Better:** gold_lp, the halves and the larger set as Stage 0 deliverables, built with the eval
+     frozen on 2026-09-27 rather than a week later. Cost: the same day's work, moved earlier.
+   - **The pre-registration was the symptom.** The -20% held-out perplexity target measured
+     transfer, which a 20M-token corpus doesn't produce (2026-10-04 conclusions). The right target
+     was gold_lp on facts from the documents CPT reads, with `ppl_postcutoff` for transfer.
+
+2. **A no-op control through the eval path before any training.**
+   - **Done:** Stage 0 evaluated the hub base through vLLM's native path; merged checkpoints load
+     through its HF path. `base-8b-hf` (the base re-saved through `merge.py`, evaluated like a merged
+     checkpoint) was built on 2026-09-28, after `cpt-8b` seemed to lose 3.7 MMLU and 6.7 GSM8K
+     points.
+   - **Evidence:** on untouched weights the unpatched HF path cost 4.8% perplexity, 3.1 MMLU, 6.1
+     GSM8K and 19.5 grounded points (2026-09-28 YaRN entry): more than any training effect in
+     Stage 2. The CPT checkpoints were evaluated, re-merged with the fix and evaluated again.
+   - **Better:** run `base-8b-hf` on day one. Cost: one eval pass (lm-eval took 33 minutes of one
+     H100 on `base-8b-hf`), or a few minutes of `eval/vllm_ppl.py` against `perplexity.py`, which
+     shows the gap alone (7.23 vs 6.89). The same idea as the seed floor: the instrument must read
+     zero before it measures.
+   - **Rule:** before a stage's first training run, its starting checkpoint goes through that
+     stage's save/merge and eval path with no training (an untrained adapter, merged). It must match
+     the checkpoint evaluated directly, and that run is the stage's zero point.
+
+3. **Augment the stream for the facts that matter.**
+   - **Done:** one pass over the concatenated documents, so each fact is seen as often as its
+     document states it, usually once.
+   - **Evidence:** per answer token, CPT moved values +0.06 nats, identifiers +0.13 and terms +0.15
+     (2026-10-04 eval v2 entry). The values, the core of the eval, moved least. That is consistent
+     with too few exposures; it doesn't test it.
+   - **Better:** synthetic continued pre-training, meaning paraphrases and QA rewrites of passages
+     mixed into the CPT stream (Yang et al. 2024, "Synthetic continued pretraining"; Allen-Zhu & Li
+     2023, "Physics of Language Models 3.1").
+     - **Cost:** the whole pool (76,582 chunks) was out of reach at 30 calls a minute. The 197
+       eval-seen chunks were not: five rewrites each is about 1,000 calls, ~35 minutes of the key's
+       quota.
+     - **What it buys:** with the halves of item 1, Stage 2's seen half would have measured
+       knowledge injection, and the unseen half its absence.
+   - **Now:** Stage 3 does the instruction-data form: 1,623 of the frozen set's records come from
+     the 197 seen chunks.
+
+4. **Ablate along the axis the goal lives on.**
+   - **Done:** A replay (forgetting), B full vs LoRA (parameterisation), C 2-GPU (systems), plus the
+     LR-up and seed runs.
+   - **Evidence:**
+     - **A:** pre-registered as likely null ("replay has nothing to protect", 2026-09-27 ablation
+       rules). It was null within noise, and its adoption fired on noise (2026-09-28 critique).
+     - **B:** it did speak to knowledge (train slice -22% vs -8%, qa_acc +3.1 at the noise edge),
+       but its weights are gone (item 8).
+     - **LR-up:** it memorised more, with no held-out gain.
+   - **Better:** epochs (1 vs 3) and augmentation (0 vs K rewrites of the seen chunks), read on
+     gold_lp and the halves.
+     - **Cost:** one LoRA epoch is ~0.95 H100-hours, so ~2.9 for the epoch ablation and ~1 for
+       augmentation, plus its API calls.
+     - **What it reverses:** the 2026-09-27 hyperparameter entry ruled out a second epoch for the
+       main config. As an ablation, repetition is the knowledge question.
+   - **Reading:** B and C taught the engineering (FSDP2, memory, the code-path speed-up). A answered
+     a question the pre-registration had already answered.
+
+5. **Judge CPT by the downstream number.**
+   - **Done:** Stage 2's decision rule (2026-09-27 success criteria) had three branches:
+     "worked", "barely moved" (LR up or a second epoch) and "memorising". None of them was "don't
+     carry CPT forward". The carried-forward checkpoint was picked among CPT runs on perplexity and,
+     for replay, on MMLU.
+   - **Evidence:** whether CPT was worth doing is answered by SFT from `cpt-8b-replay10` vs SFT
+     from the base on the same set. The Stage 3 plan (2026-10-05) runs that as its third measurement.
+   - **Better:** write that comparison into Stage 2's decision as the deciding test, and keep the
+     carry-forward choice provisional until it is read. Cost: one SFT run on the base, already
+     planned.
+   - **Rule:** `sft-from-base` is a standing part of the chain. It runs next to `sft-from-cpt` and
+     decides whether CPT stays in it, and any later claim of a CPT effect is read against that
+     lineage.
+
+6. **Document boundaries.**
+   - **Done:** one BOS/EOS pair per document (`train/packing.py`). That is 234 EOS in 19.4M train
+     tokens, one per ~83k, and about 5% of 4,096-token windows contain an end of document.
+   - **Evidence:** `cpt-8b` runs to the 256-token cap where the base stops after ~28 tokens, on the
+     fixed path too (2026-09-28 latency entry). The cause is read from the EOS count, not tested.
+   - **Better:** section-level units. Manuals are split at chapter and section headings into units of
+     a few thousand tokens, each with its own BOS/EOS, so ends of units stay common.
+     - **In `packing.py`:** free.
+     - **Whole units packed into bins** (TRL's `bfd`, or our own) would also stop windows from
+       starting mid-sentence. That needs per-unit attention masks (the flash-attn varlen path the
+       2026-09-27 hyperparameter entry deferred) or padding.
+   - **When it surfaced:** only in the latency table.
+   - **Rule:** a future CPT uses section-level units and reports output length on the KPI prompts
+     against its starting checkpoint. The first run that does also tests this item's cause.
+
+7. **Define "new documents" before training, matched to the corpus.**
+   - **Done:** the 13 post-cutoff reports were sourced on 2026-09-28, after Stage 2 trained, when
+     the prior-exposure check came back inconclusive. 11 are research, technical and workshop
+     reports; the corpus is mostly manuals and guides.
+   - **Evidence:** the genre split (2026-10-04 contamination entry) rules genre out as the
+     explanation. Val manuals gain -2.23%, new guidance -0.89% and new reports -0.32%; what
+     separates the gains is whether the document's series is in train. The new-guidance cell is two
+     documents.
+   - **Better:** post-cutoff manuals and guides from the same publishers, chosen and pinned before
+     Stage 2, with series both in and out of train (the variable that turned out to matter). Then
+     the -0.4% would rest on a designed comparison rather than a check made afterwards. Cost:
+     sourcing time, no GPU; how many such manuals exist is unknown.
+
+8. **Hygiene rules from day one.** Each was written after a loss:
+   - **Weights:** `cpt-8b-full`'s were deleted, and as a full-parameter run it has no adapter to
+     re-merge, so it has no 325-item QA scores (2026-10-04 qa_acc audit).
+   - **API time:**
+     - Burst-then-sleep left ~3/4 of worker time asleep.
+     - An adaptive pacer still drew a 429 on about one call in five, until `make_tasks.Pacer --rpm
+       30` (2026-10-04).
+     - At Stage 0, 8 judge verdicts failed on 429s.
+   - **Judge calls:** a scratch run outside `results/` re-judged 50 items (2026-10-04).
+
+   **Rules (in force since 2026-10-04; CLAUDE.md rule 12 and the judge-cache guard):**
+   - adapters are never deleted;
+   - no checkpoint with a table row is deleted until its stage's write-up is frozen;
+   - API clients pace at the key's limit instead of retrying 429s;
+   - a `--results-dir` outside `results/` must name `--judge-cache`.
+
+   For a next project they are day-one rules.
+
+9. **Calibrate every judge rubric before it labels anything.**
+   - **Done:**
+     - **The KPI grading judge** was hand-checked at Stage 0 (40 verdicts, 2026-09-27). It errs
+       strict: its misses are false negatives.
+     - **The SFT judge** (Large 3 with the ch. 12 rubrics) is a different rubric doing a different
+       job, labelling training data. It went straight to 4,020 examples (2026-10-05).
+   - **Evidence:**
+     - The full-passage audit found 37 of 200 judged-kept records defective (18%; 14-24%), and the
+       judge had passed all 37. They are framing errors, overclaims and changed conditions, which a
+       value check can't see.
+     - The closed-book pass 1 then found 333 of 1,663 (20%).
+   - **Better:** before a rubric labels anything, a set of ~40 items with known defects, read against
+     the full passages. The judge's catch rate on it decides whether a full read is needed. Cost: a
+     few hours of reading, against two filter passes over 1,663 records afterwards.
+   - **Rule:** every judge rubric gets that benchmark before it labels data. The Stage 4 preference
+     judge gets it before any DPO pair is labelled.
+
+**Rules from here:**
+- **No-op control:** before every stage's training (item 2).
+- **CPT boundaries:** section-level units for any future CPT, with output length reported (item 6).
+- **Checkpoints:** adapters are never deleted, and no tabled checkpoint is deleted before its
+  write-up is frozen (item 8, rule 12).
+- **Judges:** a benchmark per judge rubric; Stage 4's before any DPO pair is labelled (item 9).
+- **CPT control:** `sft-from-base` stays as the control that decides whether CPT is in the chain
+  (item 5).
+
+## 2026-10-05: SFT set v1 final: 2,516 records; seen half 121/167 facts, 89/101 terms (user decisions)
+**Context:** the open items from the audit entry above, decided by the user and worked in order:
+1. the FEMA metadata fix;
+2. definitions capped and read;
+3. the lost seen facts and the missing seen terms;
+4. hard-negative abstain;
+5. contamination and tests;
+6. the read of `data/sft/review.md` (delegated by the user to an LLM reader; no human read took place);
+7. then refreeze.
+
+The full-passage read is now the filter for every format that needs one. `data/sft/read_filter.jsonl`
+(2,053 verdicts) holds each record's verdict with a fingerprint of what was read. Assembly drops
+defects and leaves out anything that must be read and wasn't. The rubrics are committed in
+`data/sft/read_rubrics.md`, and the loop is in CLAUDE.md (Stage 3).
+
+**FEMA P-2335, not P-2355.**
+- **Authority:** the document's own cover, preface and footers say "FEMA P-2335 / May 2025". FEMA's
+  download URL (`..._p2355_042025.pdf`) and therefore `data/sources.csv` said P-2355.
+- **The URL is a filename, not an authority.** A client corpus will have this exact problem: take
+  document numbers from the document.
+- **Fixed:**
+  - the title in `sources.csv` (there is no separate document-number field; the slug `fema-p-2355`
+    stays as the id);
+  - the corpus-card line above;
+  - the title field of the gitignored `docs_raw.jsonl` and `chunks.jsonl`, patched to what a rebuild
+    now writes, so `extract.py --chunks` stays byte-identical to the file on disk.
+- **The eval is unaffected.** No task item says P-2355: the hits are the slug inside chunk ids,
+  three rejected items, and grounded passage text that already reads P-2335. `make_tasks` never
+  reads titles. No task-version change.
+- **SFT:** the document's records were regenerated with the corrected title (`REGENERATED_DOCS`)
+  and every one was read again. 26 are in the final set.
+
+**Definitions: capped at 300, then read.**
+- **The cap:** 772 was five times the plan's 150 and the unread quarter of the set.
+  `sft_assemble.DEFINITION_CAP` keeps every definition of a seen-half vocab term first, then fills
+  by hash.
+- **The read:** 23 of the 300 were defects (7.7%). Most turned a condition from the passage into
+  the definition, or added a doubtful specific. 277 are in the set, 136 of them defining a seen term.
+
+**The seen half.**
+- **Terms: 51 -> 89 of 101 covered.**
+  - Every seen-half vocab term gets a definition task of its own: all 101, so the set doesn't
+    depend on what an earlier build covered.
+  - This relaxes rule 10 for those term names only: the teacher sees the term and its chunk, never
+    the eval's reference definition.
+  - 89 targeted definitions passed the read.
+- **Facts: 119 -> 121 of 167 covered.** The 17 facts whose every phrasing the read had dropped were
+  re-asked, one question each, exact wording, no persona: 4 passed the read. The 11 that failed got
+  a second, quote-first re-ask (the teacher quotes the passage's sentence, then asks with its
+  conditions): 2 passed.
+- **Why re-asking stalls:** for most of these facts the extracted fact itself carries the error.
+  Examples: "25 percent" is one term of a greater-of rule; the 50% uplift relief belongs to another
+  structure; "h/t less than 8" inverts a lower limit. No wording fixes a misread fact. Recovering
+  them means re-extracting, not re-asking.
+- **Shared answers:** when the read finds a wrong answer, partial answer or worked-example value in
+  one phrasing, every phrasing of that task goes, since they share the answer. That rule
+  (`ANSWER_DEFECTS`) removed 10 records.
+
+**Abstain: hard negatives.**
+- **What was rebuilt:**
+  - the least similar quarter of the abstain sets (69), with the most similar allowed passages by
+    BM25 over the question, skipping the source's own neighbourhood and every passage that states
+    the gold;
+  - every set where the hard rule (`sft_common.gold_present`) found the gold in a passage (45).
+- **The hard rule over-reaches.** Round 1 read 40 of the old sets and found none that answered its
+  question; the rule's number matching is broad. It runs in A5 too (`gold_absent`).
+- **What it caught:** the teacher answered 29 rebuilt items instead of declining (dropped), and the
+  read found 5 of 60 more with the answer present or partly present (e.g. a conversion table that
+  gives 1/0.145 kPa per psi).
+- **Result:** 195 abstain records, 53 of them hard negatives. Off-topic negatives taught
+  "unrelated -> refuse", which is not what the adversarial eval scores.
+
+**A cache bug, found and fixed.**
+- **The bug:** `sft_common.llm_json` loaded its cache lazily on first use. pmap's workers made
+  their first calls together, so each got its own copy and re-asked prompts another had just
+  answered. 33 keys were written twice, with different outputs.
+- **The effect:** on the next load the last copy won, so a cached paraphrase could change between
+  runs. That showed up as 21 records whose read no longer matched their text.
+- **The fix:** the load now takes the lock and keeps the first answer for a key. Those records were
+  read again. The fingerprints are what caught it.
+
+**The review read (A7).** The user delegated the `review.md` read, so it was an LLM read, not a
+human one. It covered 56 records with their full passages: the 50-record sample, plus the records
+that entered it as defects were dropped (verdicts in `read_filter.jsonl` as `review-2026-10-05`).
+
+| format | defects |
+|---|---|
+| closed-book | 1/16 |
+| definition | 1/16 |
+| grounded | 4/14 |
+| abstain | 0/10 |
+
+- **The defects:**
+  - a persona moving a building-code fact into "a dam safety assessment";
+  - "safe room" redefined as part of a school that keeps utilities running;
+  - two grounded answers adding what the passage doesn't say (one where the text breaks off);
+  - a grounded answer that only points to a figure;
+  - a base-shear equation with the importance factor inverted (R·I for R/I) from garbled extraction.
+- **A correction to the first build's 50-record read:** it had passed the two unsupported grounded
+  answers as "cited correctly". That read saw passages cut to their first 260 characters.
+
+**The grounded read.** Grounded was the one generated format no full-passage read had filtered, so
+all of it was read (user decision). 94 of 485 were defects (19%).
+- **What failed:**
+  - hedges hardened ("should", "may be required" -> "must", "is required");
+  - conditions dropped ("for box sections", "if T >= 0.7 s");
+  - equations miscopied from garbled extraction;
+  - text filled in past a page break;
+  - citations pointing at the wrong passage;
+  - "how" questions answered with "what".
+- **Result:** grounded stands at 401 (the target was 500; the judged extras were not read, so they
+  are not used).
+- **What it says about the earlier estimates:** round 2's 3/40 (8%) and the review's 4/14 both sat
+  inside the interval of the full read's 19%; the round-2 sample happened to be clean.
+
+**The final set** (`data/sft/train.jsonl` 2,436, `sft_val.jsonl` 80):
+
+| format | eval-seen | ordinary | total |
+|---|---|---|---|
+| closed-book | 892 | 252 | 1,144 |
+| definition | 266 | 10 | 276 |
+| grounded | - | 401 | 401 |
+| abstain | - | 195 | 195 |
+| replay | - | - | 500 |
+
+- 1.51M tokens, max 2,307 per record.
+- **Every closed-book record, definition and grounded answer** has a keep verdict from a
+  full-passage read. So do every hard-negative abstain set and every record of the regenerated
+  document. Nothing is left unread (`stats.json` assemble.unread = 0, tested).
+- **Contamination (section 6):**
+  - 0 leaked chunks; control 40/40; no eval question in a prompt; benchmarks clean; no val record
+    half covered by train.
+  - Four unseen answers have 13-grams in SFT text, all document identifiers. Three sit in passage
+    text. One, qa-1070 (ER 1110-2-1806), is also an SFT answer from another manual
+    (EM 1110-2-2400) that cites the same regulation. That is cross-document knowledge, the
+    transfer the unseen half measures, not the unseen chunk's text.
+  - With qa-1059 (above), two unseen items are taught through other pages or documents.
+- **Abstain was not read in full:** 53 hard negatives were read (5 of 60 dropped) and round 1
+  found 0/40 among the rest. The read verdicts are the filter; the audit rounds above are
+  measurements and drop nothing.
+
+**Self-preference, measured.**
+- **The judge's acceptance:** Large judged every completion and accepted 87.4% of its own model's
+  answers against 81.2% of Medium's.
+- **The full-passage audit:** Medium's answers were no worse, with defect rates of 14% (7/50) for
+  Medium and 20% (30/150) for Large.
+- **Reading:** the judge's 6-point preference is not quality. With 50 Medium records the intervals
+  overlap (Medium 7-26%, Large 14-27%), so it is a direction, not a precise size.
+
+**Stage 5 (decided now):**
+- **Programmatic problems:** the task set will be built in code: pick a formula from a passage,
+  sample its inputs, compute the answer. It will not be teacher-authored.
+- **Why:** the teacher's worked problems failed at 42%, and the failures were ill-posed set-ups,
+  which a program can't write.
+
+**Stage 4 (to do before it starts):** the judge benchmark. The audit's labelled records (52 defects
+and the clean ones beside them) measure the Mistral judge's defect recall under three prompts:
+- the current one;
+- quote-the-supporting-sentence-then-verdict;
+- full passage instead of the chunk.
+
+Keep whichever catches the framing errors. Groundedness labels for DPO pairs were to come from this
+judge, and it passed every defect the audit found.

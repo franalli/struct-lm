@@ -3,9 +3,9 @@
   .venv/bin/python data/scripts/sft_audit.py sample [2] # -> data/sft/work/audit[_r2]_<format>.md
   (auditors write data/sft/work/audit_verdicts_<format>.jsonl, one verdict per record)
   .venv/bin/python data/scripts/sft_audit.py report   # -> data/sft/audit.jsonl, data/sft/audit.md
-  .venv/bin/python data/scripts/sft_audit.py filter-packets  # every closed-book record, 10 packets
-  (auditors write data/sft/work/filter_cb_verdicts_<k>.jsonl)
-  .venv/bin/python data/scripts/sft_audit.py filter-merge    # -> data/sft/closed_book_filter.jsonl
+  .venv/bin/python data/scripts/sft_audit.py read-packets LABEL  # unread records -> read packets
+  (readers apply data/sft/read_rubrics.md, writing data/sft/work/read_verdicts_<packet>.jsonl)
+  .venv/bin/python data/scripts/sft_audit.py read-merge          # -> data/sft/read_filter.jsonl
 
 40 records per synthetic format (closed_book, multi_step, definition, grounded, abstain), 30 from
 Mistral Large 3 and 10 from Medium 3.5 where there are enough, drawn by hash and disjoint from the
@@ -24,7 +24,7 @@ import sys
 import textwrap
 from collections import Counter, defaultdict
 
-from sft_common import SFT, WORK, h01, read_jsonl, write_jsonl
+from sft_common import READS, SFT, WORK, fingerprint, h01, read_jsonl, write_jsonl
 
 FORMATS = ("closed_book", "multi_step", "definition", "grounded", "abstain")
 PER_FORMAT, MEDIUM = 40, 10
@@ -217,79 +217,105 @@ def report() -> None:
     print("\n".join(lines[:40]))
 
 
-FILTER_PACKETS = 10
-FILTER = SFT / "closed_book_filter.jsonl"
+PACKET_SIZE = {"closed_book": 150, "definition": 150, "grounded": 40, "abstain": 40}
 
 
-def filter_packets(pass_: int = 1) -> None:
-    """Pass 1: every closed-book record of the current set, grouped by source chunk (the passage
-    once, then each of its questions and phrasings), in FILTER_PACKETS balanced packets for readers
-    who apply the closed-book rubric above. Pass 2: the records pass 1 called "minor", in 4 packets,
-    for readers with the stricter defect line (round 2 of the audit found 9 of 19 such records
-    defective: the pass-1 readers had noticed the flaw and filed it as minor)."""
-    records = [r for name in ("train.jsonl", "sft_val.jsonl") for r in read_jsonl(SFT / name)]
+def read_packets(label: str = "read") -> None:
+    """Packets of every record sft_assemble left out unread (work/unread.jsonl), per format, for
+    readers who apply data/sft/read_rubrics.md. Closed-book and definitions are grouped by passage
+    (the passage once, then each record); grounded and abstain records come with their four passages
+    as the teacher saw them, labelled [P1]-[P4]."""
+    unread = read_jsonl(WORK / "unread.jsonl")
+    manifest = {"label": label, "packets": {}}
+    for f in ("closed_book", "definition", "grounded", "abstain"):
+        es = [e for e in unread if e["format"] == f]
+        if not es:
+            continue
+        if f in ("closed_book", "definition"):
+            by_chunk = defaultdict(list)
+            for e in es:
+                by_chunk[e["chunk_id"]].append(e)
+            groups = sorted(by_chunk.values(), key=lambda g: h01(f"sft-read:{g[0]['chunk_id']}"))
+        else:
+            groups = [[e] for e in sorted(es, key=lambda e: h01(f"sft-read:{e['eid']}"))]
+        packets, cur = [], []
+        for g in groups:
+            if cur and sum(map(len, cur)) + len(g) > PACKET_SIZE[f]:
+                packets.append(cur)
+                cur = []
+            cur.append(g)
+        packets.append(cur)
+        for k, groups_k in enumerate(packets):
+            name = f"read_{f}_{k}"
+            eids = [e["eid"] for g in groups_k for e in g]
+            lines = [
+                f"# Read packet {name} ({len(eids)} records; rubric: read_rubrics.md, {f})",
+                "",
+            ]
+            for g in groups_k:
+                e0 = g[0]
+                if f in ("closed_book", "definition"):
+                    lines += [
+                        f"## Passage {e0['chunk_id']} ({e0['title']})",
+                        "",
+                        wrap(e0["text"]),
+                        "",
+                    ]
+                for e in g:
+                    lines += [f"### {e['eid']}"]
+                    if f == "closed_book":
+                        lines += [f"Q: {e['question']}", f"A: {e['answer']}", ""]
+                    elif f == "definition":
+                        lines += [f"Term: {e['term']}", f"Definition: {e['answer']}", ""]
+                    else:
+                        lines += [
+                            "",
+                            "\n\n".join(
+                                f"[{p['label']}]\n{wrap(p['text'])}" for p in e["passages"]
+                            ),
+                            "",
+                        ]
+                        lines += [f"Question: {e['question']}", f"Answer: {e['answer']}"]
+                        if f == "abstain":
+                            lines.append(f"(gold answer, from another chunk: {e['gold']})")
+                        lines.append("")
+            (WORK / f"{name}.md").write_text("\n".join(lines) + "\n")
+            manifest["packets"][name] = {"format": f, "eids": eids}
+            print(f"{name}: {len(eids)} records")
+    (WORK / "read_manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
+
+
+def read_merge() -> None:
+    """Readers' verdicts (work/read_verdicts_<packet>.jsonl) -> data/sft/read_filter.jsonl, each
+    with the fingerprint of the content read and the read's label; a new verdict replaces an
+    earlier one for the same record."""
+    manifest = json.loads((WORK / "read_manifest.json").read_text())
     judged = {e["eid"]: e for e in read_jsonl(WORK / "judged.jsonl")}
-    first = {v["eid"]: v["verdict"] for v in read_jsonl(FILTER)} if pass_ == 2 else {}
-    by_chunk = defaultdict(list)
-    for r in records:
-        closed_book = r["format"] == "closed_book" and r["kind"] != "multi_step"
-        if closed_book and (pass_ == 1 or first.get(r["eid"]) == "minor"):
-            by_chunk[judged[r["eid"]]["chunk_id"]].append(r)
-    n_packets = FILTER_PACKETS if pass_ == 1 else 4
-    name = "filter_cb" if pass_ == 1 else "filter2_cb"
-    packets = [[] for _ in range(n_packets)]
-    for cid in sorted(by_chunk, key=lambda c: (-len(by_chunk[c]), h01(f"sft-filter:{c}"))):
-        min(packets, key=lambda p: sum(len(by_chunk[c]) for c in p)).append(cid)
-    for k, cids in enumerate(packets):
-        n = sum(len(by_chunk[c]) for c in cids)
-        lines = [f"# Closed-book filter packet {k} ({n} records, {len(cids)} passages)", ""]
-        for cid in cids:
-            e0 = judged[by_chunk[cid][0]["eid"]]
-            lines += [f"## Passage {cid} ({e0['title']})", "", wrap(e0["text"]), ""]
-            for r in sorted(by_chunk[cid], key=lambda r: r["eid"]):
-                lines += [
-                    f"### {r['eid']}",
-                    f"wording {r['wording']} | gold fact (A2): {judged[r['eid']]['gold']}",
-                    f"Q: {r['question']}",
-                    f"A: {r['completion'][0]['content']}",
-                    "",
-                ]
-        (WORK / f"{name}_{k}.md").write_text("\n".join(lines) + "\n")
-        print(f"packet {k}: {n} records, {len(cids)} passages")
-
-
-def filter_merge() -> None:
-    """The readers' verdicts -> data/sft/closed_book_filter.jsonl (committed; sft_assemble drops
-    the defects and refuses a closed-book record without a verdict). A pass-2 verdict replaces the
-    pass-1 "minor" it re-read; the first verdict is kept as first_verdict."""
-    out = []
-    for k in range(FILTER_PACKETS):
-        out += read_jsonl(WORK / f"filter_cb_verdicts_{k}.jsonl")
-    assert len({v["eid"] for v in out}) == len(out), "duplicate verdicts"
-    second = {}
-    for k in range(4):
-        path = WORK / f"filter2_cb_verdicts_{k}.jsonl"
-        if path.exists():
-            second.update({v["eid"]: v for v in read_jsonl(path)})
-    if second:
-        minors = {v["eid"] for v in out if v["verdict"] == "minor"}
-        assert set(second) <= minors, "pass 2 re-reads pass-1 minors only"
-        out = [
-            {**second[v["eid"]], "pass": 2, "first_verdict": v["verdict"], "first_note": v["note"]}
-            if v["eid"] in second
-            else {**v, "pass": 1}
-            for v in out
-        ]
-    assert all(v["verdict"] in ("ok", "minor", "defect") for v in out)
-    write_jsonl(FILTER, sorted(out, key=lambda v: v["eid"]))
-    print(Counter(v["verdict"] for v in out))
+    reads = {v["eid"]: v for v in read_jsonl(READS)} if READS.exists() else {}
+    n = Counter()
+    for name, packet in manifest["packets"].items():
+        got = {v["eid"]: v for v in read_jsonl(WORK / f"read_verdicts_{name}.jsonl")}
+        missing = set(packet["eids"]) - set(got)
+        assert not missing, f"{name}: no verdict for {sorted(missing)[:3]}"
+        for eid in packet["eids"]:
+            v = got[eid]
+            assert v["verdict"] in ("ok", "minor", "defect"), v
+            row = {"eid": eid, "format": packet["format"], "verdict": v["verdict"],
+                   "categories": v.get("categories", []), "note": v.get("note", ""),
+                   "read": manifest["label"], "fp": fingerprint(judged[eid])}  # fmt: skip
+            if eid in reads:
+                row["previous_verdict"] = reads[eid]["verdict"]
+            reads[eid] = row
+            n[(packet["format"], v["verdict"])] += 1
+    write_jsonl(READS, sorted(reads.values(), key=lambda v: v["eid"]))
+    print(dict(n))
 
 
 if __name__ == "__main__":
     cmds = {
         "sample": lambda: sample(int(sys.argv[2]) if len(sys.argv) > 2 else 1),
         "report": report,
-        "filter-packets": lambda: filter_packets(int(sys.argv[2]) if len(sys.argv) > 2 else 1),
-        "filter-merge": filter_merge,
+        "read-packets": lambda: read_packets(sys.argv[2] if len(sys.argv) > 2 else "read"),
+        "read-merge": read_merge,
     }
     cmds[sys.argv[1]]()

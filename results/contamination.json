@@ -5726,24 +5726,24 @@
   ]
  },
  "sft": {
-  "train": 3031,
-  "val": 95,
+  "train": 2436,
+  "val": 80,
   "leaked_chunks": [],
   "eval": {
    "domain_qa seen: questions": {
     "items": 167,
     "checkable": 166,
     "sft": {
-     "any": 79,
-     "ge50": 18,
+     "any": 83,
+     "ge50": 20,
      "ge80": 2,
-     "mean_token_frac": 0.21491307605812404
+     "mean_token_frac": 0.22478808498706826
     },
     "either": {
-     "any": 79,
-     "ge50": 18,
+     "any": 83,
+     "ge50": 20,
      "ge80": 2,
-     "mean_token_frac": 0.21491307605812404
+     "mean_token_frac": 0.22478808498706826
     },
     "examples": [
      {
@@ -5824,18 +5824,36 @@
     "items": 101,
     "checkable": 100,
     "sft": {
-     "any": 3,
-     "ge50": 1,
+     "any": 6,
+     "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.014207351769659723
+     "mean_token_frac": 0.031607707189817126
     },
     "either": {
-     "any": 3,
-     "ge50": 1,
+     "any": 6,
+     "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.014207351769659723
+     "mean_token_frac": 0.031607707189817126
     },
     "examples": [
+     {
+      "item": 72,
+      "token_frac": 0.7307692307692307,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "Damage that reduces a building component's strength, deformation capacity, or both, thereby impairing the",
+      "text": "Damage that reduces a building component's strength, deformation capacity, or both, thereby impairing the future seismic performance of the structure."
+     },
+     {
+      "item": 8,
+      "token_frac": 0.56,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "Structural walls designed to resist lateral forces such as those from earthquakes or",
+      "text": "Structural walls designed to resist lateral forces such as those from earthquakes or high winds by providing stability to the building's perimeter."
+     },
      {
       "item": 49,
       "token_frac": 0.52,
@@ -5844,24 +5862,6 @@
       ],
       "longest_span": " connected to the bridge superstructure, eliminating the need for expansion joints",
       "text": "Abutments that are rigidly connected to the bridge superstructure, eliminating the need for expansion joints at the bridge ends."
-     },
-     {
-      "item": 95,
-      "token_frac": 0.4666666666666667,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": " rest against a girder and sill, held in place by water pressure",
-      "text": "A dam composed of narrow vertical or inclined shutters (needles) that rest against a girder and sill, held in place by water pressure."
-     },
-     {
-      "item": 38,
-      "token_frac": 0.4482758620689655,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": "Short wood-framed walls between the foundation and the first floor",
-      "text": "Short wood-framed walls between the foundation and the first floor of a building, often requiring specific bracing or reinforcement in seismic design categories."
      }
     ]
    },
@@ -5870,15 +5870,15 @@
     "checkable": 158,
     "sft": {
      "any": 51,
-     "ge50": 8,
+     "ge50": 9,
      "ge80": 0,
-     "mean_token_frac": 0.13806168034696512
+     "mean_token_frac": 0.13805749815001597
     },
     "either": {
      "any": 51,
-     "ge50": 8,
+     "ge50": 9,
      "ge80": 0,
-     "mean_token_frac": 0.13806168034696512
+     "mean_token_frac": 0.13805749815001597
     },
     "examples": [
      {
@@ -5914,18 +5914,27 @@
     "items": 158,
     "checkable": 10,
     "sft": {
-     "any": 3,
-     "ge50": 3,
-     "ge80": 3,
-     "mean_token_frac": 0.018535262206148283
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.024864376130198918
     },
     "either": {
-     "any": 3,
-     "ge50": 3,
-     "ge80": 3,
-     "mean_token_frac": 0.018535262206148283
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.024864376130198918
     },
     "examples": [
+     {
+      "item": 88,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "EM 1110-2-2904",
+      "text": "EM 1110-2-2904"
+     },
      {
       "item": 92,
       "token_frac": 1.0,
@@ -5943,15 +5952,6 @@
       ],
       "longest_span": "ER 1110-2-1806",
       "text": "ER 1110-2-1806"
-     },
-     {
-      "item": 129,
-      "token_frac": 0.9285714285714286,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": "IST GCR 14-917-27",
-      "text": "NIST GCR 14-917-27"
      }
     ]
    },
@@ -5979,24 +5979,15 @@
      "any": 4,
      "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.01781876343279852
+     "mean_token_frac": 0.019015427933556588
     },
     "either": {
      "any": 4,
      "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.01781876343279852
+     "mean_token_frac": 0.019015427933556588
     },
     "examples": [
-     {
-      "item": 71,
-      "token_frac": 0.5526315789473685,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": " in ASCE/SEI 7-16 Section 12.10.3 for",
-      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
-     },
      {
       "item": 72,
       "token_frac": 0.5384615384615384,
@@ -6005,6 +5996,15 @@
       ],
       "longest_span": " ASCE 7-10 and ASCE 7-16",
       "text": "What is the rationale for requiring liquefaction evaluation to be performed using the Maximum Considered Earthquake (MCE) ground motion instead of the design earthquake ground motion in ASCE 7-10 and ASCE 7-16?"
+     },
+     {
+      "item": 71,
+      "token_frac": 0.5263157894736842,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " ASCE/SEI 7-16 Section 12.10.3 for",
+      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
      },
      {
       "item": 15,
@@ -6053,7 +6053,7 @@
    },
    "vocab seen": {
     "items": 101,
-    "term_defined": 51
+    "term_defined": 89
    },
    "domain_qa unseen": {
     "items": 158,
@@ -6066,32 +6066,23 @@
    }
   },
   "val_vs_train": {
-   "items": 95,
-   "checkable": 95,
+   "items": 80,
+   "checkable": 80,
    "train": {
-    "any": 39,
-    "ge50": 1,
+    "any": 33,
+    "ge50": 0,
     "ge80": 0,
-    "mean_token_frac": 0.10656649812917353
+    "mean_token_frac": 0.10472121278231021
    },
    "either": {
-    "any": 39,
-    "ge50": 1,
+    "any": 33,
+    "ge50": 0,
     "ge80": 0,
-    "mean_token_frac": 0.10656649812917353
+    "mean_token_frac": 0.10472121278231021
    },
    "examples": [
     {
-     "item": 89,
-     "token_frac": 0.5,
-     "found_in": [
-      "train"
-     ],
-     "longest_span": " as stated in EM 1110-2-3800?\n",
-     "text": "What is the density ratio of carbon dioxide compared to air as stated in EM 1110-2-3800?\nNot in the provided passages."
-    },
-    {
-     "item": 94,
+     "item": 79,
      "token_frac": 0.4473684210526316,
      "found_in": [
       "train"
@@ -6100,13 +6091,22 @@
      "text": "Which document provides the Detailed Evaluation form for post-disaster building safety assessments mentioned in FEMA P-2055?\nATC-20-1 and ATC-45"
     },
     {
-     "item": 12,
+     "item": 7,
      "token_frac": 0.41935483870967744,
      "found_in": [
       "train"
      ],
      "longest_span": " in highway bridge superstructures?\nNot in the provided passages.",
      "text": "What are the two common shapes of anchor plates used for post-tensioning bar tendons in highway bridge superstructures?\nNot in the provided passages."
+    },
+    {
+     "item": 31,
+     "token_frac": 0.4117647058823529,
+     "found_in": [
+      "train"
+     ],
+     "longest_span": " in EM 1110-2-1902",
+     "text": "What is the recommended minimum number of independent methods for verifying slope stability analysis results in EM 1110-2-1902?\nmore than one method"
     }
    ]
   },

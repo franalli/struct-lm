@@ -19,11 +19,19 @@ Gates on every record (rejects appended to sft_rejected.jsonl with stage "A6"):
   rule 1 again on the final question (A4's paraphrases and Evol-Instruct problems are new text);
   every chunk id in a prompt or a citation is allowed (sft_guard); per-chunk caps (12 / 4).
 Then ordinary records are trimmed to the format targets (sft_filter.TARGETS, scaled to the pool),
-alternating the exact and paraphrased halves; eval-seen records are all kept.
+alternating the exact and paraphrased halves; eval-seen records are all kept, except that
+definitions are capped at DEFINITION_CAP (seen-term definitions first). Multi-step problems are
+dropped (2026-10-05 audit: 17/40 ill-posed).
+
+Full-passage reads (data/sft/read_filter.jsonl, rubrics in data/sft/read_rubrics.md): every
+closed-book record, definition and grounded answer, every hard-negative abstain set and every
+record of a regenerated document needs a verdict for its current content; defects are dropped and unread
+records are left out and listed in work/unread.jsonl (sft_audit.py read-packets reads them next).
 
 fact_seen: the seen-half eval items (domain_qa / vocab, same chunk) a record's answer matches,
 scored the eval's way. Coverage = share of the 167 + 101 seen items with at least one record: the
-facts SFT showed, as opposed to the chunks it drew on. The generator never knew which they were.
+facts SFT showed, as opposed to the chunks it drew on. Extraction was blind to them; the re-asked
+facts and the targeted seen-term definitions (sft_filter) are the two deliberate exceptions.
 
 Validation: 5% of each format's holdable records (ordinary and replay) held out, by source
 chunk, so no fact and none of its phrasings sits on both sides. Eval-seen records always go to
@@ -52,8 +60,11 @@ from sft_common import (
     MULTI_STEP_SUFFIX,
     QA_TEMPLATES,
     RAG_TEMPLATES,
+    READS,
+    REGENERATED_DOCS,
     SFT,
     WORK,
+    fingerprint,
     h01,
     pick,
     read_jsonl,
@@ -62,12 +73,14 @@ from sft_common import (
 )
 from sft_filter import CAP, MIN_ORDINARY_DEFINITIONS, TARGETS
 
-FILTER = SFT / "closed_book_filter.jsonl"
+# read categories about the answer, not the question: they hold for every phrasing of the task
+ANSWER_DEFECTS = {"wrong_answer", "partial_answer", "worked_example_value"}
+DEFINITION_CAP = 300  # user decision 2026-10-05: definitions were 772, a quarter of the set
 from sft_guard import Guard
 
 MAX_TOKENS = 4096
 VAL_SHARE = 0.05
-REVIEW_KEPT, REVIEW_DISAGREE = 50, 50
+REVIEW = {"closed_book": 15, "definition": 10, "grounded": 10, "abstain": 10, "new": 5}
 LABEL = re.compile(r"\[(P[1-4])\]")
 
 
@@ -185,55 +198,46 @@ def ids_in(rec: dict) -> set[str]:
     return out
 
 
-def review_md(kept: list[dict], disagree: list[dict]) -> str:
+def review_md(sample: list[dict], record_of: dict) -> str:
+    """The human read before a freeze: a stratified sample of the final set, each record as the
+    student sees it (prompt and completion) with its source passage, plus its read verdict."""
+
     def block(e: dict) -> list[str]:
-        j = e.get("judge") or {}
+        r = record_of[e["eid"]]
         out = [
             f"### {e['eid']}",
             "",
-            (
-                f"{fmt_key(e)} | {e['origin']} | {e['wording']} | teacher {e['teacher']} | "
-                f"kept {e['keep']} ({e['reason']}) | score {j.get('score')} | revised {e['revised']}"
-            ),
+            f"{fmt_key(e)} | {e['origin']} | wording {r['wording']} | teacher {e['teacher']}"
+            + (" | re-asked" if e["reask"] else "")
+            + (" | targeted term" if e["targeted"] else "")
+            + (" | hard negative" if e["hard_negative"] else ""),
             "",
         ]
         if e["passages"]:
-            out += [
-                f"- **{p['label']}** `{p['chunk_id']}`{' (gold)' if p['label'] == e['gold_label'] else ''}: "
-                f"{p['text'][:300]}..."
-                for p in e["passages"]
-            ]
+            for p in e["passages"]:
+                gold = p["label"] == e["gold_label"]
+                text = p["text"] if gold else p["text"][:400] + " ..."
+                out += [f"- **[{p['chunk_id']}]**{' (source)' if gold else ''}: {text}"]
+            if e["format"] == "abstain":
+                out.append(f"- (the gold, from another chunk: {e['gold']})")
         else:
-            out.append(f"Passage `{e['chunk_id']}`: {e['text'][:600]}...")
-        out += [
-            "",
-            f"**Q:** {e['term'] if e['format'] == 'definition' else e['question']}",
-            f"**Gold (A2):** {e['gold']}",
-            f"**Answer:** {e['answer']}",
-        ]
-        if e.get("answer_before_revise"):
-            out.append(f"**Before revise:** {e['answer_before_revise']}")
-        out += [f"**Verifier:** {e['verifier']}", f"**Judge:** {j.get('reasoning')}"]
-        if e["disagree"]:
-            out.append(f"**Disagreement:** {', '.join(e['disagree'])}")
+            out.append(f"Source passage `{e['chunk_id']}` ({e['title']}): {e['text']}")
+        question = e["term"] if e["format"] == "definition" else e["question"]
+        out += ["", f"**Asked:** {question}", f"**Target:** {r['completion'][0]['content']}"]
         return out + [""]
 
     lines = [
-        "# SFT data: hand-read sample (A7)",
+        "# SFT data: sample for the human read",
         "",
         (
-            f"{len(kept)} kept examples (stratified by format) and {len(disagree)} examples where "
-            "the rule verifier and the judge disagree on a rule they both check (kept or not). "
-            "Findings go to notes/decisions.md."
+            f"{len(sample)} records of the final set, stratified by format, each with its source "
+            "passage. Every closed-book record and definition, every hard-negative abstain set and "
+            "every record of a regenerated document was read against its passage before this "
+            "(data/sft/read_filter.jsonl); this read is the human check of what survived."
         ),
         "",
-        "## Kept",
-        "",
     ]
-    for e in kept:
-        lines += block(e)
-    lines += ["## Verifier / judge disagreements", ""]
-    for e in disagree:
+    for e in sample:
         lines += block(e)
     return "\n".join(line.rstrip() for line in "\n".join(lines).split("\n")).rstrip() + "\n"
 
@@ -323,23 +327,64 @@ def main() -> None:
     final = []
     for e in selected:
         c = e["chunk_id"]
+        if e["reask"] or e["targeted"]:  # added on top of the budget by design (sft_filter)
+            final.append(e)
+            continue
         if count[c] >= CAP[e["origin"]]:
             reject(e, "A6", "cap")
             continue
         count[c] += 1
         final.append(e)
 
-    # the closed-book filter (sft_audit.py filter-merge): every closed-book record read against its
-    # passage by a full-passage reader; defects out, minors kept, and no record goes in unread
-    if FILTER.exists():
-        verdicts = {v["eid"]: v["verdict"] for v in read_jsonl(FILTER)}
-        cb = [e for e in final if e["format"] == "closed_book" and e["kind"] != "multi_step"]
-        unread = [e["eid"] for e in cb if e["eid"] not in verdicts]
-        assert not unread, f"closed-book records without a filter verdict: {unread[:3]}"
-        for e in cb:
-            if verdicts[e["eid"]] == "defect":
-                reject(e, "A6", "closed_book_filter")
-        final = [e for e in final if verdicts.get(e["eid"]) != "defect"]
+    # ---- definitions: at most DEFINITION_CAP, first every one that defines a seen-half vocab
+    # term, then by hash. Before the reads, so the same records are chosen whether read or not.
+    defs = [e for e in final if e["format"] == "definition"]
+    covers = lambda e: bool(guard.fact_seen(e["chunk_id"], None, e["term"]))
+    defs.sort(key=lambda e: (not covers(e), h01(f"sft-def-cap:{e['eid']}")))
+    over = {e["eid"] for e in defs[DEFINITION_CAP:]}
+    for e in defs[DEFINITION_CAP:]:
+        reject(e, "A6", "definition_cap")
+    final = [e for e in final if e["eid"] not in over]
+
+    # ---- full-passage reads (sft_audit.py read-packets / read-merge, rubrics in read_rubrics.md):
+    # a verdict holds for the content it read (fingerprint); defects out, minors kept. Every
+    # closed-book record, definition and grounded answer is read, and every hard-negative abstain
+    # set and record of a regenerated document. Unread ones stay out (work/unread.jsonl lists them for the next read).
+    reads = {v["eid"]: v for v in read_jsonl(READS)} if READS.exists() else {}
+
+    def must_read(e: dict) -> bool:
+        return (
+            e["format"] in ("closed_book", "definition", "grounded")
+            or e["hard_negative"]
+            or e["doc"] in REGENERATED_DOCS
+        )
+
+    def verdict(e: dict) -> str | None:
+        v = reads.get(e["eid"])
+        return v["verdict"] if v and v["fp"] == fingerprint(e) else None
+
+    # A defect in the answer itself condemns every phrasing of the task: they share one answer.
+    shared_answer = {
+        e["tid"]
+        for e in judged
+        if verdict(e) == "defect" and set(reads[e["eid"]]["categories"]) & ANSWER_DEFECTS
+    }
+    unread = [e for e in final if must_read(e) and verdict(e) is None]
+    for e in final:
+        if verdict(e) == "defect":
+            reject(e, "A6", "read_defect")
+        elif e["tid"] in shared_answer:
+            reject(e, "A6", "read_defect_shared_answer")
+    final = [
+        e
+        for e in final
+        if verdict(e) != "defect"  # whatever the format: a read that found a defect drops it
+        and not (must_read(e) and verdict(e) is None)
+        and e["tid"] not in shared_answer
+    ]
+    write_jsonl(WORK / "unread.jsonl", unread)
+    if unread:
+        print(f"UNREAD: {len(unread)} records left out; sft_audit.py read-packets, then read-merge")
     records = [record(e, guard) for e in final]
     records += [replay_record(r) for r in read_jsonl(WORK / "replay.jsonl")]
 
@@ -391,18 +436,16 @@ def main() -> None:
     )
 
     kept_judged = {e["eid"]: e for e in final}
-    sample = []
-    for f in ("closed_book", "multi_step", "definition", "grounded", "abstain"):
-        es = sorted(
-            (e for e in final if fmt_key(e) == f), key=lambda e: h01(f"sft-review:{e['eid']}")
-        )
-        sample += es[: REVIEW_KEPT // 5]
-    disagree = sorted(
-        (e for e in judged if e["disagree"]), key=lambda e: h01(f"sft-review:{e['eid']}")
-    )
-    (SFT / "review.md").write_text(review_md(sample, disagree[:REVIEW_DISAGREE]))
+    order = lambda e: h01(f"sft-review:{e['eid']}")
+    new = sorted((e for e in final if e["reask"] or e["targeted"]), key=order)[: REVIEW["new"]]
+    sample = list(new)
+    for f in ("closed_book", "definition", "grounded", "abstain"):
+        es = sorted((e for e in final if fmt_key(e) == f and e not in new), key=order)
+        sample += es[: REVIEW[f]]
+    (SFT / "review.md").write_text(review_md(sample, {r["eid"]: r for r in records}))
 
     toks = sorted(r["n_tokens"] for r in train + val)
+    reads_used = Counter(reads[e["eid"]]["read"] for e in final if verdict(e))
     stats = {
         "train": len(train),
         "val": len(val),
@@ -426,12 +469,10 @@ def main() -> None:
             "vocab": f"{len(covered & set(seen_vocab))}/{len(seen_vocab)}",
         },
         "tokens": {"max": toks[-1], "median": toks[len(toks) // 2], "total": sum(toks)},
+        "unread": len(unread),
+        "reads_used": dict(reads_used),
         "rejected": dict(Counter(f"{r['stage']}:{r['rule']}" for r in rejects)),
-        "review": {
-            "kept": len(sample),
-            "disagreements": len(disagree),
-            "shown": min(len(disagree), REVIEW_DISAGREE),
-        },
+        "review": len(sample),
         "sha256": {n: sha256(SFT / n) for n in ("train.jsonl", "sft_val.jsonl")},
     }
     assert len(kept_judged) == len(final)

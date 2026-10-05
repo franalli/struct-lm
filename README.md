@@ -100,6 +100,7 @@ tokens, and enterprise data readiness and governance.
 | Base model | Ministral 3 8B, open weights | tens to hundreds of billions of parameters, dense or MoE |
 | Corpus | 20M tokens of cleaned public PDFs | billions of tokens: documents, code, databases, images; messy |
 | Continued pre-training | LoRA on one GPU, hours | full-parameter, multi-node, days to weeks, replay mix, annealing |
+| CPT data | documents concatenated and read once, 20M tokens | the same next-token objective with data engineering around it: rewrites of the facts that matter, per-source mixture and repetition, section-level boundaries |
 | Post-training | a few thousand SFT examples, ~1k DPO pairs, a small GRPO run | 10k–100k+ examples reviewed with domain experts, RL with distillation |
 | Evaluation | six-measurement harness plus regression suite | the same idea, built with domain experts, with audit lineage |
 | Infrastructure | rented GPUs (Modal), open-source stack | isolated environments, data residency, versioned datasets and runs |
@@ -617,6 +618,56 @@ and it needs repetition or augmentation to stick.
      Mistral's native path to five decimals. The repro and the upstream fix are in
      [`notes/contributions.md`](notes/contributions.md); the issue is not filed yet.
 
+#### What I would do differently
+
+Written after Stage 2 and before Stage 3's training, ordered by how much each would have changed the
+result. Most of it is knowledge Stage 2 produced. The evidence for each item, and the rule it became,
+is in [`notes/decisions.md`](notes/decisions.md) (2026-10-05 retrospective).
+
+1. **Build the sensitive metric before the intervention.** Stage 2 was first read on a 130-item
+   pass/fail task with a 3-point standard error. Its real effect (+0.59 nats of gold-answer
+   log-probability, 70% of items up) showed only once `gold_lp`, the seen/unseen halves and the
+   325-item set existed. All three belonged in Stage 0, a day's work moved a week earlier, and the
+   right pre-registered target was `gold_lp` on facts from the documents read, not a 20% drop in
+   held-out perplexity.
+2. **Run a no-op control through the eval path before any training.** The base re-saved through
+   `merge.py` and evaluated like a fine-tuned checkpoint was built only after `cpt-8b` seemed to lose
+   3.7 MMLU points, and it exposed the YaRN bug that outweighed every training effect. On day one it
+   would have cost one eval pass (about half an H100-hour), because an instrument has to read zero
+   before it measures.
+3. **Augment the facts that matter instead of reading them once.** One pass gives each value about
+   one exposure, and values moved least (+0.06 nats per token against +0.13-0.15). QA and paraphrase
+   rewrites of the 197 eval-seen chunks mixed into the CPT stream were affordable (about 1,000 API
+   calls) and would have made Stage 2 a knowledge-injection test; Stage 3 now does the
+   instruction-data version.
+4. **Ablate along the axis the goal lives on.** The goal was knowledge, but the ablations asked about
+   forgetting (replay, predicted null and null) and parameterisation (full vs LoRA). Epochs (1 vs 3)
+   and augmentation (0 vs K rewrites), at about one H100-hour per LoRA epoch, were the informative
+   runs; full-parameter and the 2-GPU run taught the engineering, and replay answered a question the
+   pre-registration had already answered.
+5. **Judge CPT by the downstream number.** Whether CPT was worth doing is SFT-from-CPT against
+   SFT-from-base, not perplexity. That comparison should have been written into Stage 2's decision,
+   which had no branch for leaving CPT out and picked the checkpoint on perplexity and MMLU; it is
+   now Stage 3's control.
+6. **Put boundaries where the text has them.** One EOS per manual (234 in 19.4M tokens) is the
+   likely reason `cpt-8b` runs to the 256-token cap where the base stops after ~28 tokens.
+   Section-level units with their own EOS would have kept ends common at no GPU cost, and packing
+   whole units would also stop windows from starting mid-sentence; it surfaced only in the latency
+   table.
+7. **Choose the "new documents" set before training, matched to the corpus.** The 2026 reports were
+   sourced after Stage 2, and 11 of 13 are research reports against a corpus of manuals. A genre
+   split made afterwards rules genre out, but rests on two documents. Post-cutoff manuals from the
+   same publishers, with series both in and out of train, chosen before training, would have made
+   the -0.4% unarguable.
+8. **Hygiene rules from day one.** Adapters kept, no checkpoint with a table row deleted, a paced
+   API client instead of retry-on-429, a judge-cache guard. Each was written after a loss: the
+   full-parameter run's weights (and with them its 325-item QA scores), worker time asleep or
+   retrying, and 50 re-judged items.
+9. **Calibrate every judge rubric before it labels anything.** The grading judge was hand-checked at
+   Stage 0, but the SFT judge, a new rubric labelling training data, went straight to 4,020
+   examples. A full-passage audit then found 18% of what it kept defective, every defect a framing
+   error it had passed; 40 items with known defects would have shown that first.
+
 ### 4. Results
 
 Every scored checkpoint, from [`results/table.md`](results/table.md) (copied here by
@@ -724,8 +775,9 @@ Mistral's native vLLM path, `base-8b-hf` and `cpt-8b` the HF path with the YaRN 
 - **`cpt-8b`'s end-to-end time is not a latency result.** It decodes at the same 6.6-6.9 ms per
   token as the base. It runs to the 256-token cap, though, where the base stops after ~28 tokens,
   hence the ~10x end-to-end time and the higher throughput (more tokens per request).
-  - **Cause:** the corpus holds one EOS per whole manual, 234 in 19.4M tokens. That is the correct
-    choice for CPT, and this is its known side effect.
+  - **Cause:** the corpus holds one EOS per whole manual, 234 in 19.4M tokens. Section-level units
+    would likely have avoided it (item 6 of
+    [What I would do differently](#what-i-would-do-differently)).
   - **Fix:** SFT's short answers restore stopping, and Stage 3 checks output length.
   - **Use:** compare the row only with this note. Deployment latency is measured on the SFT'd
     checkpoint.

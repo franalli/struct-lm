@@ -27,6 +27,7 @@ own document at least 3 positions from its chunk + 2 from other documents (on-to
 adversarial eval is), checked for the answer by A4's teacher and A5's judge.
 """
 
+import math
 import random
 import re
 import sys
@@ -40,8 +41,12 @@ from datasketch import MinHash, MinHashLSH
 from qa_rules import is_locator
 from scorers import normalize
 from sft_common import (
+    READS,
+    REGENERATED_DOCS,
     SFT,
     WORK,
+    content_words,
+    gold_present,
     h01,
     load_chunks,
     make_tasks,
@@ -106,6 +111,42 @@ def closed_book_rule(mt, q: str, a: str, chunk_id: str, passage: str) -> str | N
 def shingles(text: str) -> set[bytes]:
     ws = words(text)
     return {" ".join(ws[i : i + 3]).encode() for i in range(max(1, len(ws) - 2))}
+
+
+class BM25:
+    """Okapi BM25 (k1 1.2, b 0.75) over chunks' content words: picks abstain passages that look
+    like they should answer the question."""
+
+    def __init__(self, chunks: list[dict], k1: float = 1.2, b: float = 0.75) -> None:
+        self.chunks, self.k1, self.b = chunks, k1, b
+        self.tf = [Counter(content_words(c["text"])) for c in chunks]
+        self.dl = [sum(t.values()) for t in self.tf]
+        self.avg = sum(self.dl) / len(self.dl)
+        df = Counter(w for t in self.tf for w in t)
+        self.idf = {w: math.log(1 + (len(chunks) - d + 0.5) / (d + 0.5)) for w, d in df.items()}
+        self.post = defaultdict(list)
+        for i, t in enumerate(self.tf):
+            for w in t:
+                self.post[w].append(i)
+        self.pos = {c["chunk_id"]: i for i, c in enumerate(chunks)}
+
+    def _term(self, w: str, i: int) -> float:
+        f = self.tf[i][w]
+        norm = 1 - self.b + self.b * self.dl[i] / self.avg
+        return self.idf[w] * f * (self.k1 + 1) / (f + self.k1 * norm)
+
+    def score(self, query: str, chunk_id: str) -> float:
+        i = self.pos.get(chunk_id)
+        if i is None:
+            return 0.0
+        return sum(self._term(w, i) for w in set(content_words(query)) if w in self.tf[i])
+
+    def top(self, query: str, n: int) -> list[dict]:
+        acc = defaultdict(float)
+        for w in set(content_words(query)):
+            for i in self.post.get(w, []):
+                acc[i] += self._term(w, i)
+        return [self.chunks[i] for i, _ in sorted(acc.items(), key=lambda x: -x[1])[:n]]
 
 
 def main() -> None:
@@ -375,6 +416,99 @@ def main() -> None:
         ),
     }
 
+    # ---- abstain hard negatives (2026-10-05 audit: a quarter of abstain items had passages off
+    # the question's subject, which teaches "unrelated -> refuse", not what the adversarial eval
+    # scores). The least similar quarter, and any set where a passage states the gold, get the most
+    # similar allowed passages by BM25 instead, skipping the source's own neighbourhood and every
+    # passage that states the gold (sft_common.gold_present; A5 checks it again as a hard rule).
+    bm25 = BM25(allowed_far)
+    abstain = [t for t in out if t["format"] == "abstain"]
+    sim = {
+        t["tid"]: max(bm25.score(t["question"], p["chunk_id"]) for p in t["passages"])
+        for t in abstain
+    }
+    cut = sorted(sim.values())[len(sim) // 4] if sim else 0.0
+    hard = Counter()
+    for t in abstain:
+        holds_gold = any(gold_present(t["answer"], p["text"]) for p in t["passages"])
+        if sim[t["tid"]] >= cut and not holds_gold:
+            continue
+        src = by_id[t["chunk_id"]]
+        picks = []
+        for c in bm25.top(t["question"], 400):
+            near = c["doc"] == src["doc"] and abs(c["pos"] - src["pos"]) <= 2
+            if near or gold_present(t["answer"], c["text"]):
+                continue
+            picks.append(c)
+            if len(picks) == 4:
+                break
+        if len(picks) < 4:
+            continue
+        random.Random(f"sft-abstain-hard:{t['qid']}").shuffle(picks)
+        t["passages"] = [
+            {"label": f"P{k + 1}", "chunk_id": c["chunk_id"], "text": c["text"]}
+            for k, c in enumerate(picks)
+        ]
+        t["tid"], t["hard_negative"] = f"{t['qid']}:abstain-hard", True
+        hard["held_gold" if holds_gold else "easy_quarter"] += 1
+
+    # ---- seen facts the reads dropped entirely: one new question each, exact wording, no persona
+    # (paraphrased items failed 1.6x as often). Only facts that carried a seen domain_qa item no
+    # kept phrasing still covers; the question is written from the fact (A4 reask_question).
+    reads_by_tid = defaultdict(list)
+    for v in read_jsonl(READS) if READS.exists() else []:
+        reads_by_tid[v["eid"].rsplit(":", 1)[0]].append(v["verdict"])
+    covered, lost = set(), []
+    for t in out:
+        c = chunk[t["chunk_id"]]
+        if (
+            c["origin"] != "eval_seen"
+            or t["format"] != "closed_book"
+            or c["doc"] in REGENERATED_DOCS
+        ):
+            continue
+        ids = set(guard.fact_seen(t["chunk_id"], t["answer"]))
+        verdicts = reads_by_tid.get(t["tid"], [])
+        if verdicts and all(v == "defect" for v in verdicts):
+            if ids:
+                lost.append((t, ids))
+        else:
+            covered |= ids
+    # A first re-ask the read also dropped gets one more, quote-first (A4 reask_question): the
+    # first round lost most facts the same way the originals did, by dropping the condition the
+    # fact depends on ("greater of", "not applicable to ceramics", "for underwater coring").
+    reask = []
+    for t, ids in lost:
+        if not ids - covered:
+            continue
+        first = reads_by_tid.get(f"{t['qid']}:closed_book:reask", [])
+        if first and any(v != "defect" for v in first):
+            covered |= ids
+            attempt = 1
+        else:
+            attempt = 2 if first else 1
+        covered |= ids
+        suffix = "reask" if attempt == 1 else "reask2"
+        reask.append({**t, "tid": f"{t['qid']}:closed_book:{suffix}", "phrasings": 1,
+                      "rewrite_only": True, "reask": attempt})  # fmt: skip
+    out += reask
+
+    # ---- every seen-half vocab term gets a definition task of its own (user decision, 2026-10-05:
+    # extraction covered 51 of 101). The teacher sees the term and its own chunk, never the eval's
+    # reference definition: rule 10's "the generator sees no eval file" is relaxed for these term
+    # names only. All 101, not just the uncovered ones, so the set doesn't depend on a previous build.
+    targeted = []
+    for cid in sorted(guard.seen_items, key=lambda c: order.get(c, len(order))):
+        terms = [i for i in guard.seen_items[cid] if "term" in i]
+        for k, i in enumerate(terms):
+            targeted.append({
+                "qid": f"{cid}:t{k}", "chunk_id": cid, "kind": "term", "question": None,
+                "answer": i["term"], "term": i["term"], "definition": None, "what": None,
+                "format": "definition", "tid": f"{cid}:t{k}:definition", "phrasings": 1,
+                "rewrite_only": False, "targeted": True,
+            })  # fmt: skip
+    out += targeted
+
     for t in out:
         c = chunk[t["chunk_id"]]
         t.update(
@@ -388,6 +522,8 @@ def main() -> None:
         )
         t.setdefault("passages", None)
         t.setdefault("gold_label", None)
+        for flag in ("hard_negative", "reask", "targeted"):
+            t.setdefault(flag, False)
     write_jsonl(WORK / "questions_kept.jsonl", out)
     write_jsonl(SFT / "sft_rejected.jsonl", rejects)
     stats = {
@@ -400,6 +536,9 @@ def main() -> None:
         "kept_forced": dict(Counter(t["format"] for t in out if t["origin"] == "eval_seen")),
         "forced_rule1_rewrite": sum(t.get("rewrite_only", False) for t in out),
         "forced_chunks_with_tasks": len({t["chunk_id"] for t in out if t["origin"] == "eval_seen"}),
+        "abstain_hard_negatives": dict(hard),
+        "reask_seen_facts": len(reask),
+        "targeted_seen_terms": len(targeted),
         "ordinary_targets_with_headroom": want,
         "ordinary_picked": picked,
         "ordinary_wording": dict(

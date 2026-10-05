@@ -155,6 +155,53 @@ Return JSON: {{"questions": ["...", "..."]}}""",
     return [q for q in (as_text(x) for x in out.get("questions", [])) if q][: t["phrasings"]]
 
 
+def reask_question(t: dict) -> list[str]:
+    """One new question for a seen fact every earlier phrasing of which the full-passage read
+    dropped: written from the fact, in the eval's neutral register, keeping the passage's own
+    conditions and strength of obligation (the reads' commonest defects were "should" asked as
+    "must" and scope moved by a persona)."""
+    out = llm_json(
+        f"""{source(t)}
+
+Write one question a practicing structural or civil engineer would ask whose answer is exactly
+this fact: {t["answer"]} ({t["what"] or "as the passage states it"}).
+It is asked WITHOUT the passage, so:
+- name the document and the structure, condition or quantity, so it has this one answer;
+- keep the passage's own conditions, limits and strength of obligation: "should", "typically",
+  "may" and "about" stay as they are; never turn them into "must", "required", "maximum" or
+  "minimum", and never move the fact to another structure type or situation;
+- no persona and no scenario; never mention a passage, figure, table or page.
+Return JSON: {{"question": "..."}}""",
+        step="paraphrase",
+        temperature=0.7,
+    )
+    q = as_text(out.get("question"))
+    return [q] if q else []
+
+
+def reask_quoted(t: dict) -> list[str]:
+    """The second re-ask: quote first, then ask. The quote makes the teacher carry the fact's own
+    conditions, scope and limits into the question, which the first re-ask mostly dropped."""
+    out = llm_json(
+        f"""{source(t)}
+
+The fact: {t["answer"]} ({t["what"] or "as the passage states it"}).
+1. Quote, word for word, the sentence or sentences of the passage that state this fact, including
+   every condition, scope, exception and limit they attach to it (which structure, which method,
+   which case; "less than" vs "not more than"; footnotes such as "not applicable to ...").
+2. Write one question a practicing structural or civil engineer would ask whose answer is exactly
+   this fact. It is asked WITHOUT the passage: name the document, and carry every condition from
+   your quote into the question, so the fact is true as asked. Keep the passage's strength of
+   obligation ("should" stays "should"). No persona, no scenario, no mention of a passage, figure,
+   table or page.
+Return JSON: {{"quote": "...", "question": "..."}}""",
+        step="paraphrase",
+        temperature=0.7,
+    )
+    q = as_text(out.get("question"))
+    return [q] if q else []
+
+
 def as_text(x) -> str:
     """A JSON field as text: strings as they are, a list of steps one per line, anything else ""."""
     if isinstance(x, str):
@@ -209,7 +256,19 @@ def main() -> None:
     rewrites = {}
     for res in pmap(paraphrase, list(groups.values())):
         rewrites.update(res)
-    for t, qs in zip(fresh, pmap(from_fact, fresh)):
+    for t, qs in zip(
+        fresh,
+        pmap(
+            lambda t: (
+                reask_quoted(t)
+                if t["reask"] == 2
+                else reask_question(t)
+                if t["reask"]
+                else from_fact(t)
+            ),
+            fresh,
+        ),
+    ):
         rewrites[t["tid"]] = qs
     for t in tasks:  # every phrasing of the task; the first is the one the teacher answers
         if t["rewrite_only"]:
@@ -283,6 +342,9 @@ def main() -> None:
                     "persona": persona,
                     "passages": t["passages"],
                     "gold_label": t["gold_label"],
+                    "hard_negative": t["hard_negative"],
+                    "reask": t["reask"],
+                    "targeted": t["targeted"],
                     **a,
                 }
             )

@@ -40,6 +40,7 @@ from sft_common import (
     ABSTAIN_REPLY,
     TEACHER,
     WORK,
+    gold_present,
     llm_json,
     pmap,
     read_jsonl,
@@ -395,7 +396,8 @@ def rubric_key(e: dict) -> str:
 def rubric_text(e: dict) -> tuple[str, list[tuple]]:
     items = RUBRICS[rubric_key(e)]
     what = f" ({e['what']})" if e.get("what") else ""
-    gold = (e.get("gold") or "").replace('"', "'")
+    # targeted seen-term definitions carry no reference: the passage is the reference
+    gold = (e.get("gold") or "none given; judge against the passage").replace('"', "'")
     lines = []
     for rid, tag, _, w, title, desc in items:
         weight = f" (weight {w})" if w else ""
@@ -496,6 +498,9 @@ def verify(e: dict) -> dict:
             # case and the final period don't count; the record carries ABSTAIN_REPLY itself
             same = a.strip().rstrip(".").lower() == ABSTAIN_REPLY.rstrip(".").lower()
             out["exact_sentence"] = (same, "format")
+        # the hard rule: no passage states the gold, even partly (sft_common.gold_present)
+        held = any(gold_present(e["gold"] or "", p["text"]) for p in e["passages"])
+        out["gold_absent"] = (not held, "factual")
     elif fmt == "grounded":
         out["citations"] = (citations_valid(a, {p["label"] for p in e["passages"]}), "format")
         out["answered"] = ("not in the provided passages" not in a.lower(), "factual")

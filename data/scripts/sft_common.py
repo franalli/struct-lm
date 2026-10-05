@@ -17,6 +17,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -44,6 +45,21 @@ BASE = "mistralai/Ministral-3-8B-Base-2512"  # its Tekken tokenizer counts token
 
 # The sentence GROUNDED_INSTRUCTIONS asks for; scorers.abstained matches it lowercased.
 ABSTAIN_REPLY = "Not in the provided passages."
+
+# Full-passage reads (sft_audit.py read-packets / read-merge): one verdict per record, with the
+# fingerprint of what was read, so a record regenerated under the same id is read again.
+READS = SFT / "read_filter.jsonl"
+# Documents whose records were regenerated after a metadata fix: none of their records is built
+# from a read made before it (fema-p-2355 is FEMA P-2335 on its own cover; sources.csv said P-2355
+# until 2026-10-05).
+REGENERATED_DOCS = {"fema-p-2355"}
+
+
+def fingerprint(e: dict) -> str:
+    """What a read verdict vouches for: the question (or term), the answer and the passages shown."""
+    passages = [p["chunk_id"] for p in e.get("passages") or []]
+    payload = json.dumps([e.get("question"), e.get("term"), e.get("answer"), passages])
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 # ------------------------------------------------------------------ files ---
@@ -116,6 +132,38 @@ def quotas(weights: dict[str, int], n: int) -> dict[str, int]:
     return q
 
 
+STOPWORDS = {
+    "a", "an", "the", "of", "to", "in", "on", "for", "and", "or", "with", "by", "as", "at",
+    "from", "is", "are", "be", "was", "were", "that", "this", "which", "what", "when", "how",
+    "why", "where", "who", "does", "do", "it", "its", "into", "than", "then", "there", "their",
+    "these", "those", "per", "under", "over", "not", "no", "can", "may", "shall", "should",
+    "must",
+}  # fmt: skip
+
+
+def content_words(text: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", text.lower()) if w not in STOPWORDS]
+
+
+def gold_present(gold: str, text: str) -> bool:
+    """Whether a passage states the gold answer, even partly: the hard rule for abstain items.
+    A short gold (6 words or fewer) counts as present when its words appear together in the passage,
+    or any of its numbers with two or more significant characters ("50", "0.75") does, by value; a
+    longer gold (a procedure's gist) when 60% of its content words do."""
+    norm = lambda t: " ".join(re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", t.lower().replace(",", "")))
+    g, t = norm(gold), norm(text)
+    if not g:
+        return False
+    if len(g.split()) <= 6:
+        if f" {g} " in f" {t} ":
+            return True
+        values = {float(n) for n in re.findall(r"\d+(?:\.\d+)?", t)}
+        nums = [n for n in re.findall(r"\d+(?:\.\d+)?", g) if len(n.replace(".", "")) >= 2]
+        return any(float(n) in values for n in nums)
+    words = set(content_words(gold))
+    return bool(words) and len(words & set(content_words(text))) / len(words) >= 0.6
+
+
 def teacher_for(key: str) -> str:
     return SECOND_TEACHER if h01(f"sft-teacher:{key}") < SECOND_SHARE else TEACHER
 
@@ -169,13 +217,19 @@ def set_rpm(rpm: float) -> None:
 
 
 def _load_cache() -> dict[str, dict]:
+    """The cache, loaded once under the lock: pmap's workers make their first call together, and an
+    unlocked load gave each its own dict, so they re-asked prompts another had just answered (33
+    keys were written twice, with different outputs, by 2026-10-05). The first answer for a key
+    wins, so a cached prompt always returns the same output."""
     global _cache
-    if _cache is None:
-        _cache = {}
-        if CACHE_PATH.exists():
-            for line in CACHE_PATH.open():
-                rec = json.loads(line)
-                _cache[rec["key"]] = rec["out"]
+    with _cache_lock:
+        if _cache is None:
+            cache: dict[str, dict] = {}
+            if CACHE_PATH.exists():
+                for line in CACHE_PATH.open():
+                    rec = json.loads(line)
+                    cache.setdefault(rec["key"], rec["out"])
+            _cache = cache
     return _cache
 
 
@@ -225,6 +279,8 @@ def llm_json(
         return {}
     rec = {"key": key, "step": step, "model": model, "temperature": temperature}
     with _cache_lock:
+        if key in cache:  # another worker answered the same prompt meanwhile: keep the first
+            return cache[key]
         cache[key] = out
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with CACHE_PATH.open("a") as f:

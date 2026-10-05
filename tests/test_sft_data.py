@@ -154,17 +154,19 @@ def test_tokens(records):
 
 
 @HAVE
-def test_closed_book_filtered(records):
-    """Every closed-book record was read against its passage (sft_audit.py filter-merge) and none
-    the reader called a defect is in the set."""
+def test_reads(records):
+    """Every closed-book record, definition and grounded answer was read against its passage
+    (sft_audit.py read-merge), none the read called a defect is in the set, and the build left
+    nothing unread."""
     verdicts = {}
-    for line in (SFT / "closed_book_filter.jsonl").open():
+    for line in (SFT / "read_filter.jsonl").open():
         v = json.loads(line)
         verdicts[v["eid"]] = v["verdict"]
     for r in records:
-        if r["format"] == "closed_book":
+        if r["format"] in ("closed_book", "definition", "grounded"):
             assert verdicts.get(r["eid"]) in ("ok", "minor"), r["eid"]
     assert not [r["eid"] for r in records if r["kind"] == "multi_step"]
+    assert json.loads((SFT / "stats.json").read_text())["assemble"]["unread"] == 0
 
 
 def test_generators_never_read_eval():
