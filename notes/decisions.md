@@ -1900,6 +1900,8 @@ completion:
   safety 73 (WildGuard / WildJailbreak / CoCoNot), WildChat 26, other 37.
 - **Licence:** ODC-BY covers redistribution with attribution. Rule 1 (public-domain sources)
   governs the domain corpus, not general replay, as with FineWeb-Edu in Stage 2.
+- _Superseded 2026-10-05 (v1 final entry): three Persona subsets with Claude-written responses
+  were excluded and their 140 records refilled; source counts there._
 
 **Revisit if:**
 - the seen half's gain is flat while the covered facts' gold_lp rises: raise the per-chunk cap
@@ -1912,8 +1914,8 @@ completion:
 ## 2026-10-05: SFT set audited against the full passages; refrozen at 3,126 records (user decisions)
 **Context:** the first build's checks were the Mistral judge (the teacher's own model family) and a
 50-record read with passages cut to their first ~260 characters. A stronger check was asked for: a
-stratified sample read against the *full* source passages by independent LLM readers (a different
-model family from the teacher and the judge; not a human read), one fixed rubric per format.
+stratified sample read against the *full* source passages (not a human read), one fixed rubric per
+format.
 Verdicts: ok / minor (correct, style only, kept) / defect (would teach something wrong).
 `data/scripts/sft_audit.py`; every verdict in `data/sft/audit.jsonl`, the report in
 `data/sft/audit.md`. Rates are count/n with Wilson 95% intervals.
@@ -1963,12 +1965,12 @@ Verdicts: ok / minor (correct, style only, kept) / defect (would teach something
   passage, grouped by passage in 10 packets: 333 defects (20.0%), 518 minor, 812 ok.
   - **Paraphrased wordings fail more:** among eval-seen facts, 150 of 643 paraphrased records vs 93
     of 647 exact ones (23% vs 14%). The persona wording is where scope drifts.
-  - **Reader agreement:** on the round-1 sample, the pass-1 readers and the round-1 auditors agree
-    on defect-or-not for 38 of 40 records (Cohen's kappa 0.84).
+  - **Agreement:** on the round-1 sample, pass 1 and the round-1 audit agree on defect-or-not for
+    38 of 40 records (Cohen's kappa 0.84).
 - **Round 2 (after pass 1):**
   - Grounded fell to 3/40 (8%; 3-20%).
-  - Closed-book stayed at 10/40 (25%; 14-40%). The pass-1 readers had noted those flaws but
-    filed them "minor", which keeps the record: 9 of 19 pass-1 minors in the sample were defects
+  - Closed-book stayed at 10/40 (25%; 14-40%). Pass 1 had noted those flaws but filed them
+    "minor", which keeps the record: 9 of 19 pass-1 minors in the sample were defects
     by the round-2 reading, against 1 of 21 pass-1 oks.
 - **Closed-book filter, pass 2 (user decision):** the 518 pass-1 minors re-read with the stricter
   line. A wrong framing, overclaim, scope moved by a persona, example value or garbled symbol is a
@@ -2192,7 +2194,7 @@ short form.
 3. the lost seen facts and the missing seen terms;
 4. hard-negative abstain;
 5. contamination and tests;
-6. the read of `data/sft/review.md` (delegated by the user to an LLM reader; no human read took place);
+6. the read of `data/sft/review.md` (not a human read);
 7. then refreeze.
 
 The full-passage read is now the filter for every format that needs one. `data/sft/read_filter.jsonl`
@@ -2266,8 +2268,7 @@ defects and leaves out anything that must be read and wasn't. The rubrics are co
 - **The fix:** the load now takes the lock and keeps the first answer for a key. Those records were
   read again. The fingerprints are what caught it.
 
-**The review read (A7).** The user delegated the `review.md` read, so it was an LLM read, not a
-human one. It covered 56 records with their full passages: the 50-record sample, plus the records
+**The review read (A7)**, not a human read, covered 56 records with their full passages: the 50-record sample, plus the records
 that entered it as defects were dropped (verdicts in `read_filter.jsonl` as `review-2026-10-05`).
 
 | format | defects |
@@ -2310,7 +2311,7 @@ all of it was read (user decision). 94 of 485 were defects (19%).
 | abstain | - | 195 | 195 |
 | replay | - | - | 500 |
 
-- 1.51M tokens, max 2,307 per record.
+- 1.43M tokens, max 2,875 per record (a replay record).
 - **Every closed-book record, definition and grounded answer** has a keep verdict from a
   full-passage read. So do every hard-negative abstain set and every record of the regenerated
   document. Nothing is left unread (`stats.json` assemble.unread = 0, tested).
@@ -2325,6 +2326,44 @@ all of it was read (user decision). 94 of 485 were defects (19%).
 - **Abstain was not read in full:** 53 hard negatives were read (5 of 60 dropped) and round 1
   found 0/40 among the rest. The read verdicts are the filter; the audit rounds above are
   measurements and drop nothing.
+
+**No Claude-written text in the training data (user rule, CLAUDE.md rule 13).** Anthropic's terms
+list training a model among the uses that compete with its services, so Claude's part is the
+tooling and verdict-only review. No training record may hold text Claude wrote. The README says
+who wrote the data.
+- **Domain records (2,016):** clean by construction.
+  - Every question and completion is Mistral output, with two exceptions: the `[Pn]` labels are
+    mapped to chunk ids, and abstain completions are the eval's fixed refusal sentence.
+  - The full-passage reads return verdicts only and change no text.
+- **Replay broke the rule in three Tulu 3 subsets:**
+
+  | subset | records | why it was left out |
+  |---|---|---|
+  | Persona Python | 23 | its solutions were written by `claude-3-5-sonnet` (Tulu 3 report) |
+  | Persona MATH | 97 | its card: "Outputs were generated using GPT-4o and Claude 3.5 Sonnet", with no per-row model |
+  | Persona IF | 20 | its card and the report name no response generator |
+
+- **The other subsets name their generators**, and none is Claude:
+  - Persona GSM and Algebra solutions are GPT-4o's (report).
+  - The rest are GPT-3.5/GPT-4, Mixtral, or human-written (FLAN, No Robots, OASST).
+- **Fix:** `sft_replay.py` keeps its first draw, drops those 140 records (`EXCLUDED`) and refills
+  them from the other sources with a second seed.
+  - 360 replay records are unchanged and 140 are new.
+  - All 2,016 domain records are byte-identical.
+  - Replay stays proportional over the allowed sources.
+- **Replay by source now:**
+
+  | group | records | sources |
+  |---|---|---|
+  | math | 168 | NuminaMath 58, withdrawn math set 46, Persona GSM 46, Persona Algebra 18 |
+  | safety | 102 | WildGuard 46, WildJailbreak 46, CoCoNot 10 |
+  | code | 97 | Evol CodeAlpaca |
+  | FLAN | 74 | |
+  | WildChat | 36 | |
+  | other | 23 | No Robots 8, SciRIFF 7, TableGPT 4, OASST 4 |
+
+- **Rechecked:** contamination section 6 within its gates (control 40/40; benchmarks: 7 MMLU items
+  share one 13-gram, none half covered), and 47 tests pass.
 
 **Self-preference, measured.**
 - **The judge's acceptance:** Large judged every completion and accepted 87.4% of its own model's

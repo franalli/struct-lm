@@ -114,25 +114,28 @@
     "license": "ODC-BY-1.0",
     "rows": 939343,
     "eligible": 754635,
+    "excluded_sources": {
+      "ai2-adapt-dev/personahub_code_v2_34999": 34989,
+      "ai2-adapt-dev/personahub_ifdata_manual_seed_v3_29980": 29308,
+      "ai2-adapt-dev/personahub_math_v5_regen_149960": 146811
+    },
+    "refilled": 140,
     "sampled": 500,
     "by_source": {
-      "ai2-adapt-dev/personahub_math_v5_regen_149960": 97,
-      "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": 70,
-      "ai2-adapt-dev/flan_v2_converted": 53,
-      "ai2-adapt-dev/numinamath_tir_math_decontaminated": 42,
-      "withdrawn": 33,
-      "ai2-adapt-dev/tulu_v3.9_synthetic_finalresp_wildguardmixtrain_decontaminated_50k": 33,
-      "ai2-adapt-dev/tulu_v3.9_wildjailbreak_decontaminated_50k": 33,
-      "allenai/tulu-3-sft-personas-math-grade": 33,
-      "ai2-adapt-dev/tulu_v3.9_wildchat_100k": 26,
-      "ai2-adapt-dev/personahub_code_v2_34999": 23,
-      "ai2-adapt-dev/personahub_ifdata_manual_seed_v3_29980": 20,
-      "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k": 13,
-      "ai2-adapt-dev/coconot_converted": 7,
-      "ai2-adapt-dev/no_robots_converted": 6,
-      "ai2-adapt-dev/tulu_v3.9_sciriff_10k": 5,
-      "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": 3,
-      "ai2-adapt-dev/oasst1_converted": 3
+      "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": 97,
+      "ai2-adapt-dev/flan_v2_converted": 74,
+      "ai2-adapt-dev/numinamath_tir_math_decontaminated": 58,
+      "withdrawn": 46,
+      "ai2-adapt-dev/tulu_v3.9_synthetic_finalresp_wildguardmixtrain_decontaminated_50k": 46,
+      "ai2-adapt-dev/tulu_v3.9_wildjailbreak_decontaminated_50k": 46,
+      "allenai/tulu-3-sft-personas-math-grade": 46,
+      "ai2-adapt-dev/tulu_v3.9_wildchat_100k": 36,
+      "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k": 18,
+      "ai2-adapt-dev/coconot_converted": 10,
+      "ai2-adapt-dev/no_robots_converted": 8,
+      "ai2-adapt-dev/tulu_v3.9_sciriff_10k": 7,
+      "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": 4,
+      "ai2-adapt-dev/oasst1_converted": 4
     }
   },
   "answers": {
@@ -295,9 +298,9 @@
       "vocab": "89/101"
     },
     "tokens": {
-      "max": 2307,
-      "median": 216,
-      "total": 1512031
+      "max": 2875,
+      "median": 215,
+      "total": 1434013
     },
     "unread": 0,
     "reads_used": {
@@ -332,8 +335,8 @@
     },
     "review": 50,
     "sha256": {
-      "train.jsonl": "62830ac731007a5d23d1374ad3015a3eb9a16ee9d6c01be15dbadaf508204429",
-      "sft_val.jsonl": "1f1de2dac2f2aaaee62a5202e83cb904ec6393875e8aaadabb63ff70d221aaa8"
+      "train.jsonl": "49b216d438973fdba0c97b6dcccd1aaec82003c07415fde18e516febcac34876",
+      "sft_val.jsonl": "8b210969c62751463cd8861b5cd7e412463b5d6024f422fdc7af0d64e11cb585"
     }
   }
 }

@@ -1,6 +1,6 @@
 # SFT set: full-passage audit
 
-Records read against their full source passage(s) by an independent LLM reader (a different model family from the teacher and the judge; not a human read): `data/scripts/sft_audit.py`, verdicts in `data/sft/audit.jsonl`. Rates are count/n (share; Wilson 95% interval).
+Records read against their full source passage(s) (not a human read): `data/scripts/sft_audit.py`, verdicts in `data/sft/audit.jsonl`. Rates are count/n (share; Wilson 95% interval).
 
 ## Round 1
 

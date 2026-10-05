@@ -125,6 +125,13 @@ sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ─�
 | DPO  | `train/dpo.py`  | `data/dpo/{train,val}.jsonl` `{"prompt","chosen","rejected"}` | preference pairs |
 | GRPO | `train/grpo.py` | `data/grpo/train.jsonl` `{"prompt","answer"}` | verifiable reward functions |
 
+**Who wrote the training data.** The SFT questions and completions were written by Mistral Large 3
+(`mistral-large-2512`) and Mistral Medium 3.5 (`mistral-medium-2604`, 25% of completions), apart from
+the abstain records' fixed refusal sentence, and the 500 general replay records come from the Tülu 3
+SFT mixture without its Claude-written subsets. Claude, through Claude Code, built the tooling and
+reviewed the generated records against their source passages with keep/drop verdicts only: no
+training record contains text Claude wrote.
+
 Each stage trains a LoRA adapter; `train/merge.py` folds it into the weights, and the next
 stage's `model.init_from` points at the merged directory.
 

@@ -230,7 +230,7 @@ make sft-data                               # all steps below, in order
 .venv/bin/python eval/contamination.py --only sft # section 6 of results/contamination.md
 # quality: full-passage reads of the generated records (packets in data/sft/work/)
 .venv/bin/python data/scripts/sft_audit.py read-packets LABEL # records assembly left unread -> packets
-#   one reader per packet applies data/sft/read_rubrics.md -> work/read_verdicts_<packet>.jsonl
+#   each packet is read with data/sft/read_rubrics.md -> work/read_verdicts_<packet>.jsonl
 .venv/bin/python data/scripts/sft_audit.py read-merge         # -> data/sft/read_filter.jsonl; rerun sft_assemble
 .venv/bin/python data/scripts/sft_audit.py sample [N]         # audit round N sample -> report -> data/sft/audit.md
 ```
@@ -241,12 +241,12 @@ make sft-data                               # all steps below, in order
   assignments): run it through A2-A5 and read the outputs before a full run.
 - After any change to a step, rerun from that step, then `sft_assemble.py`, the contamination
   section and `pytest tests/test_sft_data.py`; a changed `train.jsonl` changes `SHA256SUMS` and
-  needs the hand-read in `review.md` redone.
+  needs the `review.md` read redone.
 - The Mistral judge passes defects a full-passage read catches (audit 2026-10-05: 18% of judged-kept
   records), so every closed-book record, definition and grounded answer, every hard-negative abstain
   set and every record of a document in `sft_common.REGENERATED_DOCS` must be read. A verdict holds for the
   content it read (`fingerprint`); `sft_assemble.py` leaves the rest out and lists them in
-  `work/unread.jsonl`. Loop: assemble -> `read-packets` -> readers -> `read-merge` -> assemble, until
+  `work/unread.jsonl`. Loop: assemble -> `read-packets` -> read -> `read-merge` -> assemble, until
   `stats.json` assemble.unread is 0 (`tests/test_sft_data.py` checks it). The line that matters in
   the rubric: a wrong framing, overclaim, scope or example value is a defect even when the answer
   value is right. Then re-audit a fresh sample (`sample N` names the round).
@@ -325,6 +325,11 @@ make sft-data                               # all steps below, in order
 12. **Checkpoints:** no checkpoint with a row in a results table is deleted until that stage's
     write-up is frozen, and adapters (`checkpoints/_train/<run>`) are never deleted; merged LoRA
     checkpoints are reproducible from them, full-parameter ones are not.
+13. **No Claude-written text in training data** (SFT, DPO chosen and rejected, GRPO): every
+    completion comes from the Mistral teachers, a fixed string, or a replay source whose card and
+    paper name a generator that isn't Claude (`sft_replay.EXCLUDED` drops three Tulu 3 Persona
+    subsets). Claude builds the tooling and reviews records with verdicts only, never by rewriting
+    one. The README's "Who wrote the training data" line states the roles.
 
 ## Known gaps
 

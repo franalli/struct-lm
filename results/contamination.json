@@ -6069,16 +6069,16 @@
    "items": 80,
    "checkable": 80,
    "train": {
-    "any": 33,
+    "any": 34,
     "ge50": 0,
     "ge80": 0,
-    "mean_token_frac": 0.10472121278231021
+    "mean_token_frac": 0.10960360737954174
    },
    "either": {
-    "any": 33,
+    "any": 34,
     "ge50": 0,
     "ge80": 0,
-    "mean_token_frac": 0.10472121278231021
+    "mean_token_frac": 0.10960360737954174
    },
    "examples": [
     {
@@ -6091,7 +6091,7 @@
      "text": "Which document provides the Detailed Evaluation form for post-disaster building safety assessments mentioned in FEMA P-2055?\nATC-20-1 and ATC-45"
     },
     {
-     "item": 7,
+     "item": 9,
      "token_frac": 0.41935483870967744,
      "found_in": [
       "train"
@@ -6100,7 +6100,7 @@
      "text": "What are the two common shapes of anchor plates used for post-tensioning bar tendons in highway bridge superstructures?\nNot in the provided passages."
     },
     {
-     "item": 31,
+     "item": 33,
      "token_frac": 0.4117647058823529,
      "found_in": [
       "train"
@@ -6118,13 +6118,13 @@
      "any": 7,
      "ge50": 0,
      "ge80": 0,
-     "mean_token_frac": 7.174892193552322e-05
+     "mean_token_frac": 7.74396238447574e-05
     },
     "either": {
      "any": 7,
      "ge50": 0,
      "ge80": 0,
-     "mean_token_frac": 7.174892193552322e-05
+     "mean_token_frac": 7.74396238447574e-05
     },
     "examples": [
      {
@@ -6138,21 +6138,21 @@
      },
      {
       "item": 2408,
-      "token_frac": 0.23809523809523808,
+      "token_frac": 0.25396825396825395,
       "found_in": [
        "sft"
       ],
-      "longest_span": "1, 2, 3, 4, 5, ",
+      "longest_span": "1, 2, 3, 4, 5, 6",
       "text": "Mr. Jones rolls a six-sided cube numbered 1, 2, 3, 4, 5, 6. What is the probability he rolls a three?\nA. 6-Jan\nB. 5-Jan\nC. 3-Jan\nD. 2-Jan"
      },
      {
-      "item": 4412,
-      "token_frac": 0.13725490196078433,
+      "item": 4385,
+      "token_frac": 0.18055555555555555,
       "found_in": [
        "sft"
       ],
-      "longest_span": "1^2 + 2^2 + 3^2 +",
-      "text": "The sum $1^2 + 2^2 + 3^2 + 4^2 + \\cdots + n^2 = n(n+1)(2n+1) \\div 6$. What is the value of $21^2 + 22^2 + \\cdots + 40^2$?\nA. 41\nB. 22140\nC. 19270\nD. 2870"
+      "longest_span": "2, 3, 4, 5, 6",
+      "text": "If an integer ends in the digit $0$ and the sum of its digits is divisible by $3$, then how many of the numbers $2, 3, 4, 5, 6, 8, 9$ necessarily divide it?\nA. 1\nB. 2\nC. 3\nD. 4"
      }
     ]
    },

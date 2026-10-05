@@ -150,7 +150,7 @@ Exact reuse (normalised text):
 | vocab seen | 101 | 89 |
 | vocab unseen | 109 | 0 |
 
-sft_val (80 records, question + completion) vs train: 33 share any 13-gram, 0 have >= 50% of their tokens covered, 0 >= 80%.
+sft_val (80 records, question + completion) vs train: 34 share any 13-gram, 0 have >= 50% of their tokens covered, 0 >= 80%.
 
 | benchmark | items | any 13-gram | >= 50% | >= 80% |
 |---|---|---|---|---|
