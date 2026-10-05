@@ -122,3 +122,38 @@ The 325 scored items against each other: 0 exact duplicate questions; 608 pairs 
 - qa-1024 / qa-1025 (30%): "What is the near-fault distance threshold for faults capable of generating magnitude-7.25 earthquakes in NIST GCR 11-917-15?" / "What is the near-fault distance threshold for faults capable of generating magnitude-8 earthquakes in NIST GCR 11-917-15?"
 - qa-0551 / qa-1039 (29%): "How often should downhole video inspections of relief wells be performed according to USACE EM 1110-2-1914?" / "What is the typical length of auger flights for larger drill rigs according to USACE EM 1110-2-1914?"
 - qa-0557 / qa-1031 (29%): "Which USACE EM document provides detailed design guidance for pile foundations?" / "Which USACE Engineer Manual governs the design of dams on pile foundations?"
+
+## 6. SFT data (Stage 3) vs the eval and the benchmarks
+
+`data/sft/train.jsonl` (3,601 records; prompt + completion) as the reference. Chunk ids from eval_chunk_ids.txt outside the seen half: 0 (rule 10). Positive control: of 40 planted items (20 unseen domain_qa, 20 MMLU), 40 are found with >= 80% of their tokens covered.
+
+| eval items | items | checkable (>= 13 tokens) | any 13-gram | >= 50% | >= 80% | mean token share |
+|---|---|---|---|---|---|---|
+| domain_qa seen: questions | 167 | 166 | 83 | 23 | 3 | 23.0% |
+| domain_qa seen: answers | 167 | 5 | 4 | 4 | 4 | 2.4% |
+| vocab seen: definitions | 101 | 100 | 3 | 1 | 0 | 1.4% |
+| domain_qa unseen: questions | 158 | 158 | 59 | 9 | 0 | 16.0% |
+| domain_qa unseen: answers | 158 | 10 | 3 | 3 | 3 | 1.9% |
+| vocab unseen: definitions | 109 | 109 | 0 | 0 | 0 | 0.0% |
+| grounded: questions | 108 | 108 | 4 | 2 | 0 | 1.7% |
+| adversarial: questions | 76 | 76 | 1 | 0 | 0 | 0.6% |
+
+Exact reuse (normalised text):
+
+| eval half | items | question inside an SFT prompt | answer = an SFT closed-book answer, same document |
+|---|---|---|---|
+| domain_qa seen | 167 | 0 | 89 |
+| domain_qa unseen | 158 | 0 | 4 |
+
+| eval half | items | term defined in SFT |
+|---|---|---|
+| vocab seen | 101 | 51 |
+| vocab unseen | 109 | 0 |
+
+sft_val (114 records, question + completion) vs train: 49 share any 13-gram, 1 have >= 50% of their tokens covered, 0 >= 80%.
+
+| benchmark | items | any 13-gram | >= 50% | >= 80% |
+|---|---|---|---|---|
+| MMLU (test) | 14042 | 7 | 0 | 0 |
+| GSM8K (test) | 1319 | 2 | 0 | 0 |
+| HellaSwag (val) | 10042 | 0 | 0 | 0 |

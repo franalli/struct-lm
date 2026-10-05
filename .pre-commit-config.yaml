@@ -18,7 +18,8 @@ repos:
         args: [--maxkb=1024]
         # generations are committed on purpose (anyone can `run_eval.py --rescore`, see .gitignore);
         # each run's is ~1.4 MB of prompts and outputs
-        exclude: ^(uv\.lock|results/runs/[^/]+/generations\.jsonl)$
+        # the frozen SFT set (data/sft/SHA256SUMS) is a few MB of passages and completions
+        exclude: ^(uv\.lock|results/runs/[^/]+/generations\.jsonl|data/sft/[^/]+\.jsonl)$
       - id: detect-private-key
       - id: forbid-new-submodules
 

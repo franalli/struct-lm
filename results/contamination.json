@@ -5724,5 +5724,496 @@
     "b_question": "In USACE EM 1110-2-2602, what percentage of the difference between headwater and tailwater is added to tailwater at the high-water face for internal hydrostatic pore pressure in a lock wall?"
    }
   ]
+ },
+ "sft": {
+  "train": 3601,
+  "val": 114,
+  "leaked_chunks": [],
+  "eval": {
+   "domain_qa seen: questions": {
+    "items": 167,
+    "checkable": 166,
+    "sft": {
+     "any": 83,
+     "ge50": 23,
+     "ge80": 3,
+     "mean_token_frac": 0.22987427633761673
+    },
+    "either": {
+     "any": 83,
+     "ge50": 23,
+     "ge80": 3,
+     "mean_token_frac": 0.22987427633761673
+    },
+    "examples": [
+     {
+      "item": 94,
+      "token_frac": 0.8571428571428571,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "In NASA-STD-5020B, what is the maximum coefficient of friction",
+      "text": "In NASA-STD-5020B, what is the maximum coefficient of friction for uncoated, non-lubricated metal surfaces cleaned by a qualified process in joint-slip analysis?"
+     },
+     {
+      "item": 152,
+      "token_frac": 0.8235294117647058,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " USACE EM 1110-2-3401",
+      "text": "What is the maximum continuous work period for surface preparation, thermal spray application, and sealing per USACE EM 1110-2-3401?"
+     },
+     {
+      "item": 137,
+      "token_frac": 0.8,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " aspect ratio for cold-formed steel shear walls sheathed with wood structural panels",
+      "text": "What is the maximum aspect ratio for cold-formed steel shear walls sheathed with wood structural panels per NIST GCR 16-917-38?"
+     }
+    ]
+   },
+   "domain_qa seen: answers": {
+    "items": 167,
+    "checkable": 5,
+    "sft": {
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.023952095808383235
+    },
+    "either": {
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.023952095808383235
+    },
+    "examples": [
+     {
+      "item": 14,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "EM 1110-2-1602",
+      "text": "EM 1110-2-1602"
+     },
+     {
+      "item": 97,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "EM 1110-2-4300",
+      "text": "EM 1110-2-4300"
+     },
+     {
+      "item": 110,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "ER 1110-2-1458",
+      "text": "ER 1110-2-1458"
+     }
+    ]
+   },
+   "vocab seen: definitions": {
+    "items": 101,
+    "checkable": 100,
+    "sft": {
+     "any": 3,
+     "ge50": 1,
+     "ge80": 0,
+     "mean_token_frac": 0.014207351769659723
+    },
+    "either": {
+     "any": 3,
+     "ge50": 1,
+     "ge80": 0,
+     "mean_token_frac": 0.014207351769659723
+    },
+    "examples": [
+     {
+      "item": 49,
+      "token_frac": 0.52,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " connected to the bridge superstructure, eliminating the need for expansion joints",
+      "text": "Abutments that are rigidly connected to the bridge superstructure, eliminating the need for expansion joints at the bridge ends."
+     },
+     {
+      "item": 95,
+      "token_frac": 0.4666666666666667,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " rest against a girder and sill, held in place by water pressure",
+      "text": "A dam composed of narrow vertical or inclined shutters (needles) that rest against a girder and sill, held in place by water pressure."
+     },
+     {
+      "item": 38,
+      "token_frac": 0.4482758620689655,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "Short wood-framed walls between the foundation and the first floor",
+      "text": "Short wood-framed walls between the foundation and the first floor of a building, often requiring specific bracing or reinforcement in seismic design categories."
+     }
+    ]
+   },
+   "domain_qa unseen: questions": {
+    "items": 158,
+    "checkable": 158,
+    "sft": {
+     "any": 59,
+     "ge50": 9,
+     "ge80": 0,
+     "mean_token_frac": 0.15994318448235365
+    },
+    "either": {
+     "any": 59,
+     "ge50": 9,
+     "ge80": 0,
+     "mean_token_frac": 0.15994318448235365
+    },
+    "examples": [
+     {
+      "item": 28,
+      "token_frac": 0.6410256410256411,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " a brace in a steel concentrically braced frame per NIST GCR 17-917-45",
+      "text": "What is the initial out-of-plane imperfection at mid-span of a brace in a steel concentrically braced frame per NIST GCR 17-917-45?"
+     },
+     {
+      "item": 140,
+      "token_frac": 0.6071428571428571,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " in AASHTO LRFD Article 6.5.4.2",
+      "text": "What is the resistance factor for bolts bearing on material in AASHTO LRFD Article 6.5.4.2?"
+     },
+     {
+      "item": 0,
+      "token_frac": 0.6,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " AASHTO LRFD-8 Bridge Design Specifications (2017",
+      "text": "What is the minimum width requirement for temporary panel support in AASHTO LRFD-8 Bridge Design Specifications (2017)?"
+     }
+    ]
+   },
+   "domain_qa unseen: answers": {
+    "items": 158,
+    "checkable": 10,
+    "sft": {
+     "any": 3,
+     "ge50": 3,
+     "ge80": 3,
+     "mean_token_frac": 0.018535262206148283
+    },
+    "either": {
+     "any": 3,
+     "ge50": 3,
+     "ge80": 3,
+     "mean_token_frac": 0.018535262206148283
+    },
+    "examples": [
+     {
+      "item": 92,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "EM 1110-2-1615",
+      "text": "EM 1110-2-1615"
+     },
+     {
+      "item": 97,
+      "token_frac": 1.0,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "ER 1110-2-1806",
+      "text": "ER 1110-2-1806"
+     },
+     {
+      "item": 129,
+      "token_frac": 0.9285714285714286,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "IST GCR 14-917-27",
+      "text": "NIST GCR 14-917-27"
+     }
+    ]
+   },
+   "vocab unseen: definitions": {
+    "items": 109,
+    "checkable": 109,
+    "sft": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   },
+   "grounded: questions": {
+    "items": 108,
+    "checkable": 108,
+    "sft": {
+     "any": 4,
+     "ge50": 2,
+     "ge80": 0,
+     "mean_token_frac": 0.01684410456340281
+    },
+    "either": {
+     "any": 4,
+     "ge50": 2,
+     "ge80": 0,
+     "mean_token_frac": 0.01684410456340281
+    },
+    "examples": [
+     {
+      "item": 72,
+      "token_frac": 0.5384615384615384,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " ASCE 7-10 and ASCE 7-16",
+      "text": "What is the rationale for requiring liquefaction evaluation to be performed using the Maximum Considered Earthquake (MCE) ground motion instead of the design earthquake ground motion in ASCE 7-10 and ASCE 7-16?"
+     },
+     {
+      "item": 15,
+      "token_frac": 0.5,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " Buckling-Restrained Braced Frames (BRBFs)",
+      "text": "Why are Buckling-Restrained Braced Frames (BRBFs) selected for the lateral force-resisting system in this building?"
+     },
+     {
+      "item": 71,
+      "token_frac": 0.4473684210526316,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " in ASCE/SEI 7-16 Section 12.1",
+      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
+     }
+    ]
+   },
+   "adversarial: questions": {
+    "items": 76,
+    "checkable": 76,
+    "sft": {
+     "any": 1,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00641025641025641
+    },
+    "either": {
+     "any": 1,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00641025641025641
+    },
+    "examples": [
+     {
+      "item": 66,
+      "token_frac": 0.48717948717948717,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " the AASHTO LRFD (7th Edition, 2014)",
+      "text": "What is the maximum spacing between cross-frames that the AASHTO LRFD (7th Edition, 2014) permits for straight girder bridges under typical conditions?"
+     }
+    ]
+   }
+  },
+  "exact": {
+   "domain_qa seen": {
+    "items": 167,
+    "question_in_a_prompt": 0,
+    "answer_in_same_document": 89
+   },
+   "vocab seen": {
+    "items": 101,
+    "term_defined": 51
+   },
+   "domain_qa unseen": {
+    "items": 158,
+    "question_in_a_prompt": 0,
+    "answer_in_same_document": 4
+   },
+   "vocab unseen": {
+    "items": 109,
+    "term_defined": 0
+   }
+  },
+  "val_vs_train": {
+   "items": 114,
+   "checkable": 114,
+   "train": {
+    "any": 49,
+    "ge50": 1,
+    "ge80": 0,
+    "mean_token_frac": 0.10371775950185914
+   },
+   "either": {
+    "any": 49,
+    "ge50": 1,
+    "ge80": 0,
+    "mean_token_frac": 0.10371775950185914
+   },
+   "examples": [
+    {
+     "item": 110,
+     "token_frac": 0.5,
+     "found_in": [
+      "train"
+     ],
+     "longest_span": " as stated in EM 1110-2-3800?\n",
+     "text": "What is the density ratio of carbon dioxide compared to air as stated in EM 1110-2-3800?\nNot in the provided passages."
+    },
+    {
+     "item": 51,
+     "token_frac": 0.4411764705882353,
+     "found_in": [
+      "train"
+     ],
+     "longest_span": " in EM 1110-2-1902?\n",
+     "text": "What is the recommended minimum number of independent methods for verifying slope stability analysis results in EM 1110-2-1902?\nmore than one method"
+    },
+    {
+     "item": 10,
+     "token_frac": 0.41935483870967744,
+     "found_in": [
+      "train"
+     ],
+     "longest_span": " in highway bridge superstructures?\nNot in the provided passages.",
+     "text": "What are the two common shapes of anchor plates used for post-tensioning bar tendons in highway bridge superstructures?\nNot in the provided passages."
+    }
+   ]
+  },
+  "benchmarks": {
+   "MMLU (test)": {
+    "items": 14042,
+    "checkable": 14042,
+    "sft": {
+     "any": 7,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 7.174892193552322e-05
+    },
+    "either": {
+     "any": 7,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 7.174892193552322e-05
+    },
+    "examples": [
+     {
+      "item": 3606,
+      "token_frac": 0.30612244897959184,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " in the 1960s and 1970s",
+      "text": "Which theory below was used as justification for US involvement in Vietnam in the 1960s and 1970s?\nA. Devolution\nB. Colonialism\nC. Heartland theory\nD. Containment theory"
+     },
+     {
+      "item": 2408,
+      "token_frac": 0.23809523809523808,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "1, 2, 3, 4, 5, ",
+      "text": "Mr. Jones rolls a six-sided cube numbered 1, 2, 3, 4, 5, 6. What is the probability he rolls a three?\nA. 6-Jan\nB. 5-Jan\nC. 3-Jan\nD. 2-Jan"
+     },
+     {
+      "item": 4412,
+      "token_frac": 0.13725490196078433,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": "1^2 + 2^2 + 3^2 +",
+      "text": "The sum $1^2 + 2^2 + 3^2 + 4^2 + \\cdots + n^2 = n(n+1)(2n+1) \\div 6$. What is the value of $21^2 + 22^2 + \\cdots + 40^2$?\nA. 41\nB. 22140\nC. 19270\nD. 2870"
+     }
+    ]
+   },
+   "GSM8K (test)": {
+    "items": 1319,
+    "checkable": 1319,
+    "sft": {
+     "any": 2,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 7.340254723571178e-05
+    },
+    "either": {
+     "any": 2,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 7.340254723571178e-05
+    },
+    "examples": [
+     {
+      "item": 1096,
+      "token_frac": 0.053691275167785234,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": ": 100% - 20% = 80%\n",
+      "text": "Question: Billy is volunteering his time to help people do their taxes. He can help 2 people per hour for 3 hours a day. If he takes 20% of the days between March 1st and April 19th off, and helps people on all the other days. How many people does he help? (Remember there are 31 days in March.)\nAnswer: First find the number of days between March 1st and April 19th: 31 days + 19 days = <<31+19=50>>50 days\nThen subtract the percentage of time Billy takes off from 100% to find the percentage of time he works: 100% - 20% = 80%\nThen multiply that number by 80% to find the number of days Billy works: 50 days * 80% = <<50*80*.01=40>>40 days\nThen find how many people Billy can help per day: 2 people/hour * 3 hours/day = <<2*3=6>>6 people/day\nThen multiply the number of people he helps per day by the number of days he works to find the total number of people he helps: 6 people/day * 40 days = <<6*40=240>>240 people\n#### 240"
+     },
+     {
+      "item": 1030,
+      "token_frac": 0.0431266846361186,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": ": 100% - 20% = 80%\n",
+      "text": "Question: Marcus is trying to decide whether he really needs to do his homework. There's a 50% chance that tomorrow he'll have a substitute teacher who won't collect the homework. Even if the normal teacher comes in, there's a 40% chance she'll give everyone an extension. Even if the whole class doesn't get an extension, there's a 20% chance Marcus can convince the teacher his dog ate his assignment and get a personal extension. What is the percentage chance that Marcus will actually have to turn in his homework tomorrow?\nAnswer: First find the chance that the normal teacher comes in by subtracting the odds she doesn't from 100%: 100% - 50% = 50%\nThen find the chance the teacher doesn't grant the whole class an extension by subtracting the chance she does from 100%: 100% - 40% = 60%\nThen find the chance that Marcus can't get a personal extension by subtracting the chance he does from 100%: 100% - 20% = 80%\nNow find the chance the teacher comes in AND doesn't grant the whole class an extension by multiplying the two independent probabilities: .6 * .5 = <<.6*.5=.3>>.3\nNow multiply that probability by the probability Marcus can't get a personal extension to find the probability he actually has to turn in his homework: .3 * .8 = <<.3*.8=.24>>.24\nFinally, multiply the decimal probability by 100 to express it as a percentage: .24 * 100% = <<.24*100=24>>24%\n#### 24"
+     }
+    ]
+   },
+   "HellaSwag (val)": {
+    "items": 10042,
+    "checkable": 10042,
+    "sft": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   }
+  },
+  "control": {
+   "planted": 40,
+   "found_ge80": 40,
+   "checkable": 40
+  }
  }
 }

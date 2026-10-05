@@ -1256,8 +1256,8 @@ matching, a first-number rule that skips values, and a chat model cut off by the
     `eval/tasks/sft_seen_chunks.txt`. That list comes from `eval/sft_split.py`: a source chunk is
     seen when the first byte of sha256("sft-seen:" + id) is even, so an item never changes half
     as tasks grow. Grounded/adversarial context chunks and few-shot chunks are never seen.
-  - The split is 65/65 QA items and 101/109 vocab items. Stage 3 SFT synthesis may draw on the
-    seen chunks only (rule 10).
+  - The split is 65/65 QA items and 101/109 vocab items (v1; on the v2 set of 325 it is 167/158,
+    vocab unchanged). Stage 3 SFT synthesis may draw on the seen chunks only (rule 10).
   - Before Stage 3 the halves are a null check. For example `base-8b-hf` scores 0.123 seen vs 0.169
     unseen: 8 vs 11 items of 65, inside the noise.
 - **Rescore guard.** `run_eval.py --rescore` refuses saved generations that miss items now in the
@@ -1698,3 +1698,208 @@ ways:
 
 **Revisit if:** the corpus or the replay slice changes (rerun the script). Before Stage 3, run the
 SFT/DPO data through the same check against every eval task (rule 10).
+
+## 2026-10-05: Stage 3 SFT set built and frozen: 3,715 records, seen half 135/167 facts (user decisions)
+**Context:** Stage 3 measures three things with the frozen v2 eval:
+- whether SFT teaches the facts it is shown (the seen half, `eval/tasks/sft_seen_chunks.txt`);
+- whether anything transfers (the unseen half);
+- whether CPT contributed (SFT from `cpt-8b-replay10` vs SFT from the base, both on this one set).
+
+This entry covers the data (Part A); training is Part B. The plan was A1-A7: chunk pool -> questions
+-> dedup / caps / decontamination -> teacher completions -> rubric filter -> assembly -> checks.
+The code is `data/scripts/sft_*.py` (`make sft-data`).
+
+**Result:** `data/sft/train.jsonl` 3,601 + `sft_val.jsonl` 114, checksums in `data/sft/SHA256SUMS`.
+
+| format | eval-seen chunks | ordinary chunks | total |
+|---|---|---|---|
+| closed-book (value / identifier / term) | 1,290 | 373 | 1,663 |
+| closed-book, worked problem (multi_step) | - | 80 | 80 |
+| definition | 722 | 50 | 772 |
+| grounded (4 passages, cited) | - | 500 | 500 |
+| abstain (4 passages, exact sentence) | - | 200 | 200 |
+| replay (Tulu 3 SFT mixture) | - | - | 500 |
+
+- **Wording:** each format is half the eval's exact instruction text (`prompts.qa_prompt` /
+  `vocab_prompt` / `grounded_prompt`, the few-shot header included) and half paraphrased with a
+  persona's question (closed-book 838 / 825, definition 374 / 398, grounded 250 / 250, abstain
+  100 / 100).
+- **Teachers:** Mistral Large 3 (`mistral-large-2512`) 2,459 completions, Mistral Medium 3.5 756.
+  Medium is pinned to `mistral-medium-2604`, the dated id behind `mistral-medium-latest` /
+  `-3.5` in the API's model list on 2026-10-04.
+- **Tokens:** max 2,307 per record (mistral-common chat rendering, no system prompt), median 205,
+  1.81M in total.
+- **API:** 9,421 calls (pilot included) at 30 a minute: questions 1,111, answers 3,103, paraphrases
+  370, problems 201, judge 4,423, revise 213.
+
+**Seen half: guaranteed per chunk, measured per fact.** All 197 seen chunks are in the set. The
+generator never saw which facts the eval asks about. The assembler tags `fact_seen` when an
+answer matches a seen item on its own chunk, scored the eval's way.
+- **domain_qa: 135 of 167 seen items** have at least one matching record.
+- **vocab: 51 of 101.**
+- **Report Stage 3 knowledge gains per half (rule 7)**, and, within the seen half, covered vs
+  not-covered facts: the 32 + 50 not covered are "chunk seen, fact not shown".
+
+**Interpretations of the plan, decided while building:**
+- **Allowed chunks (rule 10, `sft_guard.py`):**
+  - the seen half, plus free chunks outside `eval_chunk_ids.txt` that hash to seen
+    (`sft_split.is_seen`, the plan's "seen-hash chunks");
+  - minus a buffer: every chunk on the page of, or a page next to, an unseen-half source chunk
+    (domain_qa / vocab unseen, held_back, locators, few-shot). Of the 215 unseen and held-back
+    source chunks, 129 had a free chunk on their own page and 213 on a neighbouring one, so a fact
+    could have crossed a chunk boundary. The buffer is 441 chunks.
+  - Allowed: 36,616 of 76,582.
+  - Every passage of every prompt (gold, neighbour, distractor) is an allowed chunk.
+- **Rule 2's "same chunk" became the same document:** ordinary chunks are disjoint from eval
+  chunks by construction. The check is the eval's own scoring (`qa_correct` with the item's
+  tolerance; vocab by `term_key`). Unseen vocab terms and the 3 `VOCAB_SHOTS` terms are blocked in
+  definitions from any document.
+- **Rule 1 on eval-seen chunks drops the question, not the fact.** The generator's natural
+  question for a seen fact sometimes lands on the eval's wording: same model, same chunk, and
+  qa-0545 came back word for word. Dropping those facts would have emptied the seen half where it
+  matters most.
+  - The 7 such facts got two new questions written from the fact and the passage alone, never
+    from the rejected question (`from_fact`).
+  - The pilot first paraphrased the rejected question; the prompt audit in
+    `tests/test_sft_data.py` caught it, and that path is gone.
+- **Forced extraction:** values / identifiers and technical terms come back as two lists (6 each).
+  - **Allocation:** within the 12-examples-per-chunk cap, values (2 closed-book phrasings) and
+    term definitions (1) take turns, then closed-book term questions. Filling either kind first
+    starved the other in the pilot: values first left vocab at 0 of 7 on the pilot chunks,
+    definitions first cut domain_qa from 10 to 7 of 11.
+  - **Scale (user decision):** the caps filled. Eval-seen chunks gave 2,315 examples against the
+    plan's estimate of about 900 closed-book. The user kept the 12 / chunk cap: trimming to 8 would
+    have cut coverage to 126 / 37, and to 6 to 113 / 29. So 54% of the set comes from the 197 seen
+    chunks.
+- **Passage sets are built in A3** (not A6), because the teacher answers with them in front of it.
+  - Grounded = gold + its 2 nearest allowed neighbours + 1 allowed passage from another document.
+  - Abstain = 2 allowed passages from the question's own document at least 3 chunks away + 2 from
+    other documents: on-topic, like the adversarial eval, rather than trivially unrelated.
+  - The teacher sees labels `[P1]`-`[P4]`, never chunk ids; assembly maps them back.
+  - An abstain item whose teacher answered is dropped (4).
+- **Evol-Instruct problems** come from ordinary chunks only (the Stage 5 seeds stay free of eval
+  facts). Only 80 survived, against 150 planned: the judge rejected 56% for ill-posed problems or
+  wrong arithmetic.
+- **Validation:** 5% of each format's *holdable* records, grouped by source chunk. Eval-seen
+  records always go to train, and 5% of a whole format would have taken nearly every ordinary
+  definition.
+- **No hand-written anchors in v1 (user decision).**
+  - Teacher text the user approves line by line is still teacher text, so labelling it
+    `teacher: "human"` would misstate the metadata.
+  - The 500 Tulu records cover the real-data role.
+  - The human check is the A7 hand-read below.
+
+**Filtering (counts in `data/sft/stats.json`; every reject in `data/sft/sft_rejected.jsonl` with
+its rule):**
+- **A3, 7,743 tasks from 6,608 questions:**
+  - per-chunk cap 1,288 (eval-seen only);
+  - trivia 301;
+  - ungrounded number 291;
+  - term not in passage 174;
+  - locator 159 (`is_locator`, plus "which equations" with a number);
+  - duplicate 124 + near-duplicate 8;
+  - context-bound 71;
+  - long answer 63;
+  - rule 2 58;
+  - rule 1 26 (+7 rewritten).
+- **A5, 4,020 examples, 3,452 kept (85.9%):**
+
+  | format | kept |
+  |---|---|
+  | abstain | 95.3% |
+  | grounded | 94.0% |
+  | definition | 87.6% |
+  | closed-book | 84.7% |
+  | multi_step | 44.2% |
+
+  - 554 factual, 10 format, 4 abstain answered.
+  - Revise: 31 format-only examples revised, 23 salvaged (74%).
+- **A6:**
+  - rule 1 on final questions: 1;
+  - over the ordinary targets: 236.
+
+**The judge and the verifier.** The rule verifier and the judge (Large 3, ch. 12 rubrics with the
+gold fact as a hard rule) disagree on a rule they both check for 175 of 4,020 examples.
+- **The keep rule:** an example is kept only when both pass.
+- **Read 50 of the disagreements (A7).**
+  - The verifier was the stricter check in 37: it was right in about 10 and wrong in about 12,
+    all equivalent forms ("AASHTO LRFD 4.6.2.2.2b" vs "Article 4.6.2.2.2b", "L1 and L2" vs
+    "L1/L2").
+  - The judge was the stricter check in 13, right in about two-thirds ("greater than 1.0" vs
+    gold "1.0").
+  - The AND costs yield (about a dozen correct answers in 175), not quality: in the sample no
+    wrong final answer was kept.
+- **Fixed after the first full pass:**
+  - The verifier now reads plurals and number words ("six times" = 6, "cripple walls" = "cripple
+    wall").
+  - It accepts a worked problem's result at the end of one paragraph ("... = 6500 kN. Answer:
+    6500 kN"); assembly moves it to its own last line.
+  - JSON / list debris and "the passage" in a closed-book completion are format failures. The read
+    found "from the passage: 0.015" and a stringified Python list among the kept problems.
+- **One rule tightened back.** At first a factual verifier failure that the judge contradicted
+  could still go to revise. The revise prompt carries the judge's note, so that turned revise into
+  a fact-correcting step for 42 final records ("water jetting, greencutting, or sand blasting" ->
+  "roughened surface"). The plan says never revise a factual failure, so any factual failure now
+  blocks it.
+
+**Self-preference (the reason for the second teacher, user decision).** Large judged every
+completion:
+- **Overall:** its own answers were accepted at 87.4%, Medium's at 81.2%.
+- **By format, the gap sits in definitions:**
+
+  | format | Large | Medium |
+  |---|---|---|
+  | definition | 93.0% | 71.3% |
+  | closed-book | 85.5% | 82.3% |
+  | grounded | 94.1% | 93.8% |
+  | abstain | 96.1% | 91.8% |
+  | multi_step | 38.8% | 59.6% |
+
+- **Upper bound only:** the 6.2-point overall gap is quality difference plus self-preference, so
+  it is an upper bound on the bias. A third-party judge on a sample would separate them.
+- The training comparison is unaffected: sft-from-cpt and sft-from-base train on the identical set.
+
+**A7 hand-read (50 kept, stratified, plus the 50 disagreements above):**
+- **Closed-book:** 10 of 10 correct. Two persona phrasings read oddly ("During the failure analysis,
+  what value did the AASHTO LRFD ... assign ...").
+- **Definitions:** 10 of 10 faithful, some fuller than the reference.
+- **Grounded:** 10 of 10 cited correctly. One answer is weak: it points to "Figure 63" rather than
+  saying what the figure shows.
+- **Abstain:** 10 of 10 correct. A few questions are document trivia (a cost range, a year of
+  technical coordination); harmless as abstain prompts.
+- **Multi-step:** the weak format. 3 of 10 had the passage / debris defects fixed above, and a
+  few problems are contrived ("15 symbols x 2.5 MB"). Kept, at 80 records.
+
+**Contamination (`results/contamination.md` section 6, `eval/contamination.py --only sft`):**
+- **Rule 10 gate:** 0 chunk ids from `eval_chunk_ids.txt` outside the seen half.
+- **Positive control:** 40 of 40 planted items found (20 unseen domain_qa, 20 MMLU).
+- **Questions:** no eval question inside any SFT prompt.
+- **Unseen half:** 0 vocab terms defined. 9 domain_qa questions have half their tokens covered by
+  SFT text.
+  - Traced, those are document names and boilerplate ("What is the maximum ... in NIST GCR
+    17-917-45"): 2 are covered only by passage text, which CPT already trained on; the nearest SFT
+    questions ask about other facts.
+- **Unseen answers equal to a same-document SFT answer:** 4.
+  - 3 are coincidences (20% vs an h/t ratio of 20; two different NASA-STD-5001B factors).
+  - 1 is real: **qa-1059** (FEMA P-695 βRTR = 0.40) is stated again on a seen page, so the unseen
+    half has one taught fact. That is an eval-design overlap, not a leak; read qa-1059 with that in
+    mind.
+- **Benchmarks:** MMLU 7 / GSM8K 2 / HellaSwag 0 items share any 13-gram with the set, none half
+  covered.
+- **Val vs train:** 1 of 114 val records has half its question + completion covered by train.
+
+**Replay:** 500 records from `allenai/tulu-3-sft-mixture` (ODC-BY-1.0; 939,343 rows), as they are.
+- **Eligible:** single-turn user/assistant, no system message, at most 6,000 characters, at least
+  95% ASCII, not the multilingual aya subset (754,635 eligible).
+- **Sampling:** proportional by source with a fixed seed. 17 sources: math 218, code 93, FLAN 53,
+  safety 73 (WildGuard / WildJailbreak / CoCoNot), WildChat 26, other 37.
+- **Licence:** ODC-BY covers redistribution with attribution. Rule 1 (public-domain sources)
+  governs the domain corpus, not general replay, as with FineWeb-Edu in Stage 2.
+
+**Revisit if:**
+- the seen half's gain is flat while the covered facts' gold_lp rises: raise the per-chunk cap
+  (blind), don't target the eval;
+- `vocab_seen` doesn't move: only 51 of 101 terms were extracted, so a term-only extraction pass
+  over the seen chunks is the next lever;
+- Part B's chat rendering differs from the eval's `--chat` path (mistral-common, no system prompt):
+  the token counts and the exact-wording half assume it.

@@ -120,7 +120,7 @@ sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ─�
 | Stage | Script | Input data | Signal |
 |-------|--------|-----------|--------|
 | CPT  | `train/cpt.py`  | `data/processed/{train,val}.jsonl` (+ `replay.jsonl` for the replay ablation) | next-token on domain text |
-| SFT  | `train/sft.py`  | `data/sft/{train,val}.jsonl` `{"messages": [...]}` | assistant-only loss |
+| SFT  | `train/sft.py`  | `data/sft/{train,sft_val}.jsonl` `{"prompt": [...], "completion": [...]}` | completion-only loss |
 | DPO  | `train/dpo.py`  | `data/dpo/{train,val}.jsonl` `{"prompt","chosen","rejected"}` | preference pairs |
 | GRPO | `train/grpo.py` | `data/grpo/train.jsonl` `{"prompt","answer"}` | verifiable reward functions |
 
@@ -158,7 +158,8 @@ browser (Chrome DevTools MCP): save them as `data/raw/<slug>.pdf` (or the URL's 
 re-run `download.py`, which records each file's sha256 and page count in `data/sources.csv`
 (`stats.py` adds each document's final token count).
 `chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt`, so adding
-sources never resamples the eval; never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`.
+sources never resamples the eval; never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`,
+except the seen half listed in `eval/tasks/sft_seen_chunks.txt` (rule 10, `data/scripts/sft_guard.py`).
 
 ### Train
 

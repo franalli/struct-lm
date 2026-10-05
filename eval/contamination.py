@@ -33,6 +33,11 @@ Checks:
   4. general_val vs replay (both FineWeb-Edu).
   5. the 3 domain_qa few-shot items vs the 325 scored items and each other; the scored items
      against each other.
+  6. (--only sft, Stage 3) the SFT set (data/sft/train.jsonl) vs every eval item, question and
+     answer apart and the seen / unseen halves apart (seen answers are in it by design; unseen
+     should sit at the floor), vs sft_val.jsonl, and vs the three benchmarks; plus the chunk-id
+     gate (rule 10) and a planted positive control. --only sft adds this section to the existing
+     results/contamination.json and rewrites the .md, without recomputing sections 1-5.
 """
 
 import argparse
@@ -55,6 +60,7 @@ REF = "base-8b-hf"  # rule 3: Stage 2+ rows compare against the base on the same
 RUNS = ("cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10")
 BINS = (0.0, 0.01, 0.05, 0.20, 1.0)  # window token coverage
 DATA = ROOT / "data/processed"
+SFT = ROOT / "data/sft"
 POSTCUTOFF = ROOT / "data/exposure/postcutoff.jsonl"
 TASKS = ROOT / "eval/tasks"
 
@@ -354,6 +360,167 @@ def qa_checks(tok: Tok) -> dict:
     }
 
 
+# ---- Stage 3: the SFT set ----
+
+
+def sft_checks(tok: Tok, bench: dict[str, list[str]]) -> dict:
+    """Section 6. The SFT text a record trains on is its prompt plus its completion; "content" is
+    the question (or term, or replay prompt) plus the completion, without instruction templates or
+    passages, so train vs val measures repeated questions and answers, not shared boilerplate."""
+    train, val = jsonl(SFT / "train.jsonl"), jsonl(SFT / "sft_val.jsonl")
+    seen = set((TASKS / "sft_seen_chunks.txt").read_text().split())
+    eval_ids = set((TASKS / "eval_chunk_ids.txt").read_text().split())
+
+    def ids(r: dict) -> set[str]:
+        out = set(r["source_chunks"]) | set(r["distractors"])
+        return out | ({r["fact_id"].rsplit(":", 1)[0]} if r["fact_id"] else set())
+
+    full = lambda r: r["prompt"][0]["content"] + "\n" + r["completion"][0]["content"]
+    content = lambda r: (
+        (r["question"] or r["prompt"][0]["content"]) + "\n" + r["completion"][0]["content"]
+    )
+    res: dict = {
+        "train": len(train),
+        "val": len(val),
+        "leaked_chunks": sorted(set().union(*(ids(r) for r in train + val)) & (eval_ids - seen)),
+    }
+    idx = Index([tok.grams(tok.encode(full(r))) for r in train], [r["eid"] for r in train])
+
+    qa, vocab = jsonl(TASKS / "domain_qa.jsonl"), jsonl(TASKS / "vocab.jsonl")
+    grounded, adversarial = jsonl(TASKS / "grounded.jsonl"), jsonl(TASKS / "adversarial.jsonl")
+    half = lambda i: "seen" if i["source_chunk"] in seen else "unseen"
+    sets = {}
+    for h in ("seen", "unseen"):
+        sets[f"domain_qa {h}: questions"] = [i["question"] for i in qa if half(i) == h]
+        sets[f"domain_qa {h}: answers"] = [i["answer"] for i in qa if half(i) == h]
+        sets[f"vocab {h}: definitions"] = [i["definition"] for i in vocab if half(i) == h]
+    sets["grounded: questions"] = [i["question"] for i in grounded]
+    sets["adversarial: questions"] = [i["question"] for i in adversarial]
+    res["eval"] = {k: items_vs(tok, v, {"sft": idx}) for k, v in sets.items()}
+
+    # exact reuse: an eval question inside an SFT prompt; a domain_qa answer equal to an SFT
+    # closed-book completion from the same document; a vocab term equal to an SFT definition's
+    prompts_ = [norm(r["prompt"][0]["content"]) for r in train]
+    cb = {}
+    for r in train:
+        if r["format"] == "closed_book" and r["fact_id"]:
+            cb.setdefault(r["fact_id"].split(":")[0], set()).add(
+                norm(r["completion"][0]["content"])
+            )
+    terms = {norm(r["question"]) for r in train if r["format"] == "definition"}
+    exact = {}
+    for h in ("seen", "unseen"):
+        items = [i for i in qa if half(i) == h]
+        exact[f"domain_qa {h}"] = {
+            "items": len(items),
+            "question_in_a_prompt": sum(
+                any(norm(i["question"]) in p for p in prompts_) for i in items
+            ),
+            "answer_in_same_document": sum(
+                norm(i["answer"]) in cb.get(i["source_chunk"].split(":")[0], set()) for i in items
+            ),
+        }
+        v = [i for i in vocab if half(i) == h]
+        exact[f"vocab {h}"] = {
+            "items": len(v),
+            "term_defined": sum(norm(i["term"]) in terms for i in v),
+        }
+    res["exact"] = exact
+
+    tr_c = Index([tok.grams(tok.encode(content(r))) for r in train], [r["eid"] for r in train])
+    res["val_vs_train"] = items_vs(tok, [content(r) for r in val], {"train": tr_c})
+    res["benchmarks"] = {name: items_vs(tok, texts, {"sft": idx}) for name, texts in bench.items()}
+
+    # positive control: 20 unseen domain_qa items and 20 MMLU items planted as SFT records
+    planted = [f"{i['question']}\n{i['answer']}" for i in qa if half(i) == "unseen"][:20]
+    planted += bench["MMLU (test)"][:20]
+    ctl = Index(
+        [tok.grams(tok.encode(full(r))) for r in train]
+        + [tok.grams(tok.encode(t)) for t in planted],
+        [r["eid"] for r in train] + [f"planted-{k}" for k in range(len(planted))],
+    )
+    m = items_vs(tok, planted, {"sft": ctl})
+    res["control"] = {
+        "planted": len(planted),
+        "found_ge80": m["sft"]["ge80"],
+        "checkable": m["checkable"],
+    }
+    return res
+
+
+def sft_report(s: dict) -> list[str]:
+    row = lambda name, m: [
+        name, m["items"], m["checkable"], m["sft"]["any"], m["sft"]["ge50"], m["sft"]["ge80"],
+        p(m["sft"]["mean_token_frac"]),
+    ]  # fmt: skip
+    head = [
+        "eval items",
+        "items",
+        "checkable (>= 13 tokens)",
+        "any 13-gram",
+        ">= 50%",
+        ">= 80%",
+        "mean token share",
+    ]
+    out = [
+        "",
+        "## 6. SFT data (Stage 3) vs the eval and the benchmarks",
+        "",
+        (
+            f"`data/sft/train.jsonl` ({s['train']:,} records; prompt + completion) as the reference."
+            f" Chunk ids from eval_chunk_ids.txt outside the seen half: {len(s['leaked_chunks'])}"
+            " (rule 10). Positive control: of"
+            f" {s['control']['planted']} planted items (20 unseen domain_qa, 20 MMLU),"
+            f" {s['control']['found_ge80']} are found with >= 80% of their tokens covered."
+        ),
+        "",
+        table(head, [row(k, m) for k, m in s["eval"].items()]),
+        "",
+        "Exact reuse (normalised text):",
+        "",
+        table(
+            [
+                "eval half",
+                "items",
+                "question inside an SFT prompt",
+                "answer = an SFT closed-book answer, same document",
+            ],
+            [
+                [k, v["items"], v["question_in_a_prompt"], v["answer_in_same_document"]]
+                for k, v in s["exact"].items()
+                if "question_in_a_prompt" in v
+            ],
+        ),
+        "",
+        table(
+            ["eval half", "items", "term defined in SFT"],
+            [
+                [k, v["items"], v["term_defined"]]
+                for k, v in s["exact"].items()
+                if "term_defined" in v
+            ],
+        ),
+        "",
+    ]
+    v = s["val_vs_train"]
+    out += [
+        (
+            f"sft_val ({s['val']} records, question + completion) vs train: {v['train']['any']} share"
+            f" any 13-gram, {v['train']['ge50']} have >= 50% of their tokens covered,"
+            f" {v['train']['ge80']} >= 80%."
+        ),
+        "",
+        table(
+            ["benchmark", "items", "any 13-gram", ">= 50%", ">= 80%"],
+            [
+                [k, m["items"], m["sft"]["any"], m["sft"]["ge50"], m["sft"]["ge80"]]
+                for k, m in s["benchmarks"].items()
+            ],
+        ),
+    ]
+    return out
+
+
 # ---- report ----
 
 
@@ -608,6 +775,8 @@ def report(res: dict, flag: float) -> str:
             f'- {x["a"]} / {x["b"]} ({p(x["shared_of_a"], 0)}): "{x["a_question"]}" / '
             f'"{x["b_question"]}"'
         )
+    if "sft" in res:
+        out += sft_report(res["sft"])
     return "\n".join(out) + "\n"
 
 
@@ -629,9 +798,23 @@ def main() -> None:
         help="n-gram length; another n is a sensitivity run (the .md labels say 13): pass --out",
     )
     ap.add_argument("--out", default="results/contamination")
+    ap.add_argument(
+        "--only",
+        choices=["sft"],
+        help="add section 6 to the existing --out .json and rewrite the .md",
+    )
     args = ap.parse_args()
     N = args.n
     tok = Tok()
+    out = ROOT / args.out
+    if args.only == "sft":
+        res = json.loads(out.with_suffix(".json").read_text())
+        print("SFT set vs eval, val and benchmarks")
+        res["sft"] = sft_checks(tok, benchmarks())
+        out.with_suffix(".json").write_text(json.dumps(res, indent=1) + "\n")
+        out.with_suffix(".md").write_text(report(res, args.flag))
+        print(f"-> {out.with_suffix('.md')}, {out.with_suffix('.json')}")
+        return
 
     print("tokenising train, val, 2026, replay, general_val")
     train, val, post = jsonl(DATA / "train.jsonl"), jsonl(DATA / "val.jsonl"), jsonl(POSTCUTOFF)
@@ -782,8 +965,10 @@ def main() -> None:
     }
 
     res["qa"] = qa_checks(tok)
+    prev = out.with_suffix(".json")
+    if prev.exists() and "sft" in (old := json.loads(prev.read_text())):
+        res["sft"] = old["sft"]  # section 6 is refreshed by --only sft
 
-    out = ROOT / args.out
     out.with_suffix(".json").write_text(json.dumps(res, indent=1) + "\n")
     out.with_suffix(".md").write_text(report(res, args.flag))
     print(f"-> {out.with_suffix('.md')}, {out.with_suffix('.json')}")

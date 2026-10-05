@@ -215,6 +215,29 @@ mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/ba
   `results/ppl/<run>.json`, plus the usual lm_eval / runs / bench outputs for evaluated runs.
 - Base rows get perplexity by rescoring them with `--ppl-dir results/ppl` too.
 
+### Stage 3: SFT data (Mac)
+
+```bash
+set -a; . ./.env; set +a                    # MISTRAL_API_KEY (~6,000 calls at 30 a minute), HF_TOKEN
+make sft-data                               # all steps below, in order
+.venv/bin/python data/scripts/sft_pool.py        # A1 -> data/sft/work/pool.jsonl (seen half + ~900 allowed chunks)
+.venv/bin/python data/scripts/sft_questions.py   # A2 questions (Large 3, 0.7; title + passage only)
+.venv/bin/python data/scripts/sft_filter.py      # A3 rules, dedup, rule 1/2, caps, passage sets -> questions_kept.jsonl
+.venv/bin/python data/scripts/sft_answers.py     # A4 completions (Large 3 / Medium 3.5 25%), paraphrases, Evol-Instruct
+.venv/bin/python data/scripts/sft_judge.py       # A5 verifier + rubric judge + one revise round
+.venv/bin/python data/scripts/sft_replay.py      # 500 Tulu 3 SFT examples (downloads 1.4 GB once)
+.venv/bin/python data/scripts/sft_assemble.py    # A6/A7 -> data/sft/{train,sft_val}.jsonl, review.md, SHA256SUMS
+.venv/bin/python eval/contamination.py --only sft # section 6 of results/contamination.md
+```
+
+- Every call is cached in `data/sft/.cache/llm_cache.jsonl` (gitignored, with each prompt), so a
+  rerun pays only for prompts that changed. Each step writes its section of `data/sft/stats.json`.
+- `sft_pool.py --pilot N` builds the first N chunks of each kind (the head of the full pool, same
+  assignments): run it through A2-A5 and read the outputs before a full run.
+- After any change to a step, rerun from that step, then `sft_assemble.py`, the contamination
+  section and `pytest tests/test_sft_data.py`; a changed `train.jsonl` changes `SHA256SUMS` and
+  needs the hand-read in `review.md` redone.
+
 ## Decisions (rules to keep)
 
 1. **Copyright:** only public-domain US federal documents. ASCE 7, the AISC manual and the 2025
@@ -276,8 +299,11 @@ mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/ba
     the base's non-weight files (never `params.json` / `consolidated.safetensors`) and checks the
     weight names match the base. SFT data may draw on eval chunks only from
     `eval/tasks/sft_seen_chunks.txt` (`eval/sft_split.py`), never on any other chunk in
-    `eval_chunk_ids.txt`, and never reuses an eval question. SFT/DPO/GRPO data and chat template work are deferred until the
-    user asks.
+    `eval_chunk_ids.txt`, and never reuses an eval question. Enforced by `data/scripts/sft_guard.py`
+    (the SFT builder's only reader of `eval/tasks/`, never imported by a step that calls the LLM),
+    which also keeps out every chunk on or next to an unseen eval chunk's page, and checked by
+    `tests/test_sft_data.py` and `contamination.py --only sft`. DPO/GRPO data and chat template work
+    are deferred until the user asks.
 11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
     reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
     GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
@@ -299,6 +325,11 @@ mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/ba
 - SFT/DPO/GRPO are not wired into `train/modal_train.py` yet, and their configs still say
   `report_to: wandb` (no W&B secret exists; Stage 2 logs to `results/runs/<run>/train_log.jsonl`).
   `sft.yaml` starts from `checkpoints/cpt-8b-replay10`; `tf32: true` is on from Stage 3.
+- `train/sft.py` still expects `{"messages": [...]}` with `assistant_only_loss`, which needs a chat
+  template with generation markers that no checkpoint here has. The SFT set is conversational
+  `prompt` / `completion` (TRL masks the prompt itself), and training must render it as
+  mistral-common does for the eval's `--chat` path (`[INST]...[/INST]answer</s>`, no system
+  prompt): Part B of Stage 3.
 - Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
   modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

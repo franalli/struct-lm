@@ -13,7 +13,7 @@ lora:
 
 data:
   train: data/sft/train.jsonl
-  validation: data/sft/val.jsonl
+  validation: data/sft/sft_val.jsonl
 
 training:
   output_dir: checkpoints/sft

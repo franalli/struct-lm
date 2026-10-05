@@ -1,0 +1,326 @@
+{
+  "pool": {
+    "chunks": 76582,
+    "allowed": 36616,
+    "off_limits": {
+      "unseen_hash": 36868,
+      "eval_chunk": 2657,
+      "buffer": 441
+    },
+    "buffer_pages": 653,
+    "eligible_ordinary": 16395,
+    "eligible_docs": 220,
+    "forced": 197,
+    "ordinary": 900,
+    "ordinary_docs": 195,
+    "wording": {
+      "exact": 437,
+      "paraphrased": 463
+    },
+    "pilot": 0
+  },
+  "questions": {
+    "chunks": 1097,
+    "chunks_with_items": 1097,
+    "items": {
+      "eval_seen:value": 509,
+      "eval_seen:identifier": 544,
+      "eval_seen:term": 1135,
+      "ordinary:value": 1769,
+      "ordinary:identifier": 841,
+      "ordinary:term": 900,
+      "ordinary:procedure": 910
+    }
+  },
+  "filter": {
+    "items": 6608,
+    "tasks": 7743,
+    "rejected": {
+      "locator": 159,
+      "term_not_in_passage": 174,
+      "trivia": 301,
+      "context_bound": 71,
+      "near_duplicate": 8,
+      "rule1": 26,
+      "duplicate": 124,
+      "ungrounded_number": 291,
+      "long_answer": 63,
+      "rule2": 58,
+      "cap": 1288
+    },
+    "rejected_by_origin": {
+      "eval_seen:locator": 104,
+      "eval_seen:term_not_in_passage": 110,
+      "eval_seen:trivia": 117,
+      "eval_seen:context_bound": 20,
+      "eval_seen:near_duplicate": 7,
+      "eval_seen:rule1": 11,
+      "eval_seen:duplicate": 46,
+      "eval_seen:ungrounded_number": 31,
+      "eval_seen:long_answer": 17,
+      "ordinary:duplicate": 78,
+      "ordinary:ungrounded_number": 260,
+      "ordinary:term_not_in_passage": 64,
+      "ordinary:trivia": 184,
+      "ordinary:long_answer": 46,
+      "ordinary:locator": 55,
+      "ordinary:rule2": 58,
+      "ordinary:context_bound": 51,
+      "ordinary:rule1": 15,
+      "ordinary:near_duplicate": 1,
+      "eval_seen:cap": 1288
+    },
+    "kept_forced": {
+      "closed_book": 743,
+      "definition": 829
+    },
+    "forced_rule1_rewrite": 7,
+    "forced_chunks_with_tasks": 197,
+    "ordinary_targets_with_headroom": {
+      "value": 138,
+      "identifier": 75,
+      "grounded": 650,
+      "abstain": 320,
+      "definition": 65,
+      "multi_step": 195
+    },
+    "ordinary_picked": {
+      "grounded": 650,
+      "value": 138,
+      "identifier": 75,
+      "definition": 65,
+      "multi_step": 195,
+      "abstain": 320
+    },
+    "ordinary_wording": {
+      "grounded:exact": 335,
+      "grounded:paraphrased": 315,
+      "closed_book:exact": 204,
+      "closed_book:paraphrased": 204,
+      "definition:exact": 31,
+      "definition:paraphrased": 34,
+      "abstain:exact": 161,
+      "abstain:paraphrased": 159
+    }
+  },
+  "replay": {
+    "dataset": "allenai/tulu-3-sft-mixture",
+    "license": "ODC-BY-1.0",
+    "rows": 939343,
+    "eligible": 754635,
+    "sampled": 500,
+    "by_source": {
+      "ai2-adapt-dev/personahub_math_v5_regen_149960": 97,
+      "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": 70,
+      "ai2-adapt-dev/flan_v2_converted": 53,
+      "ai2-adapt-dev/numinamath_tir_math_decontaminated": 42,
+      "withdrawn": 33,
+      "ai2-adapt-dev/tulu_v3.9_synthetic_finalresp_wildguardmixtrain_decontaminated_50k": 33,
+      "ai2-adapt-dev/tulu_v3.9_wildjailbreak_decontaminated_50k": 33,
+      "allenai/tulu-3-sft-personas-math-grade": 33,
+      "ai2-adapt-dev/tulu_v3.9_wildchat_100k": 26,
+      "ai2-adapt-dev/personahub_code_v2_34999": 23,
+      "ai2-adapt-dev/personahub_ifdata_manual_seed_v3_29980": 20,
+      "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k": 13,
+      "ai2-adapt-dev/coconot_converted": 7,
+      "ai2-adapt-dev/no_robots_converted": 6,
+      "ai2-adapt-dev/tulu_v3.9_sciriff_10k": 5,
+      "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": 3,
+      "ai2-adapt-dev/oasst1_converted": 3
+    }
+  },
+  "answers": {
+    "tasks": 3001,
+    "examples": {
+      "eval_seen:closed_book": 1486,
+      "eval_seen:definition": 829,
+      "ordinary:grounded": 650,
+      "ordinary:closed_book": 670,
+      "ordinary:definition": 65,
+      "ordinary:abstain": 320
+    },
+    "teacher": {
+      "mistral-medium-2604": 738,
+      "mistral-large-2512": 2263
+    },
+    "dropped": {
+      "evol_failed": 14,
+      "no_question": 0
+    },
+    "teacher_model": "mistral-large-2512"
+  },
+  "judge": {
+    "examples": 4020,
+    "kept": 3452,
+    "acceptance_by_format": {
+      "abstain": "305/320 (95.3%)",
+      "closed_book": "1673/1975 (84.7%)",
+      "definition": "783/894 (87.6%)",
+      "grounded": "611/650 (94.0%)",
+      "multi_step": "80/181 (44.2%)"
+    },
+    "acceptance_by_origin": {
+      "eval_seen": "2013/2315 (87.0%)",
+      "ordinary": "1439/1705 (84.4%)"
+    },
+    "acceptance_by_teacher": {
+      "mistral-large-2512": "2639/3019 (87.4%)",
+      "mistral-medium-2604": "813/1001 (81.2%)"
+    },
+    "acceptance_by_teacher_and_format": {
+      "mistral-large-2512:abstain": "249/259 (96.1%)",
+      "mistral-large-2512:closed_book": "1255/1467 (85.5%)",
+      "mistral-large-2512:definition": "624/671 (93.0%)",
+      "mistral-large-2512:grounded": "459/488 (94.1%)",
+      "mistral-large-2512:multi_step": "52/134 (38.8%)",
+      "mistral-medium-2604:abstain": "56/61 (91.8%)",
+      "mistral-medium-2604:closed_book": "418/508 (82.3%)",
+      "mistral-medium-2604:definition": "159/223 (71.3%)",
+      "mistral-medium-2604:grounded": "152/162 (93.8%)",
+      "mistral-medium-2604:multi_step": "28/47 (59.6%)"
+    },
+    "reasons": {
+      "kept": 3452,
+      "factual": 554,
+      "format": 10,
+      "abstain_answered": 4
+    },
+    "first_pass_failed_rules": {
+      "definition:P2": 6,
+      "closed_book:gold": 123,
+      "closed_book:H5": 133,
+      "definition:P1": 106,
+      "closed_book:H2": 103,
+      "closed_book:P1": 78,
+      "closed_book:X2": 3,
+      "closed_book:P2": 21,
+      "closed_book:H1": 17,
+      "definition:no_passage_ref": 2,
+      "definition:X2": 4,
+      "closed_book:H4": 12,
+      "closed_book:X1": 8,
+      "closed_book:short": 13,
+      "definition:H1": 8,
+      "closed_book:H3": 4,
+      "closed_book:P3": 2,
+      "grounded:H1": 10,
+      "grounded:H2": 26,
+      "grounded:P1": 16,
+      "grounded:P2": 11,
+      "grounded:X1": 11,
+      "grounded:citations": 18,
+      "grounded:X3": 1,
+      "grounded:answered": 7,
+      "grounded:H4": 4,
+      "grounded:H3": 1,
+      "multi_step:H2": 50,
+      "multi_step:gold": 77,
+      "multi_step:answer_line": 45,
+      "multi_step:P1": 34,
+      "multi_step:no_passage_ref": 19,
+      "multi_step:H1": 35,
+      "multi_step:X1": 19,
+      "multi_step:P2": 10,
+      "multi_step:H4": 4,
+      "multi_step:H3": 1,
+      "abstain:abstained": 4,
+      "abstain:P1": 10,
+      "abstain:H2": 1
+    },
+    "revised": 31,
+    "salvaged": 23,
+    "disagreements": {
+      "gold:closed_book": 96,
+      "no_hedge:closed_book": 12,
+      "citations:grounded": 17,
+      "answered:grounded": 3,
+      "gold:multi_step": 47,
+      "answer_line:multi_step": 41,
+      "exact_sentence:abstain": 1
+    },
+    "judge_model": "mistral-large-2512"
+  },
+  "assemble": {
+    "train": 3601,
+    "val": 114,
+    "by_format": {
+      "closed_book:eval_seen": 1290,
+      "definition:eval_seen": 722,
+      "closed_book:ordinary": 373,
+      "multi_step:ordinary": 80,
+      "grounded:ordinary": 500,
+      "abstain:ordinary": 200,
+      "definition:ordinary": 50,
+      "replay:replay": 500
+    },
+    "val_by_format": {
+      "grounded": 36,
+      "abstain": 22,
+      "closed_book": 21,
+      "replay": 25,
+      "definition": 2,
+      "multi_step": 8
+    },
+    "wording": {
+      "closed_book:exact": 838,
+      "closed_book:paraphrased": 825,
+      "definition:exact": 374,
+      "definition:paraphrased": 398,
+      "multi_step:None": 80,
+      "grounded:exact": 250,
+      "grounded:paraphrased": 250,
+      "abstain:exact": 100,
+      "abstain:paraphrased": 100
+    },
+    "teacher": {
+      "mistral-medium-2604": 756,
+      "mistral-large-2512": 2459,
+      "allenai/tulu-3-sft-mixture": 500
+    },
+    "targets": {
+      "value": 110,
+      "identifier": 60,
+      "grounded": 500,
+      "abstain": 200,
+      "definition": 50,
+      "multi_step": 150
+    },
+    "forced_records": 2012,
+    "seen_coverage": {
+      "domain_qa": "135/167",
+      "vocab": "51/101"
+    },
+    "tokens": {
+      "max": 2307,
+      "median": 205,
+      "total": 1809287
+    },
+    "rejected": {
+      "A3:locator": 159,
+      "A3:term_not_in_passage": 174,
+      "A3:trivia": 301,
+      "A3:context_bound": 71,
+      "A3:near_duplicate": 8,
+      "A3:rule1": 26,
+      "A3:duplicate": 124,
+      "A3:ungrounded_number": 291,
+      "A3:long_answer": 63,
+      "A3:rule2": 58,
+      "A3:cap": 1288,
+      "A5:factual": 554,
+      "A5:format": 10,
+      "A5:abstain_answered": 4,
+      "A6:rule1": 1,
+      "A6:over_target": 236
+    },
+    "review": {
+      "kept": 50,
+      "disagreements": 175,
+      "shown": 50
+    },
+    "sha256": {
+      "train.jsonl": "0c9f6a926318a66c01ba6c739b50f823a6a7cb674595e4819e723c9654570085",
+      "sft_val.jsonl": "34872502843c4bcfbfe573367ed4847363171710de085f7fdcde7ba6ce81f137"
+    }
+  }
+}

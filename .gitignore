@@ -58,3 +58,7 @@ nohup.out
 
 # make_tasks LLM call cache
 eval/.cache/
+# SFT builder: its LLM call cache and the intermediate files between steps (data/sft/stats.json
+# records every count; train.jsonl, sft_val.jsonl, sft_rejected.jsonl and review.md are committed)
+data/sft/.cache/
+data/sft/work/

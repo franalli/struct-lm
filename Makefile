@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data train eval serve all
+.PHONY: data sft-data train eval serve all
 
 # --- data -------------------------------------------------------------------
 # Stage 1 corpus: data/sources.csv -> data/processed/{docs_raw,docs,train,val,replay,general_val}.jsonl
@@ -12,6 +12,15 @@ MODAL ?= .venv/bin/modal
 DATA_STEPS = download extract filter dedup pii split replay tokenizer_coverage stats
 data:
 	for s in $(DATA_STEPS); do $(PY) data/scripts/$$s.py || exit 1; done
+
+# --- SFT data ---------------------------------------------------------------
+# Stage 3 SFT set: data/processed/chunks.jsonl + eval/tasks (seen half) -> data/sft/{train,sft_val}.jsonl.
+# Mistral API (MISTRAL_API_KEY, ~6,000 calls at 30 a minute) and HF_TOKEN (Tulu 3 replay); every
+# call is cached in data/sft/.cache, so a rerun only pays for what changed. Steps: data/scripts/sft_*.py.
+SFT_STEPS = sft_pool sft_questions sft_filter sft_answers sft_judge sft_replay sft_assemble
+sft-data:
+	for s in $(SFT_STEPS); do $(PY) data/scripts/$$s.py || exit 1; done
+	$(PY) eval/contamination.py --only sft
 
 # --- train ------------------------------------------------------------------
 # Stage 2 runs on Modal (commands and ablations: CLAUDE.md, Stage 2); this starts the main run.
