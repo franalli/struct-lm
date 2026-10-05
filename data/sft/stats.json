@@ -151,38 +151,38 @@
   },
   "judge": {
     "examples": 4020,
-    "kept": 3452,
+    "kept": 3437,
     "acceptance_by_format": {
       "abstain": "305/320 (95.3%)",
       "closed_book": "1673/1975 (84.7%)",
       "definition": "783/894 (87.6%)",
-      "grounded": "611/650 (94.0%)",
+      "grounded": "596/650 (91.7%)",
       "multi_step": "80/181 (44.2%)"
     },
     "acceptance_by_origin": {
       "eval_seen": "2013/2315 (87.0%)",
-      "ordinary": "1439/1705 (84.4%)"
+      "ordinary": "1424/1705 (83.5%)"
     },
     "acceptance_by_teacher": {
-      "mistral-large-2512": "2639/3019 (87.4%)",
-      "mistral-medium-2604": "813/1001 (81.2%)"
+      "mistral-large-2512": "2629/3019 (87.1%)",
+      "mistral-medium-2604": "808/1001 (80.7%)"
     },
     "acceptance_by_teacher_and_format": {
       "mistral-large-2512:abstain": "249/259 (96.1%)",
       "mistral-large-2512:closed_book": "1255/1467 (85.5%)",
       "mistral-large-2512:definition": "624/671 (93.0%)",
-      "mistral-large-2512:grounded": "459/488 (94.1%)",
+      "mistral-large-2512:grounded": "449/488 (92.0%)",
       "mistral-large-2512:multi_step": "52/134 (38.8%)",
       "mistral-medium-2604:abstain": "56/61 (91.8%)",
       "mistral-medium-2604:closed_book": "418/508 (82.3%)",
       "mistral-medium-2604:definition": "159/223 (71.3%)",
-      "mistral-medium-2604:grounded": "152/162 (93.8%)",
+      "mistral-medium-2604:grounded": "147/162 (90.7%)",
       "mistral-medium-2604:multi_step": "28/47 (59.6%)"
     },
     "reasons": {
-      "kept": 3452,
-      "factual": 554,
-      "format": 10,
+      "kept": 3437,
+      "factual": 555,
+      "format": 24,
       "abstain_answered": 4
     },
     "first_pass_failed_rules": {
@@ -207,6 +207,7 @@
       "grounded:H2": 26,
       "grounded:P1": 16,
       "grounded:P2": 11,
+      "grounded:every_sentence_cited": 110,
       "grounded:X1": 11,
       "grounded:citations": 18,
       "grounded:X3": 1,
@@ -227,8 +228,8 @@
       "abstain:P1": 10,
       "abstain:H2": 1
     },
-    "revised": 31,
-    "salvaged": 23,
+    "revised": 120,
+    "salvaged": 98,
     "disagreements": {
       "gold:closed_book": 96,
       "no_hedge:closed_book": 12,
@@ -241,40 +242,37 @@
     "judge_model": "mistral-large-2512"
   },
   "assemble": {
-    "train": 3601,
-    "val": 114,
+    "train": 3031,
+    "val": 95,
     "by_format": {
-      "closed_book:eval_seen": 1290,
+      "closed_book:eval_seen": 901,
       "definition:eval_seen": 722,
-      "closed_book:ordinary": 373,
-      "multi_step:ordinary": 80,
+      "closed_book:ordinary": 253,
       "grounded:ordinary": 500,
       "abstain:ordinary": 200,
       "definition:ordinary": 50,
       "replay:replay": 500
     },
     "val_by_format": {
-      "grounded": 36,
-      "abstain": 22,
-      "closed_book": 21,
+      "grounded": 34,
+      "closed_book": 15,
+      "abstain": 19,
       "replay": 25,
-      "definition": 2,
-      "multi_step": 8
+      "definition": 2
     },
     "wording": {
-      "closed_book:exact": 838,
-      "closed_book:paraphrased": 825,
+      "closed_book:exact": 641,
+      "closed_book:paraphrased": 513,
       "definition:exact": 374,
       "definition:paraphrased": 398,
-      "multi_step:None": 80,
       "grounded:exact": 250,
       "grounded:paraphrased": 250,
       "abstain:exact": 100,
       "abstain:paraphrased": 100
     },
     "teacher": {
-      "mistral-medium-2604": 756,
-      "mistral-large-2512": 2459,
+      "mistral-medium-2604": 592,
+      "mistral-large-2512": 2034,
       "allenai/tulu-3-sft-mixture": 500
     },
     "targets": {
@@ -287,13 +285,13 @@
     },
     "forced_records": 2012,
     "seen_coverage": {
-      "domain_qa": "135/167",
+      "domain_qa": "119/167",
       "vocab": "51/101"
     },
     "tokens": {
       "max": 2307,
-      "median": 205,
-      "total": 1809287
+      "median": 210,
+      "total": 1735641
     },
     "rejected": {
       "A3:locator": 159,
@@ -307,20 +305,22 @@
       "A3:long_answer": 63,
       "A3:rule2": 58,
       "A3:cap": 1288,
-      "A5:factual": 554,
-      "A5:format": 10,
+      "A5:factual": 555,
+      "A5:format": 24,
       "A5:abstain_answered": 4,
       "A6:rule1": 1,
-      "A6:over_target": 236
+      "A6:multi_step_dropped": 80,
+      "A6:over_target": 221,
+      "A6:closed_book_filter": 509
     },
     "review": {
-      "kept": 50,
+      "kept": 40,
       "disagreements": 175,
       "shown": 50
     },
     "sha256": {
-      "train.jsonl": "0c9f6a926318a66c01ba6c739b50f823a6a7cb674595e4819e723c9654570085",
-      "sft_val.jsonl": "34872502843c4bcfbfe573367ed4847363171710de085f7fdcde7ba6ce81f137"
+      "train.jsonl": "c1c6adf126230134d42643ba098fcfb04c131c8dfc037247403677331a866140",
+      "sft_val.jsonl": "a5dfe51dcc777788afcbbdbe8fbae0192e19ebe11a2ad32a60c4841fcf9a37d7"
     }
   }
 }

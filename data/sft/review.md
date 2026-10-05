@@ -1,6 +1,6 @@
 # SFT data: hand-read sample (A7)
 
-50 kept examples (stratified by format) and 50 examples where the rule verifier and the judge disagree on a rule they both check (kept or not). Findings go to notes/decisions.md.
+40 kept examples (stratified by format) and 50 examples where the rule verifier and the judge disagree on a rule they both check (kept or not). Findings go to notes/decisions.md.
 
 ## Kept
 
@@ -52,18 +52,6 @@ Passage `usace-em-1110-2-2901:p202:c0`: (7) Chapter 10 Instrumentation and Monit
 **Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
 **Judge:** The answer 'long-term operation of a facility' is directly stated in the passage as the phase where baseline groundwater pressure data is particularly valuable. The passage explicitly mentions this in section (10) under Chapter 10. The answer adheres to the specificity and brevity required, and it aligns with the document's general recommendation rather than a worked example. No hedging or additional facts are included.
 
-### nasa-std-5001b:p21:c0:f3:closed_book:2
-
-closed_book | eval_seen | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `nasa-std-5001b:p21:c0`: Table 3—Minimum Design and Test Factors for Glass/Ceramics in Robotic Applications Verification Ultimate Design Proof Test Factor Approach Loading Condition Factor Nonpressurized 3.0 1.2 Test Pressurized 3.0 2.0 Analysis Only* Nonpressurized 5.0 N/A * Not applicable to ceramic structures. b. [FSR 33] Structural integrity of all pressurized glass and ceramics shall be verified by both analysis and proof testing. c. [FSR 34] Proof tests of glass and ceramics shall be configured to simulate flight-like boundary conditions and loading. d. [FSR 35] For glass proof testing, the total time during unl...
-
-**Q:** In disaster mitigation planning, what ultimate design factor does NASA-STD-5001B assign to nonpressurized glass or ceramic structures when analysis alone is used for verification?
-**Gold (A2):** 5.0
-**Answer:** 5.0
-**Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
-**Judge:** The answer '5.0' is directly stated in Table 3 of the passage as the ultimate design factor for nonpressurized glass/ceramics when using analysis only for verification. The question specifically asks for this value, and the answer matches the gold fact exactly. The answer is a general rule from the document, not a computed or example-specific value, and it is stated plainly without hedging or additional information.
-
 ### usace-em-1110-1-4008:p68:c2:q0:closed_book:2
 
 closed_book | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
@@ -75,18 +63,6 @@ Passage `usace-em-1110-1-4008:p68:c2`: Most metals and alloys depend upon a prot
 **Answer:** 60°C (140°F)
 **Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
 **Judge:** The answer '60°C (140°F)' is explicitly stated in the passage as the upper temperature limit for copper tubing in corrosive potable hot water systems. The answer adheres to the exact value and notation provided, avoids hedging, and does not restate the question or add extraneous facts. The question is clear and directly targets a general recommendation from the document.
-
-### fhwa-if-12-027:p171:c0:f3:closed_book:2
-
-closed_book | eval_seen | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `fhwa-if-12-027:p171:c0`: tests must be specified in clear and concise terms so there is no misunderstanding regarding what is required. NDE procedures should be developed for the welds being tested. Due to the critical nature of the proper fabrication of the RD weld, a special UT procedure should be developed for monitoring the depth of penetration. Experience has shown that it may take up to 50 test trials on mock-up weldments to develop the proper procedure. UT will not give a precise penetration value; rather, it will read the depth to + / - 5 percent, but coupled with production macroetch testing, this will be eno...
-
-**Q:** Under the manual’s guidelines, what portion of complete joint penetration field welds in orthotropic deck bridges must undergo ultrasonic testing?
-**Gold (A2):** 100 percent
-**Answer:** 100 percent
-**Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
-**Judge:** The answer '100 percent' is explicitly stated in the passage as the required portion of complete joint penetration (CJP) field welds that must undergo ultrasonic testing (UT). The question directly asks for this specific value, which is a general requirement in the document, not a computed or example-specific value. The answer is precise, matches the passage's notation, and avoids hedging or additional facts.
 
 ### fhwa-nhi-15-047:p1222:c0:q1:closed_book:1
 
@@ -124,148 +100,29 @@ Passage `fhwa-sbdh-ex2b:p19:c0`: 5.0 STRUCTURAL ANALYSIS The AASHTO LRFD (7th Ed
 **Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
 **Judge:** The answer 'Section 4' is explicitly stated in the passage as the section detailing acceptable analysis methods in the AASHTO LRFD specifications. The question directly asks for this section designation, and the answer matches the gold fact without hedging or additional information. The passage notation is followed, and no pitfalls are violated.
 
-### usace-em-1110-2-6056:p124:c0:q1:multi_step:1
+### fema-p-1026:p41:c0:f2:closed_book:2
 
-multi_step | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised True
+closed_book | eval_seen | paraphrased | teacher mistral-medium-2604 | kept True (kept) | score 5.0 | revised False
 
-Passage `usace-em-1110-2-6056:p124:c0`: CONUS coastal areas, the crest elevation of structures may be below that originally designed. In such cases, the original design documents should be checked to verify that allowance for sea level rise was considered in the design elevation. b. NSRS connection. Connection to an NSRS orthometric datum need only be at the ± 0.25 ft accuracy level. This connection accuracy is usually adequate to relate protection heights to floodplain and first-floor elevations on a federally recognized reference system—e.g., NAVD88. Evaluated shore protection projects that are not on updated tidal and/or NSRS dat...
+Passage `fema-p-1026:p41:c0`: In reaction to the repeated failures of the wall anchorage system in these buildings in the western United States, the Uniform Building Code (UBC) provisions have, multiple times, become more stringent and required higher design forces for out-of-plane wall anchorage (Figure 2-6). Based on observations following the 1994 Northridge earthquake, the current wall anchorage provisions are contained in ASCE/SEI 7-22 Section 12.11.2 and prescribe maximum expected design forces without relying upon connection ductility (SEAOC, 1999). These design force levels and detailing requirements for out-of-pla...
 
-**Q:** According to EM 1110-2-6056, a coastal levee project in Louisiana requires vertical control points for elevation referencing. If a surveyor establishes 12 Primary Project Control Points (PPCPs) along the levee alignment, how many of these PPCPs must minimally have both a water level reference elevation and a NAVD88 elevation to comply with the document's standards?
-**Gold (A2):** 1
-**Answer:** The document specifies that at least one PPCP on each project must have both a water level reference elevation and a NAVD88 elevation. Number of PPCPs requiring both elevations = 1. Answer: 1
-**Before revise:** The passage states: "At least one PPCP on each project shall have both a water level reference elevation and a NAVD88 elevation."
-Number of PPCPs requiring both elevations = 1.
-Answer: 1
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer directly cites the passage stating that at least one PPCP on each project must have both a water level reference elevation and a NAVD88 elevation. The calculation is straightforward, requiring no additional arithmetic beyond quoting the document's explicit requirement. The problem is self-contained and the answer format complies with the rubric.
+**Q:** For a dam safety assessment under USACE guidelines, which edition of the International Building Code is projected to maintain the existing wall anchorage requirements for RWFD buildings without modifications?
+**Gold (A2):** 2024 IBC
+**Answer:** 2024 IBC
+**Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
+**Judge:** The passage explicitly states that the current wall anchorage provisions are anticipated to be carried forward through the 2024 IBC without change. The answer '2024 IBC' directly matches the term in the passage and fits the question's requirement for the projected edition maintaining existing requirements. No hedging or additional facts are included, and the answer is precise and bare.
 
-### usace-em-1110-2-1605:p34:c0:q0:multi_step:1
+### fhwa-sbdh-v05:p24:c0:f1:closed_book:1
 
-multi_step | ordinary | paraphrased | teacher mistral-medium-2604 | kept True (kept) | score 5.0 | revised False
+closed_book | eval_seen | exact | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
 
-Passage `usace-em-1110-2-1605:p34:c0`: greater than 40 feet, model testing is required. Using one-third of the head on the crest in Equation 5-1 results in a downstream face shape which is close to that resulting from the procedure used for high spillways (presented in EM 1110-2-1603). The techniques presented in EM 1110-2-1603 can be used for heads greater than 40 feet. The trajectory resulting from using one-third of the head on the crest is the steepest that can be used without severe negative pressures occurring on the downstream face; flatter trajectories can be used. The parabolic trajectory continues to the stilling basin fl...
+Passage `fhwa-sbdh-v05:p24:c0`: 4.0 CONSTRUCTABILITY 4.1 Rolled Beams/Welded Plate Girders Rolled beam and plate girder bridges are generally easily constructed, particularly for span lengths less than 200 feet, which encompasses a large majority of the steel bridges constructed in the U.S. For span lengths under 200 feet, the girders can generally be erected with little or no falsework. Pier brackets are often used to provide stability of the negative moment sections until the positive moment sections can be erected. As the span lengths exceed 200 feet, falsework towers may become necessary to erect the girders. Stability o...
 
-**Q:** An engineer is designing a spillway crest for a low-head navigation dam following EM 1110-2-1605. The design head on the crest is 45 feet. According to the document, what is the minimum value of one-third of the design head that should be used in Equation 5-1 to determine the downstream face shape? Provide the result in feet.
-**Gold (A2):** 15 feet
-**Answer:** one-third of 45 feet = 45 / 3 = 15 feet
-Answer: 15 feet
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies the requirement from the passage to use one-third of the design head in Equation 5-1 for a head greater than 40 feet. The arithmetic calculation is accurate, and the final answer matches the expected result. The problem is self-contained, and the answer adheres to the required format.
-
-### fhwa-nhi-15-047:p290:c0:q1:multi_step:1
-
-multi_step | ordinary | exact | teacher mistral-medium-2604 | kept True (kept) | score 5.0 | revised False
-
-Passage `fhwa-nhi-15-047:p290:c0`: LRFD for Highway Bridge Superstructures Chapter 5 Reference Manual Concrete Girder Superstructures Figure 5.2.4-1  Post-Tensioning Anchor Bar tendons are secured by a threaded anchor nut that bears against an anchor plate.  The anchor plate may be a square or rectangular steel plate or a special embedded casting, depending upon the system. Various types and sizes of components are commercially available for posttensioning.  For bridges, post-tensioning bars are most often used for temporary construction uses, such as for erecting precast segments, as well as for permanent applications.  Bar an...
-
-**Q:** An engineer is designing a highway bridge superstructure using the LRFD for Highway Bridge Superstructures Reference Manual (NHI-15-047). A post-tensioning bar system is required to temporarily support a precast concrete segment during construction. The segment weighs 450 kN, and the bar must resist 1.5 times the segment weight for safety. If the allowable stress for the post-tensioning bar is 650 MPa, what is the minimum required cross-sectional area of the bar in square millimeters?
-**Gold (A2):** 1038.46 mm²
-**Answer:** Calculate required force: 1.5 * 450 kN = 675 kN. Convert force to Newtons: 675 kN * 1000 = 675000 N. Calculate required area: 675000 N / 650 MPa = 1038.46 mm². Answer: 1038.46 mm²
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly uses the allowable stress value (650 MPa) from the passage for post-tensioning bars. The arithmetic is accurate, and the final answer matches the expected result. The problem is self-contained, and the answer line is properly formatted. No extraneous facts from outside the passage are used.
-
-### fema-e-74:p56:c0:q0:multi_step:1
-
-multi_step | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `fema-e-74:p56:c0`: Performance-based design concepts have been in development for several decades; this process is Analogy: Financial Risk ongoing.  These concepts are gradually finding their Tolerance way into the building codes used for new construction, One of the first things most such as the International Building Code and ASCE/SEI 7 financial advisors do with new Minimum Design Loads for Buildings and Other clients is to present them with Structures, and into the building standards used for the an investment questionnaire to evaluation and retrofitting of existing structures, gauge how they feel about ASCE...
-
-**Q:** Using FEMA E-74: Reducing the Risks of Nonstructural Earthquake Damage, a structural engineer assesses an existing building’s seismic performance. The building’s nonstructural components have a calculated seismic force demand of 12.5 kN. If the components are designed to meet the minimum life safety standard equivalent described in the document, what is the minimum required seismic capacity (in kN) assuming a safety factor of 1.5 must be applied to the demand?
-**Gold (A2):** 18.75 kN
-**Answer:** Seismic force demand = 12.5 kN
-Safety factor = 1.5
-Minimum required seismic capacity = Seismic force demand × Safety factor
-Minimum required seismic capacity = 12.5 kN × 1.5
-Minimum required seismic capacity = 18.75 kN
-Answer: 18.75 kN
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly applies the safety factor of 1.5 to the seismic force demand of 12.5 kN as implied by the document's reference to minimum life safety standards. The calculation is accurate, and the problem is self-contained with all necessary inputs provided. The answer adheres to the required format and does not introduce any external facts not present in the passage.
-
-### fhwa-hif17019:p296:c0:q0:multi_step:1
-
-multi_step | ordinary | exact | teacher mistral-medium-2604 | kept True (kept) | score 5.0 | revised False
-
-Passage `fhwa-hif17019:p296:c0`: Example 13.6-1. Sample Materials Specification Language for Grouted Reinforcing Splice Couplers. Grouted Splice Couplers: Use grouted splice couplers to join precast elements as shown on the plans. The coupler shall be specifically designed to join reinforcing steel from within a precast concrete element to projecting bars from an adjacent precast concrete element. The couplers shall use cementitious grout placed inside a steel casting to develop the strength of the connection. Threaded connections may be used for the portions of the coupler that are placed within the precast element if the st...
-
-**Q:** Using the tensile strength requirement from the document 'Engineering Design, Fabrication and Erection of Prefabricated Bridge Elements and Systems,' calculate the minimum tensile force (in kips) that a grouted splice coupler must withstand when connecting a #11 ASTM A615 reinforcing bar. The cross-sectional area of a #11 bar is 1.56 square inches.
-**Gold (A2):** 140.4 kips
-**Answer:** Tensile strength requirement: 90,000 psi. Cross-sectional area of #11 bar: 1.56 in². Minimum tensile force = 90,000 psi * 1.56 in² = 140,400 lbs. Convert to kips: 140,400 lbs / 1000 = 140.4 kips. Answer: 140.4 kips
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies the tensile strength requirement of 90,000 psi from the document and uses the provided cross-sectional area of 1.56 in² for a #11 bar. The arithmetic is accurate, and the final answer is correctly converted to kips. The solution adheres to the required format and does not introduce any external values.
-
-### usace-em-1110-2-2107:p340:c0:q0:multi_step:1
-
-multi_step | ordinary | paraphrased | teacher mistral-medium-2604 | kept True (kept) | score 5.0 | revised False
-
-Passage `usace-em-1110-2-2107:p340:c0`: Equation C.8 is taken from Equation C.85 and Equation C.93 in section C.4, which are both implementations of Hooke’s Law relating force F of a linearly elastic system to the displacement of the system by a proportionality constant k (referred to as stiffness). Formally: 𝐹𝐹 = 𝑘𝑘𝑘𝑘 (Equation C.34) or equivalently, 𝐹𝐹 𝑘𝑘 = 𝑘𝑘 (Equation C.35) Equation C.93 is a manipulation of Hooke’s law to relate the torsional deflection of the miter end of a miter gate to the applied torsion on the gate. Using the notation of Hooke’s law shown above for Equation C.93, the force F is the applied live load torsio...
-
-**Q:** An engineer is designing a miter gate for a hydraulic steel structure following EM 1110-2-2107. The gate experiences a total applied live load torsion of 500 kN·m, and the torsional deflection of the miter block is measured as 0.02 radians. The gate’s inherent torsional stiffness is 15,000 kN·m/rad, and it is reinforced with two pretensioned diagonals, each contributing an additional stiffness of 5,000 kN·m/rad. Calculate the total torsional stiffness of the system to verify the deflection.
-**Gold (A2):** 25000 kN·m/rad
-**Answer:** Step 1: Identify gate inherent torsional stiffness: Q0 = 15,000 kN·m/rad. Step 2: Identify stiffness of each diagonal: Qi = 5,000 kN·m/rad. Step 3: Sum stiffness of diagonals: ∑Qi = 2 * 5,000 = 10,000 kN·m/rad. Step 4: Calculate total stiffness: k = Q0 + ∑Qi = 15,000 + 10,000 = 25,000 kN·m/rad. Answer: 25,000 kN·m/rad
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies and applies the torsional stiffness formula from the passage (Equation C.38). The arithmetic is accurate, and the final answer matches the expected result. The problem statement provides all necessary inputs, and the answer adheres to the required format. No extraneous document values are used.
-
-### usace-em-1110-2-4300:p32:c0:q1:multi_step:1
-
-multi_step | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `usace-em-1110-2-4300:p32:c0`: b. Instrument Storage and Protection. Stress meters and pore pressure cells should be left in packing boxes for storage as illustrated in Figure 2-9, secured as received. The inspection and reading check to be made as outlined above can be completed without removing the strips which secure the meters for shipment. For protection during cable splicing operations and handling on the job, strain meters and joint meters may be carefully repacked in the manner received or preferably each meter may be placed in a protective container such as shown in Figure 2-10. The container illustrated was made b...
-
-**Q:** An engineer is installing instrumentation in a concrete structure following EM 1110-2-4300. A strain meter cable requires two copper identification bands: one near the meter and another near the free end. If the total cable length is 25 feet, how far from the free end should the second copper band be placed, assuming the band near the meter is positioned per the document's guidance?
-**Gold (A2):** 1 foot
-**Answer:** Total cable length = 25 feet.|Band near meter is placed 3 feet from meter.|Remaining cable length = 25 - 3 = 22 feet.|Second copper band is placed 1 foot from free end.|Distance from meter to second band = 22 - 1 = 21 feet.|Answer: 1 foot
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies the placement of the copper bands as specified in the document. The calculation follows the document's guidance for the band near the meter (3 feet) and the band near the free end (1 foot). The arithmetic is accurate, and the final answer aligns with the document's requirements.
-
-### usace-em-1110-1-1005:p282:c0:q1:multi_step:1
-
-multi_step | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `usace-em-1110-1-1005:p282:c0`: Figure 11-9 below depicts feature and attribute assignments on one of the objects (“FH” -- fire hydrant) that were imported into a Trimble Geomatics Office (TGO) software display. Processing Features and Attributes Figure 11-9.  Feature and attribute coding--Trimble Geomatics Office (David Evans & Associates) 11-8.  Cell Libraries Containing Corps of Engineers Standardized Symbology A “cell” in MicroStation and a “block” in AutoCAD are groups of graphical elements that can be manipulated as a single entity.  Examples of cells/blocks are hydrants, poles, benchmarks, etc.  The use of such symbol...
-
-**Q:** An engineer is working with MicroStation to standardize CADD symbols for a USACE project, following EM 1110-1-1005. The engineer needs to create a new cell library to store 15 custom survey symbols, each requiring 2.5 MB of storage. What is the total estimated file size of the new MicroStation cell library in megabytes?
-**Gold (A2):** 37.5 MB
-**Answer:** 15 symbols * 2.5 MB per symbol = 37.5 MB
-Answer: 37.5 MB
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies the storage requirement per symbol from the problem statement, not the document, and performs the arithmetic accurately. The document is referenced appropriately, but the value used (2.5 MB per symbol) is provided in the problem, not the passage. The answer format adheres to the required structure.
-
-### usace-em-1110-2-2007:p24:c0:q1:multi_step:1
-
-multi_step | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `usace-em-1110-2-2007:p24:c0`: (5) Case 5, Other special load cases. Modify all of the previous load cases to include other special loads applied to the U-frame structure. Examples are maintenance vehicles and bridges or other permanent structures which are supported by the U-frame. (2) Minimum reinforcement. Reinforcement for continuously reinforced concrete slabs on soil foundations should comply with Tables 3-1 or 3-2.; except that the area of temperature reinforcement in thicker slabs need not exceed 2,200 mm2 per meter (1 in.2 per foot). Reinforcement should be placed in two layers, top and bottom of slab, when the sla...
-
-**Q:** According to EM 1110-2-2007, what is the minimum required area of temperature reinforcement in the bottom layer of a continuously reinforced concrete slab on a soil foundation with a thickness of 350 mm, if the total required temperature reinforcement is 3000 mm² per meter? Assume the reinforcement is distributed as specified for thicker slabs in the document.
-**Gold (A2):** 1000 mm² per meter
-**Answer:** Total temperature reinforcement required: 3000 mm²/m.
-For thicker slabs, 2/3 of reinforcement is placed in the top face.
-Reinforcement in top face: (2/3) * 3000 = 2000 mm²/m.
-Reinforcement in bottom face: 3000 - 2000 = 1000 mm²/m.
-Minimum temperature reinforcement in bottom layer: 1000 mm²/m.
-Answer: 1000 mm² per meter
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly identifies the document's value for reinforcement distribution in thicker slabs (2/3 in the top face) and applies it accurately. The arithmetic is correct, and the final answer matches the expected result. The problem is self-contained, and the answer line is properly formatted.
-
-### usace-em-1110-2-2502:p639:c0:q1:multi_step:1
-
-multi_step | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept) | score 5.0 | revised False
-
-Passage `usace-em-1110-2-2502:p639:c0`: Per Table G.2 in paragraph G.6.5, the A2 – 10-year low tide with surcharge load case produced the maximum anchor force: Ta = 12.4 kip/ft Per paragraph 10.5.2.4, the continuous anchor wall capacity for this project’s soil conditions is: 𝛾𝛾𝐻𝐻2 Cac = PP – PA = (𝐾𝐾𝑃𝑃 − 𝐾𝐾𝐴𝐴) 2 H = total sheet pile depth = 40 ft + 12.6 ft = 52.6 ft γ = soil unit weight = 120 pcf For design: Cac ≥ Ta Therefore: Rearranging, 𝛾𝛾𝐻𝐻2 𝑇𝑇𝑎𝑎 ≤ (𝐾𝐾𝑃𝑃 − 𝐾𝐾𝐴𝐴) 2 2 𝑇𝑇𝑎𝑎 𝐻𝐻 ≥ ඨ𝛾𝛾(𝐾𝐾𝑃𝑃 − 𝐾𝐾𝐴𝐴 ) The earth pressure coefficients are calculated assuming zero wall friction and the same mobilized shear strength parameters used in the ...
-
-**Q:** Using EM 1110-2-2502, calculate the required minimum depth of embedment (H) for a continuous anchor wall in soil with a unit weight of 120 pcf to resist an anchor force of 12.4 kip/ft. The soil's active and passive earth pressure coefficients are based on friction angles of 33° (active) and 23.4° (passive), respectively, with zero wall friction. Assume the difference in earth pressure coefficients (Kp - Ka) is 1.2. Provide the result in feet.
-**Gold (A2):** 13.12 ft
-**Answer:** Ta = 12.4 kip/ft = 12,400 lb/ft
-γ = 120 pcf
-(Kp - Ka) = 1.2
-H ≥ sqrt( (2 * Ta) / (γ * (Kp - Ka)) )
-H ≥ sqrt( (2 * 12,400) / (120 * 1.2) )
-H ≥ sqrt( 24,800 / 144 )
-H ≥ sqrt(172.22)
-H ≥ 13.12 ft
-Answer: 13.12 ft
-**Verifier:** {'answer_line': True, 'no_passage_ref': True, 'gold': True}
-**Judge:** The answer correctly uses the values provided in the passage (Ta = 12.4 kip/ft, γ = 120 pcf, (Kp - Ka) = 1.2) and follows the formula derived from paragraph 10.5.2.4. The arithmetic is accurate, and the final answer matches the expected result. The problem statement is self-contained, and the answer ends with the required line. Steps are clear and concise, with no extraneous information or unsourced facts.
+**Q:** What is the generally advisable maximum length for field sections in steel bridge fabrication to maximize fabricator participation, as stated in the Steel Bridge Design Handbook?
+**Gold (A2):** 120 feet
+**Answer:** 120 feet
+**Verifier:** {'gold': True, 'no_passage_ref': True, 'no_hedge': True, 'short': True}
+**Judge:** The answer '120 feet' is explicitly stated in the passage as the generally advisable maximum length for field sections to maximize fabricator participation. It meets all hard rules as it is directly supported, matches the gold fact, fits the question, is a general recommendation, and is stated plainly without hedging. The answer also adheres to the principles and avoids pitfalls.
 
 ### usace-em-1110-2-1420:p99:c0:f9:definition:1
 
@@ -399,7 +256,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How should values for modeling parameters be determined when they fall between the specified ranges in FEMA P-2208 for conforming and nonconforming reinforced concrete structural walls?
 **Gold (A2):** Linear interpolation between the values given in the table shall be permitted; however, interpolation between the values specified for Conforming walls and Nonconforming walls shall not be permitted.
 **Answer:** Linear interpolation between the values given in the table for conforming walls shall be permitted; however, interpolation between the values specified for conforming walls and nonconforming walls shall not be permitted. [P4]
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer directly addresses the question by quoting the relevant guidance from passage P4. It specifies that linear interpolation is permitted within the values for conforming walls but explicitly prohibits interpolation between conforming and nonconforming walls. The answer is concise, cites only the supporting passage (P4), and does not introduce unsupported facts or restate the question.
 
 ### fhwa-sbdh-ex5:p47:c0:q4:grounded:1
@@ -414,7 +271,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How are tub girder distortional stresses calculated in the Steel Bridge Design Handbook Design Example 5?
 **Gold (A2):** Distortional stresses are determined based on the beam-on-elastic-foundation analogy.
 **Answer:** Tub girder distortional stresses are calculated based on the beam-on-elastic-foundation analogy [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer directly cites the method for calculating tub girder distortional stresses as described in P4. The passage P4 explicitly states that 'sample calculations for determining tub girder distortional stresses based on the beam-on-elastic-foundation analogy are provided.' This satisfies the question's requirement and aligns with the rubric's criteria for support, citation, and completeness. No additional or unsupported claims are made.
 
 ### usace-em-1110-2-1612:p337:c0:q4:grounded:1
@@ -429,7 +286,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How is it determined whether an ice cover can progress upstream in a river when the flow Froude Number exceeds the Juxtaposition Froude Number?
 **Gold (A2):** Check if the Froude Number of the flow is less than the limiting value of the Froude Number for progression; if true, the ice cover may progress in narrow-jam or wide-jam modes, otherwise no progression occurs.
 **Answer:** If the Froude Number of the flow exceeds the Juxtaposition Froude Number but is less than the limiting value of the Froude Number for progression, the ice cover can progress upstream in either the narrow-jam or wide-jam modes [P3]. If the Froude Number exceeds the limiting value for progression, no upstream progression is possible, and arriving ice is swept downstream [P3].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer correctly identifies the key condition from P3 regarding the Froude Number exceeding the Juxtaposition Froude Number but being less than the limiting value for progression. It also accurately states the outcome if the limiting value is exceeded. The claims are directly supported by P3, and no unsupported facts or unrelated passages are cited. The response is concise and directly addresses the question without restating it.
 
 ### nist-gcr-11-917-11:p27:c2:q4:grounded:1
@@ -444,7 +301,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How can confinement reinforcement be provided for diagonally reinforced coupling beams to ease construction difficulties?
 **Gold (A2):** Hoops and crossties confine the entire beam cross section rather than individual diagonals, with confinement reinforcement placed along the main reinforcement.
 **Answer:** Confinement reinforcement can be provided by using hoops and crossties to confine the entire beam cross section, rather than individual diagonals, which reduces construction difficulties [P2][P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer directly addresses the question by referencing the second option in P2, which describes using hoops and crossties to confine the entire beam cross section to ease construction difficulties. This is further supported by P4, which reiterates the same method and its benefits. The answer is concise, cites only relevant passages, and does not introduce unsupported facts or restate the question.
 
 ### usace-em-1110-2-2602:p58:c1:q4:grounded:1
@@ -459,7 +316,7 @@ grounded | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | sc
 **Q:** How is a nonlinear incremental structural analysis (NISA) justified for massive concrete structures like navigation locks?
 **Gold (A2):** A NISA should be performed if it will help achieve a more accurate assessment of the structure's behavior under loading, particularly when nonlinear effects are significant.
 **Answer:** A nonlinear incremental structural analysis (NISA) is justified for massive concrete structures like navigation locks when it helps achieve a more accurate assessment of structural behavior, particularly under complex loading conditions, material nonlinearities, or dynamic effects such as seismic activity [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer directly addresses the justification for using NISA in massive concrete structures by referencing the specific passage P4, which states that NISA should be performed if it helps achieve a more accurate assessment of structural behavior. The claim is supported solely by P4, and no unrelated passages or external facts are introduced. The response is concise and avoids restating the question.
 
 ### usace-em-1110-1-3500:p24:c0:q4:grounded:1
@@ -474,7 +331,7 @@ grounded | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | sc
 **Q:** How should the permeability of in situ soil or rock be determined before chemical grouting?
 **Gold (A2):** The general geology of the area should be known, specifically, in fractured rock, the size, configuration, and location of openings; coatings on the surface of the openings; amount of free water or moisture present; and the strength of the medium to be grouted.
 **Answer:** The permeability of the in situ soil or rock should be determined through laboratory testing and analysis of the general geology of the area, including the size, configuration, and location of openings in fractured rock, as well as the presence of coatings, moisture, and strength of the medium [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer correctly identifies that the permeability of in situ soil or rock should be determined through laboratory testing and analysis of the general geology of the area, as specified in P4. It aligns with the content of P4, which details the factors to consider, such as the size, configuration, and location of openings in fractured rock, coatings, moisture, and strength. The answer is concise and directly addresses the question without citing unrelated passages or adding extraneous information. However, it does not explicitly mention 'permeability testing' as a distinct step, though P4 im
 
 ### usace-em-1110-2-4300:p258:c0:q4:grounded:1
@@ -489,7 +346,7 @@ grounded | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | sc
 **Q:** How should modifications, additions, or deletions to an installed instrumentation system for concrete structures be documented?
 **Gold (A2):** They should be documented in the system installation manual to reflect the actual configuration of the system after installation and acceptance.
 **Answer:** Modifications, additions, or deletions to the system should be documented in the system installation manual, which must include updated site plans, power wiring drawings, cable routing and identification drawings, and other configuration details [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer correctly identifies that modifications, additions, or deletions should be documented in the system installation manual, as explicitly stated in P4. It also lists specific details (e.g., site plans, power wiring drawings) that P4 mentions must be included in the manual. The answer adheres to the question's scope by citing only P4 and avoids unsupported claims or distractors. The response is concise and directly addresses the question without restating it.
 
 ### fhwa-sbdh-v04:p140:c0:q4:grounded:1
@@ -504,7 +361,7 @@ grounded | ordinary | paraphrased | teacher mistral-medium-2604 | kept True (kep
 **Q:** How do the flexural resistances from AASHTO (2014) and AISC (2010) compare to test results for rolled beam I-sections under uniform bending?
 **Gold (A2):** White and Chang (2007) show that Eq. (8) with a coefficient of 1.1 gives resistances larger than traditional AISC ASD values for most compact-web I-section members, with a maximum difference of approximately six percent compared to Eq. (10). Figure 63 compares these resistances to test results from Dux and Kitipornchai (1983) and Wong-Chung and Kitipornchai (1987).
 **Answer:** The flexural resistances from AASHTO (2014) and AISC (2010) are compared to test results for rolled beam I-sections under uniform bending in Figure 63, showing their respective Mnc values relative to test data [P2].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer correctly identifies that the comparison of flexural resistances from AASHTO (2014) and AISC (2010) to test results for rolled beam I-sections under uniform bending is shown in Figure 63, as stated in passage P2. The answer cites P2, which directly supports the claim. The response is concise and directly addresses the question without adding unsupported facts or restating the question. No unrelated passages are cited.
 
 ### fhwa-nhi-15-047:p182:c0:q4:grounded:1
@@ -519,7 +376,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How is the wheel-load distribution to the exterior girder calculated when one design lane is loaded on a steel I-girder bridge?
 **Gold (A2):** The lever rule is used by summing moments about the adjacent interior girder to find the wheel-load reaction at the exterior girder, assuming the concrete deck is hinged at the interior girder.
 **Answer:** The wheel-load distribution to the exterior girder when one design lane is loaded is calculated using the Lever Rule, which involves summing moments about the adjacent interior girder to find the wheel-load reaction at the exterior girder, assuming the concrete deck is hinged at the interior girder [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer correctly identifies the Lever Rule as the method for calculating wheel-load distribution to the exterior girder when one design lane is loaded. It directly cites [P4], which explicitly describes the Lever Rule and its application, including the assumption of the concrete deck being hinged at the interior girder. The answer adheres to the question's requirement to use only passages P1-P4 and does not introduce extraneous information or citations. It is concise and aligns with the gist of the gold passage P4.
 
 ### fhwa-nhi-04-041:p118:c0:q4:grounded:1
@@ -534,7 +391,7 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 **Q:** How should empirically determined live load distribution factors for one-lane loaded be adjusted when applied to the single fatigue truck?
 **Gold (A2):** All empirically determined distribution factors for one-lane loaded that are applied to the single fatigue truck must be divided by 1.20.
 **Answer:** Empirically determined distribution factors for one-lane loaded that are applied to the single fatigue truck must be divided by 1.20, as the multiple presence factor is not applied to the fatigue limit state [P4].
-**Verifier:** {'citations': True, 'answered': True}
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
 **Judge:** The answer directly addresses the question by referencing the specific adjustment required for empirically determined live load distribution factors when applied to the single fatigue truck. The adjustment (dividing by 1.20) is explicitly stated in passage P4, and the answer correctly cites this passage without adding extraneous information or misattributing content. The response is concise and adheres to the rubric's requirements for completeness and directness.
 
 ### usace-em-1110-1-1005:p11:c1:q1:abstain:1
@@ -843,10 +700,10 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 
 **Q:** How is the earth load pressure acting on a pipe calculated when the cover height exceeds 8 feet and live loads are neglected?
 **Gold (A2):** The earth load pressure is calculated by multiplying the unit weight of the fill over the top of the pipe by the height of the soil column.
-**Answer:** The earth load pressure (PFD) is calculated by multiplying the unit weight of the fill over the top of the pipe by the height of the soil column [P1].
+**Answer:** The earth load pressure (PFD) is calculated by multiplying the unit weight of the fill over the top of the pipe by the height of the soil column. [P1]
 **Before revise:** The earth load pressure (PFD) is calculated by multiplying the unit weight of the fill over the top of the pipe (γ) by the height of the soil column (H). [P1, P4]
-**Verifier:** {'citations': True, 'answered': True}
-**Judge:** The question asks how the earth load pressure acting on a pipe is calculated when the cover height exceeds 8 feet and live loads are neglected. Passage P1 explicitly states the formula for earth load pressure (PFD) as the product of the unit weight of the fill and the height of the soil column. This directly answers the question without requiring additional information from other passages. The answer provided in the 'Answer to grade' section aligns with this formula and cites P1 correctly.
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
+**Judge:** The question asks how the earth load pressure acting on a pipe is calculated when the cover height exceeds 8 feet and live loads are neglected. Passage P1 explicitly provides the formula and explanation for calculating the earth load pressure (PFD) by multiplying the unit weight of the fill by the height of the soil column. This directly answers the question without requiring additional information from other passages. The answer adheres to the rubric by citing the correct passage and avoiding unsupported claims or restatements of the question.
 **Disagreement:** citations:verifier=False/judge=True
 
 ### usace-em-1110-2-1602:p107:c0:q1:multi_step:1
@@ -873,10 +730,10 @@ grounded | ordinary | exact | teacher mistral-large-2512 | kept True (kept) | sc
 
 **Q:** What happens during the short-circuiting cycle in the GMAW process when the electrode touches the workpiece?
 **Gold (A2):** The electrode creates a short in the electrical circuit, the arc is extinguished, current increases dramatically, superheating the electrode and causing it to melt. The short breaks, initiating a momentary arc, and a small amount of metal is transferred to the work.
-**Answer:** When the electrode touches the workpiece, it creates a short in the electrical circuit, extinguishing the arc [P1]. The current then increases dramatically, superheating and melting the electrode, which breaks the short and initiates a momentary arc, transferring a small amount of metal to the work [P1]. This cycle repeats 20 to 200 times per second [P1].
+**Answer:** When the electrode touches the workpiece, it creates a short in the electrical circuit [P1]. The arc is extinguished at this point [P1]. The current then increases dramatically, superheating the electrode and causing it to melt [P1]. The shorted electrode breaks, initiating a momentary arc and transferring a small amount of metal to the work [P1]. This cycle repeats 20 to 200 times per second [P1].
 **Before revise:** When the electrode touches the workpiece, it creates a short in the electrical circuit, extinguishing the arc. The current then increases dramatically, superheating and melting the electrode, which breaks the short and initiates a momentary arc, transferring a small amount of metal to the work [P1]. This cycle repeats 20 to 200 times per second [P1, P3].
-**Verifier:** {'citations': True, 'answered': True}
-**Judge:** The answer directly addresses the short-circuiting cycle in GMAW as described in P1. It includes all key steps: the short circuit, arc extinction, current increase, electrode melting, short breaking, arc initiation, and metal transfer. The claims are supported by P1, and no unsupported facts or unrelated passages are cited. The response is concise and avoids restating the question.
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
+**Judge:** The answer directly addresses the short-circuiting cycle in GMAW as described in P1. It includes all key steps: the short circuit, arc extinction, current increase, electrode melting, short breaking, arc initiation, and metal transfer. The claims are supported by P1 alone, and no unsupported facts or unrelated passages are cited. The response is concise and avoids restating the question.
 **Disagreement:** citations:verifier=False/judge=True
 
 ### fema-p-2082-1:p592:c0:q4:grounded:1
@@ -891,7 +748,7 @@ grounded | ordinary | exact | teacher mistral-large-2512 | kept False (factual) 
 **Q:** How is the leadership structure of the BSSC Board of Direction organized for the 2020 NEHRP Recommended Seismic Provisions project?
 **Gold (A2):** The Board of Direction includes a Chair, Vice Chair, Secretary, At-Large members, and an NIBS Board Liaison, with specific individuals named for each role annually.
 **Answer:** Not in the provided passages
-**Verifier:** {'citations': False, 'answered': False}
+**Verifier:** {'citations': False, 'answered': False, 'every_sentence_cited': False}
 **Judge:** The question asks about the leadership structure of the BSSC Board of Direction for the 2020 NEHRP Recommended Seismic Provisions project. The provided passages (P1-P4) only detail the BSSC Board of Direction structure for the years 2015-2019, with no information about 2020. The answer is absent from the passages, so the response must decline to answer due to lack of relevant information.
 **Disagreement:** citations:verifier=False/judge=True
 
@@ -1094,10 +951,10 @@ grounded | ordinary | paraphrased | teacher mistral-large-2512 | kept True (kept
 
 **Q:** How is the suitability of a simplified 2D MDOF wood model justified for seismic performance evaluation in FEMA P-2343?
 **Gold (A2):** The 2D MDOF model predicted median collapse SCT values within 5% and probabilities of collapse within 16% of the detailed 3D model, while requiring significantly less computation time.
-**Answer:** The simplified 2D MDOF wood model is justified for seismic performance evaluation because it predicts median collapse SCT values within a 5% difference and collapse probabilities within a maximum of 16% difference compared to the detailed 3D model [P1], while being significantly more computationally efficient, taking about 2 hours instead of 5 days [P1].
+**Answer:** The simplified 2D MDOF wood model predicts median collapse SCT values within a 5% difference of the detailed 3D model [P1]. It also estimates collapse probabilities within a maximum of 16% difference [P1]. The 2D model is significantly more computationally efficient, taking about 2 hours compared to 5 days for the 3D model [P1].
 **Before revise:** The simplified 2D MDOF wood model is justified for seismic performance evaluation because it predicts median collapse SCT values within a 5% difference and collapse probabilities within a maximum of 16% difference compared to the detailed 3D model, while being significantly more computationally efficient, taking about 2 hours instead of 5 days [P1, P3].
-**Verifier:** {'citations': True, 'answered': True}
-**Judge:** The answer directly addresses the justification for the simplified 2D MDOF wood model by citing its accuracy (median collapse SCT values within 5% and collapse probabilities within 16%) and computational efficiency (2 hours vs. 5 days) from passage P1. No unsupported claims or unrelated passages are cited. The response is concise and avoids restating the question or adding extraneous information.
+**Verifier:** {'citations': True, 'answered': True, 'every_sentence_cited': True}
+**Judge:** The answer correctly cites P1 for all claims, which directly supports the justification of the 2D MDOF model's suitability. The claims align with the key points in P1: median collapse SCT values within 5%, collapse probabilities within 16%, and computational efficiency. No unsupported claims or unrelated passages are cited. The answer is concise and directly addresses the question without restating it.
 **Disagreement:** citations:verifier=False/judge=True
 
 ### usace-em-1110-2-2301:p55:c0:q1:multi_step:1

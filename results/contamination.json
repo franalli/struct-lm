@@ -5726,43 +5726,34 @@
   ]
  },
  "sft": {
-  "train": 3601,
-  "val": 114,
+  "train": 3031,
+  "val": 95,
   "leaked_chunks": [],
   "eval": {
    "domain_qa seen: questions": {
     "items": 167,
     "checkable": 166,
     "sft": {
-     "any": 83,
-     "ge50": 23,
-     "ge80": 3,
-     "mean_token_frac": 0.22987427633761673
+     "any": 79,
+     "ge50": 18,
+     "ge80": 2,
+     "mean_token_frac": 0.21491307605812404
     },
     "either": {
-     "any": 83,
-     "ge50": 23,
-     "ge80": 3,
-     "mean_token_frac": 0.22987427633761673
+     "any": 79,
+     "ge50": 18,
+     "ge80": 2,
+     "mean_token_frac": 0.21491307605812404
     },
     "examples": [
      {
       "item": 94,
-      "token_frac": 0.8571428571428571,
+      "token_frac": 0.8333333333333334,
       "found_in": [
        "sft"
       ],
-      "longest_span": "In NASA-STD-5020B, what is the maximum coefficient of friction",
+      "longest_span": " NASA-STD-5020B, what is the maximum coefficient of friction",
       "text": "In NASA-STD-5020B, what is the maximum coefficient of friction for uncoated, non-lubricated metal surfaces cleaned by a qualified process in joint-slip analysis?"
-     },
-     {
-      "item": 152,
-      "token_frac": 0.8235294117647058,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": " USACE EM 1110-2-3401",
-      "text": "What is the maximum continuous work period for surface preparation, thermal spray application, and sealing per USACE EM 1110-2-3401?"
      },
      {
       "item": 137,
@@ -5772,6 +5763,15 @@
       ],
       "longest_span": " aspect ratio for cold-formed steel shear walls sheathed with wood structural panels",
       "text": "What is the maximum aspect ratio for cold-formed steel shear walls sheathed with wood structural panels per NIST GCR 16-917-38?"
+     },
+     {
+      "item": 152,
+      "token_frac": 0.7647058823529411,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " continuous work period for surface preparation, thermal spray application, and sealing",
+      "text": "What is the maximum continuous work period for surface preparation, thermal spray application, and sealing per USACE EM 1110-2-3401?"
      }
     ]
    },
@@ -5869,16 +5869,16 @@
     "items": 158,
     "checkable": 158,
     "sft": {
-     "any": 59,
-     "ge50": 9,
+     "any": 51,
+     "ge50": 8,
      "ge80": 0,
-     "mean_token_frac": 0.15994318448235365
+     "mean_token_frac": 0.13806168034696512
     },
     "either": {
-     "any": 59,
-     "ge50": 9,
+     "any": 51,
+     "ge50": 8,
      "ge80": 0,
-     "mean_token_frac": 0.15994318448235365
+     "mean_token_frac": 0.13806168034696512
     },
     "examples": [
      {
@@ -5977,17 +5977,26 @@
     "checkable": 108,
     "sft": {
      "any": 4,
-     "ge50": 2,
+     "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.01684410456340281
+     "mean_token_frac": 0.01781876343279852
     },
     "either": {
      "any": 4,
-     "ge50": 2,
+     "ge50": 3,
      "ge80": 0,
-     "mean_token_frac": 0.01684410456340281
+     "mean_token_frac": 0.01781876343279852
     },
     "examples": [
+     {
+      "item": 71,
+      "token_frac": 0.5526315789473685,
+      "found_in": [
+       "sft"
+      ],
+      "longest_span": " in ASCE/SEI 7-16 Section 12.10.3 for",
+      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
+     },
      {
       "item": 72,
       "token_frac": 0.5384615384615384,
@@ -6005,15 +6014,6 @@
       ],
       "longest_span": " Buckling-Restrained Braced Frames (BRBFs)",
       "text": "Why are Buckling-Restrained Braced Frames (BRBFs) selected for the lateral force-resisting system in this building?"
-     },
-     {
-      "item": 71,
-      "token_frac": 0.4473684210526316,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": " in ASCE/SEI 7-16 Section 12.1",
-      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
      }
     ]
    },
@@ -6049,7 +6049,7 @@
    "domain_qa seen": {
     "items": 167,
     "question_in_a_prompt": 0,
-    "answer_in_same_document": 89
+    "answer_in_same_document": 78
    },
    "vocab seen": {
     "items": 101,
@@ -6066,23 +6066,23 @@
    }
   },
   "val_vs_train": {
-   "items": 114,
-   "checkable": 114,
+   "items": 95,
+   "checkable": 95,
    "train": {
-    "any": 49,
+    "any": 39,
     "ge50": 1,
     "ge80": 0,
-    "mean_token_frac": 0.10371775950185914
+    "mean_token_frac": 0.10656649812917353
    },
    "either": {
-    "any": 49,
+    "any": 39,
     "ge50": 1,
     "ge80": 0,
-    "mean_token_frac": 0.10371775950185914
+    "mean_token_frac": 0.10656649812917353
    },
    "examples": [
     {
-     "item": 110,
+     "item": 89,
      "token_frac": 0.5,
      "found_in": [
       "train"
@@ -6091,16 +6091,16 @@
      "text": "What is the density ratio of carbon dioxide compared to air as stated in EM 1110-2-3800?\nNot in the provided passages."
     },
     {
-     "item": 51,
-     "token_frac": 0.4411764705882353,
+     "item": 94,
+     "token_frac": 0.4473684210526316,
      "found_in": [
       "train"
      ],
-     "longest_span": " in EM 1110-2-1902?\n",
-     "text": "What is the recommended minimum number of independent methods for verifying slope stability analysis results in EM 1110-2-1902?\nmore than one method"
+     "longest_span": " in FEMA P-2055?\nATC-20-1",
+     "text": "Which document provides the Detailed Evaluation form for post-disaster building safety assessments mentioned in FEMA P-2055?\nATC-20-1 and ATC-45"
     },
     {
-     "item": 10,
+     "item": 12,
      "token_frac": 0.41935483870967744,
      "found_in": [
       "train"
@@ -6160,37 +6160,18 @@
     "items": 1319,
     "checkable": 1319,
     "sft": {
-     "any": 2,
+     "any": 0,
      "ge50": 0,
      "ge80": 0,
-     "mean_token_frac": 7.340254723571178e-05
+     "mean_token_frac": 0.0
     },
     "either": {
-     "any": 2,
+     "any": 0,
      "ge50": 0,
      "ge80": 0,
-     "mean_token_frac": 7.340254723571178e-05
+     "mean_token_frac": 0.0
     },
-    "examples": [
-     {
-      "item": 1096,
-      "token_frac": 0.053691275167785234,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": ": 100% - 20% = 80%\n",
-      "text": "Question: Billy is volunteering his time to help people do their taxes. He can help 2 people per hour for 3 hours a day. If he takes 20% of the days between March 1st and April 19th off, and helps people on all the other days. How many people does he help? (Remember there are 31 days in March.)\nAnswer: First find the number of days between March 1st and April 19th: 31 days + 19 days = <<31+19=50>>50 days\nThen subtract the percentage of time Billy takes off from 100% to find the percentage of time he works: 100% - 20% = 80%\nThen multiply that number by 80% to find the number of days Billy works: 50 days * 80% = <<50*80*.01=40>>40 days\nThen find how many people Billy can help per day: 2 people/hour * 3 hours/day = <<2*3=6>>6 people/day\nThen multiply the number of people he helps per day by the number of days he works to find the total number of people he helps: 6 people/day * 40 days = <<6*40=240>>240 people\n#### 240"
-     },
-     {
-      "item": 1030,
-      "token_frac": 0.0431266846361186,
-      "found_in": [
-       "sft"
-      ],
-      "longest_span": ": 100% - 20% = 80%\n",
-      "text": "Question: Marcus is trying to decide whether he really needs to do his homework. There's a 50% chance that tomorrow he'll have a substitute teacher who won't collect the homework. Even if the normal teacher comes in, there's a 40% chance she'll give everyone an extension. Even if the whole class doesn't get an extension, there's a 20% chance Marcus can convince the teacher his dog ate his assignment and get a personal extension. What is the percentage chance that Marcus will actually have to turn in his homework tomorrow?\nAnswer: First find the chance that the normal teacher comes in by subtracting the odds she doesn't from 100%: 100% - 50% = 50%\nThen find the chance the teacher doesn't grant the whole class an extension by subtracting the chance she does from 100%: 100% - 40% = 60%\nThen find the chance that Marcus can't get a personal extension by subtracting the chance he does from 100%: 100% - 20% = 80%\nNow find the chance the teacher comes in AND doesn't grant the whole class an extension by multiplying the two independent probabilities: .6 * .5 = <<.6*.5=.3>>.3\nNow multiply that probability by the probability Marcus can't get a personal extension to find the probability he actually has to turn in his homework: .3 * .8 = <<.3*.8=.24>>.24\nFinally, multiply the decimal probability by 100 to express it as a percentage: .24 * 100% = <<.24*100=24>>24%\n#### 24"
-     }
-    ]
+    "examples": []
    },
    "HellaSwag (val)": {
     "items": 10042,

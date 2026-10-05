@@ -14,6 +14,10 @@ Two independent checks per example, then a verdict:
             JSON with the reasoning first, then each rule's verdict.
   keep      verifier passes, no hard rule fails, and the principle score (weighted mean of the
             1-5 principle grades, minus half of each pitfall's weight) is at least 4
+(The eval's own closed-book checks, make_tasks.verify_qa's faithfulness test and the blind
+is_standalone test, were tried here after the 2026-10-05 audit and left out: on the 40 audited
+closed-book items the first caught 1 of 8 defects, the second rejected 9 of 19 good items for 4 of
+8 defects, so neither lowered the defect rate; notes/decisions.md.)
 Critique-and-revise, one round: an example whose only failures are format failures (citation
 format, hedging, a reworded abstain sentence, extra words) goes back to its own teacher with the
 failures listed, then through both checks again. Factual failures are never revised. A5 logs the
@@ -62,6 +66,7 @@ PASSAGE_REF = re.compile(
     r"\b(?:the|this|that) passage\b|\bpassages?\s+(?:states?|gives?|says|provides?)\b",
     re.IGNORECASE,
 )
+LABEL_CITE = re.compile(r"\[P[1-4]\]")
 NUMBER_WORDS = {w: str(k) for k, w in enumerate(
     ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 )}  # fmt: skip
@@ -494,6 +499,10 @@ def verify(e: dict) -> dict:
     elif fmt == "grounded":
         out["citations"] = (citations_valid(a, {p["label"] for p in e["passages"]}), "format")
         out["answered"] = ("not in the provided passages" not in a.lower(), "factual")
+        # every sentence carries its own [Pn] (audit 2026-10-05: one citation at the end of two
+        # sentences was 6 of 9 grounded defects, and the judge passed them all)
+        sentences = [s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z(])", a.strip()) if s.strip()]
+        out["every_sentence_cited"] = (all(LABEL_CITE.search(s) for s in sentences), "format")
     elif fmt == "definition":
         sentences = [s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", a.strip()) if s]
         out["one_sentence"] = (len(sentences) == 1, "format")

@@ -61,6 +61,8 @@ from sft_common import (
     write_jsonl,
 )
 from sft_filter import CAP, MIN_ORDINARY_DEFINITIONS, TARGETS
+
+FILTER = SFT / "closed_book_filter.jsonl"
 from sft_guard import Guard
 
 MAX_TOKENS = 4096
@@ -266,6 +268,9 @@ def main() -> None:
             reject(e, "A5", e["reason"])
     candidates = []
     for e in (e for e in judged if e["keep"]):
+        if e["kind"] == "multi_step":  # dropped from v1: 17 of 40 audited were defective
+            reject(e, "A6", "multi_step_dropped")
+            continue
         if e["format"] == "definition":
             hit = guard.term_block(e["term"])
         else:
@@ -324,6 +329,17 @@ def main() -> None:
         count[c] += 1
         final.append(e)
 
+    # the closed-book filter (sft_audit.py filter-merge): every closed-book record read against its
+    # passage by a full-passage reader; defects out, minors kept, and no record goes in unread
+    if FILTER.exists():
+        verdicts = {v["eid"]: v["verdict"] for v in read_jsonl(FILTER)}
+        cb = [e for e in final if e["format"] == "closed_book" and e["kind"] != "multi_step"]
+        unread = [e["eid"] for e in cb if e["eid"] not in verdicts]
+        assert not unread, f"closed-book records without a filter verdict: {unread[:3]}"
+        for e in cb:
+            if verdicts[e["eid"]] == "defect":
+                reject(e, "A6", "closed_book_filter")
+        final = [e for e in final if verdicts.get(e["eid"]) != "defect"]
     records = [record(e, guard) for e in final]
     records += [replay_record(r) for r in read_jsonl(WORK / "replay.jsonl")]
 

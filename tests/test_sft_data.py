@@ -153,6 +153,20 @@ def test_tokens(records):
         assert len(enc[0]) == r["n_tokens"] <= 4096, r["eid"]
 
 
+@HAVE
+def test_closed_book_filtered(records):
+    """Every closed-book record was read against its passage (sft_audit.py filter-merge) and none
+    the reader called a defect is in the set."""
+    verdicts = {}
+    for line in (SFT / "closed_book_filter.jsonl").open():
+        v = json.loads(line)
+        verdicts[v["eid"]] = v["verdict"]
+    for r in records:
+        if r["format"] == "closed_book":
+            assert verdicts.get(r["eid"]) in ("ok", "minor"), r["eid"]
+    assert not [r["eid"] for r in records if r["kind"] == "multi_step"]
+
+
 def test_generators_never_read_eval():
     """The steps that call the LLM can't reach eval/tasks/: they never import sft_guard."""
     for name in GENERATORS:

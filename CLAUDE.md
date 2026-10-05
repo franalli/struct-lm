@@ -228,6 +228,11 @@ make sft-data                               # all steps below, in order
 .venv/bin/python data/scripts/sft_replay.py      # 500 Tulu 3 SFT examples (downloads 1.4 GB once)
 .venv/bin/python data/scripts/sft_assemble.py    # A6/A7 -> data/sft/{train,sft_val}.jsonl, review.md, SHA256SUMS
 .venv/bin/python eval/contamination.py --only sft # section 6 of results/contamination.md
+# quality: full-passage reads of the generated records (packets in data/sft/work/)
+.venv/bin/python data/scripts/sft_audit.py filter-packets   # pass 1: every closed-book record, 10 packets
+.venv/bin/python data/scripts/sft_audit.py filter-packets 2 # pass 2: pass-1 "minor" records, stricter defect line
+.venv/bin/python data/scripts/sft_audit.py filter-merge     # -> data/sft/closed_book_filter.jsonl (assembly drops defects)
+.venv/bin/python data/scripts/sft_audit.py sample [N]       # audit round N sample -> report -> data/sft/audit.md
 ```
 
 - Every call is cached in `data/sft/.cache/llm_cache.jsonl` (gitignored, with each prompt), so a
@@ -237,6 +242,12 @@ make sft-data                               # all steps below, in order
 - After any change to a step, rerun from that step, then `sft_assemble.py`, the contamination
   section and `pytest tests/test_sft_data.py`; a changed `train.jsonl` changes `SHA256SUMS` and
   needs the hand-read in `review.md` redone.
+- The Mistral judge passes defects a full-passage read catches (audit 2026-10-05: 18% of judged-kept
+  records). A rebuild that adds or changes closed-book records needs `filter-packets`, a
+  reader per packet with the audit's closed-book rubric, then pass 2 over what pass 1 kept as
+  "minor" (the line that matters: a wrong framing, overclaim, scope or example value is a defect
+  even when the answer value is right), then `filter-merge`: assembly refuses a closed-book record
+  without a verdict. Then re-audit a fresh sample (`sample N` names the round).
 
 ## Decisions (rules to keep)
 

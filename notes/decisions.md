@@ -1709,7 +1709,11 @@ This entry covers the data (Part A); training is Part B. The plan was A1-A7: chu
 -> dedup / caps / decontamination -> teacher completions -> rubric filter -> assembly -> checks.
 The code is `data/scripts/sft_*.py` (`make sft-data`).
 
-**Result:** `data/sft/train.jsonl` 3,601 + `sft_val.jsonl` 114, checksums in `data/sft/SHA256SUMS`.
+**Superseded counts:** this entry describes the first build (commit b20d03d). The full-passage
+audit below dropped the worked problems and filtered closed-book twice: the frozen set is 3,126
+records, seen half 119/167 facts.
+
+**Result (first build):** `data/sft/train.jsonl` 3,601 + `sft_val.jsonl` 114.
 
 | format | eval-seen chunks | ordinary chunks | total |
 |---|---|---|---|
@@ -1787,7 +1791,7 @@ answer matches a seen item on its own chunk, scored the eval's way.
   - Teacher text the user approves line by line is still teacher text, so labelling it
     `teacher: "human"` would misstate the metadata.
   - The 500 Tulu records cover the real-data role.
-  - The human check is the A7 hand-read below.
+  - The human check is a read of `data/sft/review.md` (50 kept records and the disagreements).
 
 **Filtering (counts in `data/sft/stats.json`; every reject in `data/sft/sft_rejected.jsonl` with
 its rule):**
@@ -1859,7 +1863,7 @@ completion:
   it is an upper bound on the bias. A third-party judge on a sample would separate them.
 - The training comparison is unaffected: sft-from-cpt and sft-from-base train on the identical set.
 
-**A7 hand-read (50 kept, stratified, plus the 50 disagreements above):**
+**A7 read (50 kept, stratified, plus the 50 disagreements above):**
 - **Closed-book:** 10 of 10 correct. Two persona phrasings read oddly ("During the failure analysis,
   what value did the AASHTO LRFD ... assign ...").
 - **Definitions:** 10 of 10 faithful, some fuller than the reference.
@@ -1903,3 +1907,120 @@ completion:
   over the seen chunks is the next lever;
 - Part B's chat rendering differs from the eval's `--chat` path (mistral-common, no system prompt):
   the token counts and the exact-wording half assume it.
+
+## 2026-10-05: SFT set audited against the full passages; refrozen at 3,126 records (user decisions)
+**Context:** the first build's checks were the Mistral judge (the teacher's own model family) and a
+50-record read with passages cut to their first ~260 characters. A stronger check was asked for: a
+stratified sample read against the *full* source passages by independent LLM readers (a different
+model family from the teacher and the judge; not a human read), one fixed rubric per format.
+Verdicts: ok / minor (correct, style only, kept) / defect (would teach something wrong).
+`data/scripts/sft_audit.py`; every verdict in `data/sft/audit.jsonl`, the report in
+`data/sft/audit.md`. Rates are count/n with Wilson 95% intervals.
+
+**Round 1: the first build (200 records, 40 per format, 30 Large / 10 Medium):**
+
+| format | defects |
+|---|---|
+| abstain | 0/40 (0-9%) |
+| definition | 3/40 (8%; 3-20%) |
+| closed-book | 8/40 (20%; 10-35%) |
+| grounded | 9/40 (22%; 12-38%) |
+| multi_step | 17/40 (42%; 29-58%) |
+| all | 37/200 (18%; 14-24%) |
+
+- **The judge passed all 37.** Agreement with the verifier didn't catch them either: they are
+  framing errors a value check can't see.
+- **What goes wrong:**
+  - **Closed-book questions claim more than the passage.** They turn "should", "typical" or one
+    study's result into "must", "maximum" or "required".
+  - **Conditions change:** "less than 2 to 1" becomes "does not exceed"; "20 or more" becomes
+    "20".
+  - **Other closed-book errors:** they credit a document with what it only cites, use
+    worked-example inputs, or carry PDF artifacts ("AASHTO T 1619" = T 161 + footnote 19).
+  - **Grounded:** a sentence without a citation (6 of the 9), two invented claims, a reversed
+    equation (bfc >= L/85 read as "85 times").
+  - **Worked problems:** wrong physics or set-up (force vs moment balance, a fencepost count, L^3
+    for an L^4 stiffness), steps missing, or no document value needed at all.
+- **Self-preference, read against the judge's acceptance rates.** The judge accepted 87.4% of
+  Large's answers and 81.2% of Medium's, but the audit found Medium's defect rate no higher
+  (7/50, 14%, vs 30/150, 20%). The judge's gap is not quality, which points to self-preference.
+  The samples are small: 50 Medium records.
+
+**Checks tried and left out.** On the 40 audited closed-book records, the eval's own two checks
+(make_tasks.verify_qa's faithfulness test, the blind is_standalone test) run with Mistral Large 3:
+- **Faithfulness** caught 1 of 8 defects (and no good records).
+- **Standalone** rejected 4 of 8 defects, but also 9 of 19 good ones. The defect rate among what it
+  kept was unchanged at 20%.
+- Neither is in the pipeline (`sft_judge.py` says so).
+
+**Fixes (rebuilt from the cache; no new teacher calls):**
+- **multi_step dropped (80 records).** The Stage 5 seeds need a verifier that checks the set-up,
+  not only the arithmetic.
+- **Grounded: every sentence must carry its own [Pn]** (a format rule in `sft_judge.verify`, so it
+  goes to the revise round). 0 of the 500 final grounded records has an uncited sentence.
+- **Closed-book filter, pass 1:** every one of the 1,663 closed-book records read against its
+  passage, grouped by passage in 10 packets: 333 defects (20.0%), 518 minor, 812 ok.
+  - **Paraphrased wordings fail more:** among eval-seen facts, 150 of 643 paraphrased records vs 93
+    of 647 exact ones (23% vs 14%). The persona wording is where scope drifts.
+  - **Reader agreement:** on the round-1 sample, the pass-1 readers and the round-1 auditors agree
+    on defect-or-not for 38 of 40 records (Cohen's kappa 0.84).
+- **Round 2 (after pass 1):**
+  - Grounded fell to 3/40 (8%; 3-20%).
+  - Closed-book stayed at 10/40 (25%; 14-40%). The pass-1 readers had noted those flaws but
+    filed them "minor", which keeps the record: 9 of 19 pass-1 minors in the sample were defects
+    by the round-2 reading, against 1 of 21 pass-1 oks.
+- **Closed-book filter, pass 2 (user decision):** the 518 pass-1 minors re-read with the stricter
+  line. A wrong framing, overclaim, scope moved by a persona, example value or garbled symbol is a
+  defect even when the answer value is right. Pass 2 found 176 defects and kept 342. Assembly
+  drops all 509 and refuses a closed-book record without a verdict (`data/sft/closed_book_filter.jsonl`,
+  pinned by `tests/test_sft_data.py`).
+- **Round 3 (after pass 2):** closed-book 2/40 (5%; 1-17%), and no wrong answers. Both defects are
+  framing (an unnamed document where another code differs; a "maximum" the passage never gives).
+
+**The frozen set: 3,126 records** (`train.jsonl` 3,031, `sft_val.jsonl` 95; `data/sft/SHA256SUMS`):
+
+| format | eval-seen chunks | ordinary chunks | total |
+|---|---|---|---|
+| closed-book | 901 | 253 | 1,154 |
+| definition | 722 | 50 | 772 |
+| grounded | - | 500 | 500 |
+| abstain | - | 200 | 200 |
+| replay (Tulu 3) | - | - | 500 |
+
+- **Seen coverage:** domain_qa 119/167 (135 before the filter: 16 seen facts lost every phrasing
+  to it), vocab 51/101.
+- **Tokens:** max 2,307 per record, 1.74M in total.
+- **Teachers:** Large 2,034, Medium 592.
+- **Contamination (section 6):** still clean.
+  - 0 leaked chunks; control 40/40; no eval question in a prompt.
+  - Unseen same-document answer matches: 4 (3 coincidences plus qa-1059, as before).
+  - Benchmarks: MMLU 7 / GSM8K 0 / HellaSwag 0 items with any 13-gram, none half covered.
+
+**Residual quality, as measured:**
+
+| format | measured on | defect rate |
+|---|---|---|
+| closed-book | round 3 | ~5% |
+| grounded | round 2 | ~8% |
+| definition | round 1 | ~8% (not filtered) |
+| abstain | round 1 | ~0% |
+| replay | not audited | - |
+
+- **Abstain is easy too often:** 10/40 of its records pair the question with passages off its
+  subject. Choosing the same-document passages by similarity would make them harder.
+- **Minor flaws stay in by design:** odd persona framing, locator trivia (chapter or section
+  numbers), completions with a few extra words.
+
+**Source issues the reads surfaced (not fixed here):**
+- **FEMA P-2355 / P-2335:** the document's cover, preface and footers say "FEMA P-2335 / May
+  2025", while `data/sources.csv` and FEMA's URL say P-2355. 28 SFT records name it P-2355.
+- **PDF footnote merges** ("AASHTO T 1619", "M 1951", fhwa-hif19067-nov2021); records carrying
+  them were filtered as garbled.
+- **Sample-contract pages** (EM 1110-2-1003 p382) read as manual requirements; filtered.
+
+**Revisit if:**
+- a rebuild changes closed-book records: run both filter passes and a fresh round (CLAUDE.md,
+  Stage 3);
+- Stage 5 needs worked problems: generate them with a set-up check, not only an arithmetic one;
+- seen coverage matters more than v1 allows: the 16 lost facts can come back as new, faithful
+  phrasings (a rebuild of A2/A4 for those chunks).
