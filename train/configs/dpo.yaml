@@ -1,5 +1,5 @@
 model:
-  init_from: checkpoints/sft-merged
+  init_from: checkpoints/sft-from-cpt  # Stage 3 final: epoch 1, sha256 db8ddabf (notes/decisions.md)
   dtype: bfloat16
 
 lora:

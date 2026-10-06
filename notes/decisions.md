@@ -2761,3 +2761,86 @@ result is kept as `merge_check_original.json`.
   finish; an equal digest shows that the gate and the evals ran on the same file.
 - **Both runs pass with room.** sft-from-cpt's evals are released on its existing merged
   checkpoint, with no re-merge.
+
+## 2026-10-06: Stage 3 read (B7, pre-registered rules applied); Stage 3 final = sft-from-cpt, epoch 1
+**Runs:**
+- sft-from-cpt, sft-from-base and sft-from-cpt-seed1, each at epoch 1 by B4;
+- merged, passing the amended gate (the sha256s matched at gate time and after the evals);
+- evaluated on v3 with `--chat`;
+- scored locally with 1,101 judge calls, none failed.
+
+Tables: `results/table.md`, `results/train_runs.md` (Stage 3), figures `results/curves/sft.png` and
+`sft_kpi.png`.
+
+**1. First line: CPT bought something that survives SFT.**
+- **Unseen `gold_lp`, sft-from-cpt − sft-from-base:** +0.355 nats per answer, 95% bootstrap CI
+  [+0.146, +0.575] over 155 items, 61% of items up.
+- **The noise:** 0.258 = max(seed gap sft-from-cpt vs seed1, 0.258; paired SE, 0.109). The CI
+  excludes 0 and the difference exceeds the noise, so the rule reads positive. The seen half
+  agrees: +0.289 [+0.088, +0.470].
+- **Unseen qa_acc:** 0.136 vs 0.110 (+2.6 points against 2.7 of noise), reported, not argued.
+- **The margin is modest,** 1.4x the noise.
+  - SFT is a noisy instrument here: the seed gap on unseen `gold_lp` (0.26 nats) is 8x Stage 2's
+    (0.03).
+  - sft-from-base has no seed twin, so its own run-to-run spread is assumed, not measured.
+  - With the seed-1 run instead, the gap would be +0.61.
+- **Qualitatively:** before SFT, CPT's lead over the base on unseen `gold_lp` was +0.67 nats (base
+  format); after SFT it is +0.36 (chat format). The formats differ, so this says only that about
+  half of the lead is still visible after SFT.
+
+**2. Against the instruct-8b bar (sft-from-cpt; noise in brackets):**
+
+| metric | sft-from-cpt | instruct-8b | reading |
+|---|---|---|---|
+| closed-book qa_acc | 0.211 | 0.099 | beats |
+| identifiers | 0.203 | 0.031 | beats |
+| vocab | 0.833 | 0.786 | beats |
+| vocab seen / unseen | 0.891 / 0.780 | 0.802 / 0.771 | seen beats; unseen matches |
+| grounded_acc | 0.907 | 0.898 | matches |
+| cite_supported | 0.861 | 0.787 | beats |
+| false_abstain | 0.000 | 0.074 | better |
+| halluc_rate | 0.053 | 0.013 | **worse:** +4.0 against 3.9 noise; the seed twin has 0.013, so it is at the edge of the run-to-run spread |
+
+- **Expectation met:** beat it on identifiers and vocab, match it on grounded. Citation came out
+  better than a match.
+- **General benchmarks: no claim.** MMLU 0.766 vs 0.761, GSM8K 0.814 vs 0.855.
+
+**3-4. Guards: neither fired.**
+- **Format/mask guard:** both halves rose from each start.
+  - sft-from-cpt: seen 0.150 -> 0.281, unseen 0.110 -> 0.136.
+  - sft-from-base: seen 0.126 -> 0.245; unseen 0.116 -> 0.110, a 0.6-point drop inside the noise.
+- **MMLU and GSM8K:** no run lost more than noise (MMLU 0.766-0.770 against starts of
+  0.766-0.767; GSM8K 0.792-0.814 against 0.791-0.793).
+
+**5. Seen vs unseen.**
+- sft-from-cpt: seen 0.281 vs unseen 0.136 (`gold_lp` -5.12 vs -6.43). sft-from-base: 0.245 vs
+  0.110.
+- The seen chunks were forced into the SFT pool by design. The gain there is knowledge injection
+  by the synthetic records: SFT alone took the base's seen half from 0.126 to 0.245, about 4 SE,
+  and vocab_seen from 0.713 to 0.911.
+- Transfer to the unseen half is inside the noise on qa_acc and shows only in `gold_lp`.
+
+**6. Abstain targets met on all three runs:**
+- halluc_rate 0.053 / 0.066 / 0.013 (target < 0.20);
+- false_abstain 0.000 / 0.000 / 0.009 (target < 0.05).
+
+**7. Diversity: within the line.**
+- **Against instruct-8b (100 prompts, T 0.7):** distinct-4 0.772 vs 0.810 (−4.7%), entropy 9.02 vs
+  9.80 bits (−8.0%).
+- **Not a collapse by the pre-registered line,** but entropy is near the 10% edge.
+- **Length caveat:** answers are about half Instruct's length (163 vs 343 tokens), so part of the
+  gap is length.
+- **For Stage 4:** sample at T >= 0.8 rather than 0.7.
+
+**Serving, the headline:** sft-from-cpt's E2E p50 at one request is 159 ms, against cpt-8b's 1,753
+ms. 100% of bench requests stop before the cap (mean 23 output tokens). All 716 KPI generations
+and 98.75% of the eos job's sampled answers end on `</s>`. SFT fixed the no-EOS problem CPT
+introduced.
+
+**Stage 3 final:**
+- **The checkpoint:** `/vol/checkpoints/sft-from-cpt`, epoch 1 (`checkpoint-77`), checkpoint
+  sha256 `db8ddabfc9a8b3f8756004a96b5c6a6d84b02ffc31dc2110c563c6a9bbfb8055`.
+- `train/configs/dpo.yaml` `init_from` points at it.
+- **The adapters** are kept in `checkpoints/_train/` (rule 12).
+- **CPT stays in the chain** (the retrospective's CPT-control rule): the sft-from-base control
+  shows a positive, if modest, effect on the measure the pre-registration named.

@@ -934,8 +934,18 @@ def checks_table() -> str:
     return "\n".join(out)
 
 
+CHAT_ROWS = (
+    "instruct-8b",
+    "sft-from-base",
+    "sft-from-cpt",
+    "sft-from-cpt-seed1",
+    "sft-from-cpt-lr2e-4",
+)
+
+
 def plot_sft_kpi(out: Path) -> None:
-    """Seen / unseen gold_lp and qa_acc for the starts, the SFT runs and the instruct bar."""
+    """Seen / unseen gold_lp (chat-format runs only: a base-format gold_lp isn't comparable) and
+    qa_acc (every row) for the starts, the SFT runs and the instruct bar."""
     names = [r for r in SFT_COLUMNS if (RUNS / r / "metrics.json").exists()]
     if not any(r in names for r in SFT_COLORS):
         return
@@ -943,6 +953,7 @@ def plot_sft_kpi(out: Path) -> None:
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
 
     m = {r: json.loads((RUNS / r / "metrics.json").read_text()) for r in names}
     colors = {
@@ -952,48 +963,89 @@ def plot_sft_kpi(out: Path) -> None:
         "cpt-8b-replay10": "#9fc3ef",
     }
     sizes = half_sizes()
-    fig, (ax_lp, ax_qa) = plt.subplots(1, 2, figsize=(12, 4.8), dpi=150)
+    halves = (f"seen half ({sizes['qa_seen']})", f"unseen half ({sizes['qa_unseen']})")
+    fig, (ax_lp, ax_qa) = plt.subplots(1, 2, figsize=(12, 5.2), dpi=150)
     fig.patch.set_facecolor(SURFACE)
+
+    chat = [r for r in names if r in CHAT_ROWS]
+    step = 0.7 / max(1, len(chat) - 1)
+    for j, r in enumerate(chat):
+        for i, k in enumerate(("gold_lp_seen", "gold_lp_unseen")):
+            v = m[r].get(k)
+            if v is None:
+                continue
+            x = i - 0.35 + step * j
+            ax_lp.plot(
+                x,
+                v,
+                "o",
+                ms=9,
+                color=colors.get(r, INK_2),
+                mec=SURFACE,
+                mew=1.5,
+                fillstyle="left" if r in TWIN else "full",
+            )
+            ax_lp.annotate(
+                f"{v:.2f}",
+                (x, v),
+                xytext=(0, 8),
+                textcoords="offset points",
+                ha="center",
+                fontsize=8,
+                color=INK_2,
+            )
+    ax_lp.set_xlim(-0.6, 1.6)
+    ax_lp.set_xticks(range(2), halves)
+    style(
+        ax_lp, "Gold-answer log-prob, chat format (nats per answer, higher is better)", "", "nats"
+    )
+
     width = 0.8 / len(names)
     for j, r in enumerate(names):
-        for ax, keys, scale in (
-            (ax_lp, ("gold_lp_seen", "gold_lp_unseen"), 1),
-            (ax_qa, ("qa_seen", "qa_unseen"), 100),
-        ):
-            vals = [m[r].get(k) for k in keys]
-            xs = [i - 0.4 + width * (j + 0.5) for i in range(2)]
-            err = (
-                [
-                    math.sqrt(v * (1 - v) / sizes[k]) * 100 if v is not None else 0
-                    for v, k in zip(vals, keys)
-                ]
-                if ax is ax_qa
-                else None
-            )
-            ax.bar(
-                xs,
-                [(v or 0) * scale for v in vals],
-                width,
-                yerr=err,
-                color=colors.get(r, INK_2),
-                edgecolor=SURFACE,
-                lw=1.5,
-                hatch="//" if r in TWIN else None,
-                label=r,
-                error_kw={"ecolor": INK_2, "lw": 1, "capsize": 2},
-            )
-    sizes_txt = (f"seen half ({sizes['qa_seen']})", f"unseen half ({sizes['qa_unseen']})")
-    for ax, title, ylabel in (
-        (ax_lp, "Gold-answer log-probability (nats per answer, higher is better)", "nats"),
-        (ax_qa, "Closed-book qa_acc (%, +-1 binomial SE)", "%"),
-    ):
-        ax.set_xticks(range(2), sizes_txt)
-        style(ax, title, "", ylabel)
-    ax_lp.legend(frameon=False, fontsize=8, labelcolor=INK, loc="lower left")
-    fig.suptitle(
-        "Stage 3: closed-book knowledge by half", color=INK, fontsize=11, x=0.01, ha="left"
+        vals = [m[r].get(k) for k in ("qa_seen", "qa_unseen")]
+        xs = [i - 0.4 + width * (j + 0.5) for i in range(2)]
+        err = [
+            math.sqrt(v * (1 - v) / sizes[k]) * 100 if v is not None else 0
+            for v, k in zip(vals, ("qa_seen", "qa_unseen"))
+        ]
+        ax_qa.bar(
+            xs,
+            [(v or 0) * 100 for v in vals],
+            width,
+            yerr=err,
+            color=colors.get(r, INK_2),
+            edgecolor=SURFACE,
+            lw=1.5,
+            hatch="//" if r in TWIN else None,
+            error_kw={"ecolor": INK_2, "lw": 1, "capsize": 2},
+        )
+    ax_qa.set_xticks(range(2), halves)
+    style(ax_qa, "Closed-book qa_acc (%, +-1 binomial SE)", "", "%")
+    handles = [
+        Patch(
+            facecolor=colors.get(r, INK_2),
+            hatch="//" if r in TWIN else None,
+            edgecolor=SURFACE,
+            label=r,
+        )
+        for r in names
+    ]
+    fig.legend(
+        handles=handles,
+        loc="lower center",
+        ncol=len(names),
+        frameon=False,
+        fontsize=9,
+        labelcolor=INK,
     )
-    fig.tight_layout()
+    fig.suptitle(
+        "Stage 3: closed-book knowledge by half (eval v3)",
+        color=INK,
+        fontsize=11,
+        x=0.01,
+        ha="left",
+    )
+    fig.tight_layout(rect=(0, 0.07, 1, 1))
     fig.savefig(out, facecolor=SURFACE)
     print(f"-> {out}")
 

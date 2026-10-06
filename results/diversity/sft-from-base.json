@@ -1,0 +1,30 @@
+{
+  "run": "sft-from-base",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.79,
+    "entropy": 9.3114,
+    "mean_len": 185.3,
+    "stop_rate": 0.95
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.7765,
+    "entropy": 9.1388,
+    "mean_len": 321.0,
+    "stop_rate": 0.9
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.8847,
+    "entropy": 8.2215,
+    "mean_len": 49.7,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 80,
+    "eos_stop_rate": 0.9875,
+    "mean_len": 91.6,
+    "passed": true
+  }
+}

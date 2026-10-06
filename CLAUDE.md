@@ -270,8 +270,9 @@ $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name 
   --overrides "model.init_from=checkpoints/base-8b-hf"
 $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt-seed1 --steps train \
   --overrides "training.seed=1 training.data_seed=1"
-$M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-154 --chat \
-  --steps merge,mergecheck,ppl,eval,latency,sample
+$M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-77 --chat \
+  --steps merge,mergecheck,ppl,eval,latency,sample      # checkpoint-N: the epoch B4 picked
+$M run train/modal_train.py::digest --run-name sft-from-cpt   # CPU: checkpoint sha256, after the evals too
 $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8B-Instruct-2512-BF16 \
   --run-name instruct-8b --chat --sample-jobs diversity --config-format auto
 # pull (runs/<run> includes samples/ and merge_check.json; results/noop/), then score with --chat
@@ -285,6 +286,11 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
   Every reason and the pre-registered rules: `notes/decisions.md`, Stage 3b pre-registration.
 - SFT checkpoints are chat models: `--chat` for their KPI eval and samples, never for lm-eval
   (`run_eval.needs_chat` refuses otherwise for run names with sft/dpo/grpo).
+- The merge gate (`mergecheck`, `merge_check.py check`) compares merged and unmerged bf16 against
+  an fp32 reference over all 11,351 sft_val positions (flips added <= 11, |dlp| ratio <= 1.5, val
+  loss within 0.5%) and records the checkpoint's sha256. A failed gate stops the pipeline.
+- Judge a run's generations into the shared cache before its lm-eval lands (`--results-dir
+  <scratch> --judge-cache results/judge_cache.jsonl`), then score into `results/` for free.
 
 ## Decisions (rules to keep)
 
@@ -317,6 +323,7 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
    gains per half, never pooled), `grounded_acc` (judge, correct per gold, citations ignored),
    `cite_valid` (rules), `cite_supported` (judge, correct and backed by cited passages),
    `vocab_recall` (judge), `halluc_rate` (answered an unanswerable question; lower is better),
+   `false_abstain` (grounded answers with the abstain phrase, by rule; from Stage 3),
    plus `mmlu` and its four groups / `gsm8k` (strict-match) / `hellaswag` (acc_norm), and from
    Stage 2 `ppl_train` / `ppl_domain_val` / `ppl_general_val` (`eval/perplexity.py`, lower is
    better; `ppl_train` is measured on a train slice, for base too) and `ppl_postcutoff` (the 13
