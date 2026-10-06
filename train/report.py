@@ -883,20 +883,27 @@ def checks_table() -> str:
         f = RUNS / name / "merge_check.json"
         if f.exists():
             r = json.loads(f.read_text())
+            if "added_flips" not in r:  # the first gate's format; superseded
+                continue
+            p = r.get("probes") or {}
+            sha = (r.get("checkpoint_sha256") or {}).get("sha256", "")
             rows.append(
-                f"| {name} | {r['val_loss_unmerged']:.4f} | {r['val_loss_merged']:.4f} | "
-                f"{r['val_loss_rel_diff']:.2%} | {r['top1_agreement']:.1%} | "
-                f"{r['max_abs_merge_error']} | {r['max_abs_adapter_effect']} | {r['ratio']} | "
+                f"| {name} | {r['added_flips']} of {r['added_flips_allowed']} | "
+                f"{r['lp_error_ratio']:.3f} | {r['val_loss_rel_diff']:.2%} | "
+                f"{r['merged_vs_unmerged_top1']:.2%} | {p.get('ratio_mean', '')} | `{sha[:12]}` | "
                 f"{'yes' if r['passed'] else 'NO'} |"
             )
     if rows:
         out.append(
-            "\nMerge check (B5: merged val loss within 0.5% of start + adapter, top-1 agreement "
-            ">= 99%; the ratio is flagged above 0.05):\n"
+            "\nMerge gate (B5, amended): over all 11,351 sft_val completion positions against an "
+            "fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own, "
+            "and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss "
+            "within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are "
+            "reported, not gated; sha256 of the merged checkpoint's file list:\n"
         )
         out.append(
-            "| run | val loss, adapter | val loss, merged | diff | top-1 agreement | max merge "
-            "error | max adapter effect | ratio | passed |\n|" + "---|" * 9
+            "| run | flips added | \\|dlp\\| ratio | val loss diff | merged vs unmerged top-1 | "
+            "probe error ratio | checkpoint sha256 | passed |\n|" + "---|" * 8
         )
         out += rows
     rows = []

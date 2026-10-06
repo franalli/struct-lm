@@ -1,0 +1,21 @@
+{
+  "check": "merge",
+  "start": "checkpoints/cpt-8b-replay10",
+  "adapter": "/vol/checkpoints/_train/sft-from-cpt/checkpoint-77",
+  "merged": "/vol/checkpoints/sft-from-cpt",
+  "val_tokens": 11351,
+  "val_loss_unmerged": 0.559281,
+  "val_loss_merged": 0.559094,
+  "val_loss_rel_diff": 0.000335,
+  "top1_agreement": 0.986441,
+  "probe_positions": 295,
+  "max_abs_merge_error": 7.9272,
+  "max_abs_adapter_effect": 10.7344,
+  "ratio": 0.7385,
+  "mean_abs_merge_error": 0.02706,
+  "mean_abs_adapter_effect": 0.52446,
+  "ratio_mean": 0.0516,
+  "ratio_flag": true,
+  "rule": "|val loss rel diff| <= 0.005 and top-1 agreement >= 0.99",
+  "passed": false
+}

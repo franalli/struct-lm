@@ -2723,3 +2723,41 @@ the target|. It runs for sft-from-cpt and, as the passing comparison, sft-from-b
   disagrees with fp32 at 0.5-0.65% of positions.
 - **Reading:** the merge is as faithful as bf16 inference. The 295-position gate failed on its
   sample size. Whether the gate is amended is the user's call.
+
+## 2026-10-06: B5's merge gate amended to the fp32-referenced comparison; both runs pass (user decision)
+**Context:** the first gate (top-1 agreement >= 99% between merged and start + adapter over 3 val
+records, 295 completion positions) failed sft-from-cpt at 98.64%: 4 flips against 2 allowed. The
+diagnostic over all 11,351 positions (entries above) showed that as sampling variation:
+- bf16 inference by itself flips 0.5-0.65% of argmaxes against fp32, at near-ties;
+- 295 positions leave a margin of 2 flips.
+
+Amended before any downstream eval of sft-from-cpt; sft-from-base's evals had already started
+under the first gate, which it passed.
+
+**The gate now:** per run, over all 11,351 `sft_val` completion positions, against an fp32 reference
+(the start in fp32 + the fp32 adapter, unmerged):
+- the merge adds at most 0.1% of positions (11) in argmax flips over the unmerged bf16 model's own;
+- the merged model's mean |delta log-prob of the target| is at most 1.5x the unmerged bf16 model's;
+- val loss (token-mean NLL) within 0.5% of the unmerged model's, as before.
+
+**Reported, not gated:**
+- **Merged-vs-unmerged top-1 agreement.** Why it is not gated: it compares two bf16
+  approximations, so a 99% line on it measures bf16's own near-tie noise (0.6% here) as much as
+  the merge. The fp32-referenced pair isolates what the merge adds, which is the question B5 asks.
+- **The 3-probe logit ratios.**
+- **The sha256 of every file of the merged checkpoint.**
+
+`merge_check.py check` computes all of it on the full set (seed1 is gated by it in its pipeline,
+with no hand step). The two finished runs were gated by `merge_check.py regate` on their recorded
+diagnose measurement plus a digest of the checkpoint (`modal_train.py::digest`). The first gate's
+result is kept as `merge_check_original.json`.
+
+| run | added flips (max 11) | mean \|dlp\| ratio (max 1.5) | val loss diff | merged-vs-unmerged top-1 | first gate | merged checkpoint sha256 (file list) | model.safetensors sha256 |
+|---|---|---|---|---|---|---|---|
+| sft-from-cpt | 5 | 1.005 | 0.03% | 99.60% | failed (98.64%) | `db8ddabfc9a8b3f8756004a96b5c6a6d84b02ffc31dc2110c563c6a9bbfb8055` | `27681fbd41eae2b6402df4b4c414f44ddfc6c2577e82d7559df03bc0618f4435` |
+| sft-from-base | 1 | 0.965 | 0.02% | 99.67% | passed (100%) | `7c6458a784042a3b…` (results/runs/sft-from-base/checkpoint_sha256.json) | `8dbb8b454b032ec0…` |
+
+- **The same file:** the evals load `/vol/checkpoints/<run>`. The digest is recomputed after they
+  finish; an equal digest shows that the gate and the evals ran on the same file.
+- **Both runs pass with room.** sft-from-cpt's evals are released on its existing merged
+  checkpoint, with no re-merge.

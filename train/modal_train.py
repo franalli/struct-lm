@@ -256,6 +256,21 @@ def merge_check(run_name: str, adapter: str = "") -> None:
         raise RuntimeError(f"{run_name}: merge check failed (merge_check.json); never serve it")
 
 
+@app.function(**COMMON, cpu=4, memory=16384, timeout=3600)
+def digest(run_name: str) -> dict:
+    """merge_check.py digest: sha256 of each file of /vol/checkpoints/<run> (and of the list), so
+    a gate result and the evals can be shown to be on the same file.
+      modal run train/modal_train.py::digest --run-name sft-from-cpt"""
+    import json
+
+    vol.reload()
+    out = f"/vol/results/runs/{run_name}/checkpoint_sha256.json"
+    cmd = [sys.executable, "/root/train/merge_check.py", "digest"]
+    subprocess.run(cmd + ["--merged", f"/vol/checkpoints/{run_name}", "--out", out], check=True)
+    vol.commit()
+    return json.loads(Path(out).read_text())
+
+
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
 def merge_diagnose(run_name: str, adapter: str = "") -> None:
     """merge_check.py diagnose after a failed merge check: argmax flips and log-prob error of the
@@ -398,8 +413,8 @@ def main(
         raise SystemExit(f"--chat on {run_name or model}, which isn't a chat checkpoint (rule 2)")
     if gpus == 2 and "sft" in Path(config).stem:
         raise SystemExit("SFT runs on one GPU (train/sft.py has no FSDP path)")
-    if merge_from and "merge" not in todo:
-        raise SystemExit("--merge-from applies to the merge step")
+    if merge_from and not {"merge", "mergecheck"} & set(todo):
+        raise SystemExit("--merge-from names the adapter for the merge and mergecheck steps")
     pipeline.remote(
         config,
         run_name,
