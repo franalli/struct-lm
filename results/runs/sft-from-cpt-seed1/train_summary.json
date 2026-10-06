@@ -1,0 +1,112 @@
+{
+  "stage": "sft",
+  "run": "sft-from-cpt-seed1",
+  "base": "checkpoints/cpt-8b-replay10",
+  "lora": true,
+  "gpus": 1,
+  "dataset_hash": "70f47740bd973dc47f43d74c826b1bca3a82bb3e50379fe3ccc44179566ab4b6",
+  "records": 2436,
+  "tokens": 1349325,
+  "completion_tokens": 179332,
+  "seqs_per_step": 32,
+  "steps_per_epoch": 77,
+  "steps": 154,
+  "epochs": 2,
+  "optim": "adamw_torch_fused",
+  "tokens_per_s": 1737.3,
+  "train_runtime_s": 1906.2,
+  "wall_s": 1934.9,
+  "gpu_hours": 0.537,
+  "final_train_loss": 0.3616,
+  "final_eval_loss": 0.5718,
+  "val_loss_epoch_end": {
+    "1": 0.558643,
+    "2": 0.580394
+  },
+  "val_loss_by_format_epoch_end": {
+    "1": {
+      "abstain": 0.007911,
+      "closed_book": 1.169614,
+      "definition": 1.893975,
+      "grounded": 0.18139,
+      "replay": 0.626581
+    },
+    "2": {
+      "abstain": 0.004446,
+      "closed_book": 1.312577,
+      "definition": 2.104895,
+      "grounded": 0.205645,
+      "replay": 0.646526
+    }
+  },
+  "checkpoints": [
+    "checkpoint-77",
+    "checkpoint-154"
+  ],
+  "peak_mem_gb": 54.71,
+  "smoke": false,
+  "data": {
+    "data/sft/train.jsonl": "49b216d438973fdba0c97b6dcccd1aaec82003c07415fde18e516febcac34876",
+    "data/sft/sft_val.jsonl": "8b210969c62751463cd8861b5cd7e412463b5d6024f422fdc7af0d64e11cb585"
+  },
+  "config": {
+    "stage": "sft",
+    "model": {
+      "init_from": "checkpoints/cpt-8b-replay10",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa"
+    },
+    "lora": {
+      "r": 64,
+      "lora_alpha": 128,
+      "lora_dropout": 0.05,
+      "bias": "none",
+      "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
+    },
+    "data": {
+      "dir": "data/sft",
+      "train": "data/sft/train.jsonl",
+      "val": "data/sft/sft_val.jsonl"
+    },
+    "run": {
+      "results_dir": "results"
+    },
+    "training": {
+      "output_dir": "checkpoints/_train/sft-from-cpt-seed1",
+      "run_name": "sft-from-cpt-seed1",
+      "num_train_epochs": 2,
+      "per_device_train_batch_size": 8,
+      "gradient_accumulation_steps": 4,
+      "per_device_eval_batch_size": 8,
+      "learning_rate": 0.0001,
+      "lr_scheduler_type": "linear",
+      "warmup_steps": 0.03,
+      "weight_decay": 0.0,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.999,
+      "adam_epsilon": 1e-08,
+      "max_grad_norm": 1.0,
+      "completion_only_loss": true,
+      "assistant_only_loss": false,
+      "loss_type": "nll",
+      "max_length": 4096,
+      "packing": false,
+      "padding_free": false,
+      "bf16": true,
+      "tf32": true,
+      "gradient_checkpointing": true,
+      "gradient_checkpointing_kwargs": {
+        "use_reentrant": false
+      },
+      "logging_steps": 1,
+      "eval_strategy": "steps",
+      "eval_steps": 50,
+      "eval_on_start": true,
+      "save_strategy": "epoch",
+      "save_total_limit": null,
+      "report_to": "none",
+      "seed": 1,
+      "data_seed": 1
+    }
+  }
+}

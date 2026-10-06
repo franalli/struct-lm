@@ -1,0 +1,35 @@
+{
+  "check": "merge_diagnose",
+  "start": "checkpoints/cpt-8b-replay10",
+  "adapter": "/vol/checkpoints/_train/sft-from-cpt/checkpoint-77",
+  "merged": "/vol/checkpoints/sft-from-cpt",
+  "positions": 11351,
+  "ref_margin_median": 5.6254,
+  "ref_margin_share_below_0.25": 0.0552,
+  "unmerged_bf16_vs_fp32_ref": {
+    "top1_agreement": 0.993481,
+    "flips": 74,
+    "median_ref_margin_at_flips": 0.0308,
+    "mean_abs_lp_diff": 0.007806,
+    "max_abs_lp_diff": 0.2054
+  },
+  "merged_bf16_vs_fp32_ref": {
+    "top1_agreement": 0.99304,
+    "flips": 79,
+    "median_ref_margin_at_flips": 0.0383,
+    "mean_abs_lp_diff": 0.007842,
+    "max_abs_lp_diff": 0.3172
+  },
+  "merged_vs_unmerged_bf16": {
+    "top1_agreement": 0.996036,
+    "flips": 45,
+    "median_ref_margin_at_flips": 0.0373,
+    "mean_abs_lp_diff": 0.007795,
+    "max_abs_lp_diff": 0.2219
+  },
+  "nll_fp32_ref": 0.559012,
+  "nll_unmerged_bf16": 0.559281,
+  "nll_merged_bf16": 0.559094,
+  "merge_adds_flips": 5,
+  "passed": true
+}

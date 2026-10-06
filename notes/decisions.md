@@ -2700,3 +2700,26 @@ the target|. It runs for sft-from-cpt and, as the passing comparison, sft-from-b
   gate to this full-val comparison, applied to all three runs, and release sft-from-cpt's evals on
   the existing merged checkpoint.
 - **If not,** the merge has a real defect and is investigated; nothing is served.
+
+## 2026-10-06: B4 outcome, sft-from-cpt-seed1: epoch 1 (pre-registered rule applied)
+| run | closed-book, epoch 1 -> 2 | definition, epoch 1 -> 2 | overall val_loss, 1 -> 2 | picks |
+|---|---|---|---|---|
+| sft-from-cpt-seed1 | 1.170 -> 1.313 | 1.894 -> 2.105 | 0.559 -> 0.580 | epoch 1, `checkpoint-77` |
+
+- **Read from the loss curve only,** before its merge and eval.
+- **All three runs agree:** each takes epoch 1, with both recall formats up in epoch 2.
+- **Health:** step-50 generations ended on `</s>` 10 of 10; the run took 0.54 GPU-h.
+
+**Diagnostic result (entry above): both criteria hold for both runs.**
+
+| | flips the merge adds (pass <= 11) | mean \|delta log-prob\| vs fp32, merged / unmerged (pass <= 1.5x) |
+|---|---|---|
+| sft-from-cpt | 5 (79 vs 74) | 0.00784 / 0.00781 (1.005x) |
+| sft-from-base | 1 | 0.96x |
+
+- **Merged vs unmerged top-1 agreement over all 11,351 positions:** 99.60% for sft-from-cpt,
+  99.67% for sft-from-base.
+- **What the flips are:** near-ties (median fp32 margin 0.03 logits). bf16 inference by itself
+  disagrees with fp32 at 0.5-0.65% of positions.
+- **Reading:** the merge is as faithful as bf16 inference. The 295-position gate failed on its
+  sample size. Whether the gate is amended is the user's call.
