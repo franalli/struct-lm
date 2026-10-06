@@ -615,12 +615,22 @@ SFT_COLUMNS = [
 ]
 
 
+B4_FORMATS = ("closed_book", "definition")
+
+
 def epoch_rule(summary: dict) -> int | None:
-    """B4: epoch 2 unless the end-of-epoch-2 val_loss is above end-of-epoch-1's, then epoch 1."""
-    v = summary.get("val_loss_epoch_end") or {}
+    """B4 (amended 2026-10-06, before training): epoch 2 unless the closed-book or the definition
+    sft_val loss rose from the end of epoch 1 to the end of epoch 2, then epoch 1. Overfitting
+    shows in the recall formats first, and the mixture's mean (83% replay tokens) would hide it."""
+    v = summary.get("val_loss_by_format_epoch_end") or {}
     if "1" not in v or "2" not in v:
         return None
-    return 1 if v["2"] > v["1"] else 2
+    return 1 if any(v["2"][f] > v["1"][f] for f in B4_FORMATS) else 2
+
+
+def epochs_pair(by_epoch: dict) -> str:
+    """'epoch-1 value / epoch-2 value' for whichever epoch ends were logged."""
+    return " / ".join(f"{by_epoch[e]:.4f}" for e in ("1", "2") if e in by_epoch)
 
 
 def sft_table(runs: dict, usd: float) -> str:
@@ -635,14 +645,17 @@ def sft_table(runs: dict, usd: float) -> str:
         "$",
         "peak GB",
         "final train loss",
-        "val_loss epoch 1",
-        "val_loss epoch 2",
+        "val_loss epoch 1 / 2",
+        "closed-book 1 / 2",
+        "definition 1 / 2",
         "B4 picks",
     ]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for name, (s, _) in runs.items():
         v = s.get("val_loss_epoch_end") or {}
+        vf = s.get("val_loss_by_format_epoch_end") or {}
         epoch = epoch_rule(s)
+
         cells = [
             name,
             Path(s["base"]).name,
@@ -654,8 +667,9 @@ def sft_table(runs: dict, usd: float) -> str:
             f"{s['gpu_hours'] * usd:.2f}",
             f"{s['peak_mem_gb']:.0f}" if s.get("peak_mem_gb") else "",
             f"{s['final_train_loss']:.3f}" if s.get("final_train_loss") else "",
-            f"{v['1']:.4f}" if "1" in v else "",
-            f"{v['2']:.4f}" if "2" in v else "",
+            epochs_pair(v),
+            epochs_pair({e: x["closed_book"] for e, x in vf.items()}),
+            epochs_pair({e: x["definition"] for e, x in vf.items()}),
             f"epoch {epoch}" if epoch else "",
         ]
         lines.append("| " + " | ".join(str(c) for c in cells) + " |")
@@ -980,8 +994,10 @@ def plot_sft_kpi(out: Path) -> None:
 def stage3_md(runs: dict, usd: float) -> str:
     md = "## Training runs\n\n" + sft_table(runs, usd)
     md += (
-        "\n\nB4 (pre-registered): epoch 2 unless its end-of-epoch val_loss (token mean over the "
-        f"80 sft_val records) is above epoch 1's. $ at {usd} per GPU-hour (assumed).\n"
+        "\n\nB4 (pre-registered, amended before training): epoch 2 unless the closed-book or the "
+        "definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss "
+        "is 83% replay tokens, so it is shown, not used. $ at "
+        f"{usd} per GPU-hour (assumed).\n"
     )
     if deltas := sft_delta_table():
         md += (

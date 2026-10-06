@@ -2578,3 +2578,64 @@ seed. sft-from-cpt-lr2e-4 is optional, only after the three are evaluated.
 - **A failed merge check:** never served.
 **Revisit if:** the smoke run's step-1 loss is outside 1.5-3 nats (template or mask), or its peak
 memory leaves under ~8 GB (go to 4 x 8 before the main runs).
+
+## 2026-10-06: Stage 3b amendments after the smoke run, before any training (user decisions)
+**Context:** the smoke run (`smoke-sft`, `results/runs/smoke-sft/`) passed every check but one.
+Its step-1 loss was 0.686 nats, under the pre-registered 1.5-3 band. The user read
+`data/sft/review.md`, so gate G2 passes. Everything below was decided before any main run started.
+
+**Step-1 check: per format, not the token mean.** The 1.5-3 band was a prior for recall
+completions.
+- **Why it failed:** applied to a token mean, it couldn't hold. The smoke step's first micro-batch
+  was the 8 longest records, grounded and abstain, with 574 of the step's 1,049 completion tokens.
+  Their answers copy from passages in the prompt or are a fixed sentence.
+- **The amended check:**
+  - closed-book and definition in 1.5-3;
+  - grounded and abstain expected under 0.5.
+- **Smoke values after one step:** closed-book 1.65, definition 2.02, grounded 0.22, abstain 0.39,
+  replay 0.70. Pass.
+- **Ruled out:** an all-zero mask would give no loss tokens, and a wrong template would push the
+  loss over 6.
+
+**Eval every 50 steps logs sft_val loss per format** (already in `sft.py`: `val_loss_by_format`
+at every evaluation, step 0 included), not only the mean.
+
+**B4, amended:** epoch 2 unless the closed-book or the definition `sft_val` loss rose from the end
+of epoch 1 to the end of epoch 2. Then epoch 1.
+- **Why:** overfitting shows in the recall formats first, and a rise there could sit under a
+  falling grounded or replay loss in the mean. It replaces the overall-`val_loss` rule of the
+  pre-registration entry.
+- Still decided from the loss curve only, and written here before that run's merge and eval.
+- **Implemented:** `train_summary.json` has `val_loss_by_format_epoch_end`, and
+  `report.py epoch_rule` applies the rule.
+- **The size of what it reads (measured after the user's decision, reported to the user):** sft_val
+  holds 15 closed-book records (86 completion tokens) and 1 definition record (22 tokens). So the
+  rule rests on 108 tokens, the definition half of it on one answer.
+
+**Where the gradient goes.** The training loss is token-weighted.
+
+| format | share of the 179,332 train completion tokens |
+|---|---|
+| replay | 74.9% |
+| grounded | 15.6% |
+| closed-book | 4.6% |
+| definition | 4.3% |
+| abstain | 0.7% |
+
+- So replay, not grounded copy, carries most of the gradient. The 55% copy share quoted first was
+  the smoke step's longest-first micro-batch, not the set.
+- Per-format loss weighting goes in next steps, not Stage 3 (README).
+
+**Merge ratio, smoke 0.25: no action; expectation pre-registered.**
+- **Why 0.25 is not alarming:** one Adam step moves each LoRA weight by about the LR, so the merged
+  delta sits at bf16's resolution, and rounding error and adapter effect come out the same size.
+- **Ruled out:** a merge bug, by the no-op control (531 of 531 identical, both starts). The pass
+  rule held: val loss +0.06%, top-1 99.66%.
+- **For the trained runs:**
+  - the mean-abs ratio (`ratio_mean`, added to `merge_check.py` after the smoke run) is expected
+    to be well under the smoke run's;
+  - top-1 agreement at or above 99.66%.
+
+  The smoke's mean ratio wasn't measured, so its max ratio (0.25) is the stand-in, unless the
+  smoke merge check is rerun.
+- If a trained run comes in worse on either, that is a finding, not a rounding story.

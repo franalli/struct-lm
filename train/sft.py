@@ -16,8 +16,10 @@ Checks written into train_log.jsonl, before and during the run:
   - at step 1, num_items_in_batch: it equals the completion tokens of the step's micro-batches, so
     the logged loss is their token mean; the mean of per-micro-batch means is logged beside it
     (what gradient accumulation without the fix would train on: the Tulu 3 bug).
-Every evaluation (eval_steps, and each epoch end, which B4's checkpoint rule reads):
-  - val_loss: the token mean of the NLL over every sft_val completion token, and per format;
+Every evaluation (eval_steps, each epoch end, and step 0, the start):
+  - val_loss: the token mean of the NLL over every sft_val completion token, and per format
+    (B4's checkpoint rule reads closed-book and definition at the epoch ends: the mean is 83%
+    replay tokens and would hide them);
   - 10 fixed greedy generations, two per format (256 new tokens), each with whether it ended on
     </s>, appended to <results>/runs/<run>/eval_generations.jsonl.
 run.smoke: one optimizer step on 32 records (the 8 longest as the first micro-batch, so peak
@@ -239,13 +241,14 @@ class EvalExtras(TrainerCallback):
             print(f"WARNING step {state.global_step}: no generation ended on </s> (failure mode 4)")
 
 
-def epoch_val_losses(path: Path) -> dict[str, float]:
-    """{epoch: val_loss} at each epoch end, from the log (so a resumed run keeps earlier epochs)."""
+def epoch_val_losses(path: Path, by_format: bool = False) -> dict:
+    """{epoch: val_loss} (or {epoch: {format: val_loss}}) at each epoch end, from the log, so a
+    resumed run keeps earlier epochs. B4 (amended 2026-10-06) reads the per-format values."""
     out = {}
     for line in path.read_text().splitlines():
         r = json.loads(line)
         if r.get("epoch_end"):
-            out[str(round(r["epoch"]))] = r["val_loss"]
+            out[str(round(r["epoch"]))] = r["val_loss_by_format"] if by_format else r["val_loss"]
     return out
 
 
@@ -420,7 +423,9 @@ def train(cfg: dict, callbacks: list | None = None) -> dict:
         "gpu_hours": round(wall * world / 3600, 3),
         "final_train_loss": round(statistics.fmean(losses[-10:]), 4) if losses else None,
         "final_eval_loss": round(evals[-1], 4) if evals else None,
-        "val_loss_epoch_end": epoch_val_losses(log.path),  # B4's quantity, per epoch
+        "val_loss_epoch_end": epoch_val_losses(log.path),
+        # B4's quantity (amended): closed-book and definition val loss at each epoch end
+        "val_loss_by_format_epoch_end": epoch_val_losses(log.path, by_format=True),
         "checkpoints": [p.name for p in ckpts],
         "peak_mem_gb": peak_mem_gb(),
         "smoke": smoke,
