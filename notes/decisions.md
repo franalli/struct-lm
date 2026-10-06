@@ -2901,3 +2901,34 @@ b7_first_line`):**
 - **Beyond the noise:** the item-bootstrap CI excludes 0 and Δ > noise. Otherwise the README's
   first line becomes "CPT's value is not distinguishable at this scale", and that is the result.
 - **Also reported:** Δ in run-SD units, the single-run pairs, and unseen qa_acc (not argued).
+
+## 2026-10-06: Two-arm read: CPT's contribution survives SFT at 3.6 run SD (pre-registered rule applied)
+**sft-from-base-seed1:**
+- **B4:** applied by the pipeline from its own loss curve (`results/runs/sft-from-base-seed1/b4.json`,
+  written before the merge). Epoch 1: closed-book 1.235 -> 1.345, definition 1.912 -> 2.043. That
+  makes four runs out of four.
+- **Amended merge gate:** passed at its line, with exactly 11 added flips of 11 allowed, log-prob
+  error 0.98x and val loss within 0.02%.
+- **Checkpoint sha256:** `272cbcb28872f325…`, equal at gate time and after the evals.
+- **Scoring:** 716 of 716 KPI answers ended on `</s>`, with 301 judge calls and no failures.
+- **Row:** qa_seen 0.234, qa_unseen 0.097, unseen `gold_lp` -6.741, halluc 1/76, MMLU 0.768, GSM8K
+  0.790.
+
+**First line, two arms (rule fixed in the entry above before this run reported):**
+- **Δ unseen `gold_lp`:** mean(sft-from-cpt, seed1) − mean(sft-from-base, seed1) = +0.464 nats per
+  answer, item CI [+0.276, +0.660], 68% of items up.
+- **Noise:** max(run-variance SD sqrt(0.258^2 + 0.039^2) / 2 = 0.130, paired SE 0.099) = 0.130.
+  Δ = 3.6 run SD.
+- **Verdict:** the CI excludes 0 and Δ > noise, so **beyond the noise: CPT bought something that
+  survives SFT.**
+- **Robustness:**
+  - each arm's SD rests on one seed pair. With the CPT arm's larger gap for both arms (SD 0.182),
+    Δ is 2.5 SD;
+  - all four single-run pairs are positive: +0.355, +0.315, +0.612, +0.573;
+  - the seen half agrees (+0.332, 2.3 run SD).
+- **Unseen qa_acc:** 0.132 against 0.103 between the arm means (+2.9 points), inside binomial
+  noise: reported, not argued. As in Stage 2, the effect shows in the probabilities, below
+  accuracy's resolution.
+- **The read moved from 1.4 SD (one-arm floor) to 3.6 SD (two-arm floor).** The README carries the
+  two-arm result, with the one-arm history in "what I would do differently".
+- **CPT stays in the chain;** sft-from-cpt, epoch 1, is the Stage 3 checkpoint as decided.

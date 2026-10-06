@@ -1,0 +1,25 @@
+{
+  "run": "sft-from-base-seed1",
+  "epoch": 1,
+  "checkpoint": "checkpoint-77",
+  "rose": {
+    "closed_book": true,
+    "definition": true
+  },
+  "val_loss_by_format_epoch_end": {
+    "1": {
+      "abstain": 0.005978,
+      "closed_book": 1.234726,
+      "definition": 1.911582,
+      "grounded": 0.177082,
+      "replay": 0.62599
+    },
+    "2": {
+      "abstain": 0.011573,
+      "closed_book": 1.34528,
+      "definition": 2.043179,
+      "grounded": 0.205703,
+      "replay": 0.643676
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "run": "sft-from-base-seed1",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.8026,
+    "entropy": 9.3672,
+    "mean_len": 190.8,
+    "stop_rate": 1.0
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.7955,
+    "entropy": 9.2233,
+    "mean_len": 330.9,
+    "stop_rate": 1.0
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.8533,
+    "entropy": 8.1126,
+    "mean_len": 50.6,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 80,
+    "eos_stop_rate": 0.9875,
+    "mean_len": 82.4,
+    "passed": true
+  }
+}

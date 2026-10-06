@@ -1,0 +1,69 @@
+{
+  "check": "merge",
+  "gate": "amended 2026-10-06",
+  "added_flips": 11,
+  "added_flips_allowed": 11,
+  "lp_error_ratio": 0.9842,
+  "val_loss_unmerged": 0.557833,
+  "val_loss_merged": 0.557918,
+  "val_loss_rel_diff": 0.000152,
+  "merged_vs_unmerged_top1": 0.995331,
+  "rule": "added flips <= 11 of 11351, merged |dlp| <= 1.5x unmerged's (both against fp32), val loss within 0.5%",
+  "passed": true,
+  "measurement": {
+    "start": "checkpoints/base-8b-hf",
+    "adapter": "/vol/checkpoints/_train/sft-from-base-seed1/checkpoint-77",
+    "merged": "/vol/checkpoints/sft-from-base-seed1",
+    "positions": 11351,
+    "ref_margin_median": 5.6453,
+    "ref_margin_share_below_0.25": 0.0537,
+    "unmerged_bf16_vs_fp32_ref": {
+      "top1_agreement": 0.993833,
+      "flips": 70,
+      "median_ref_margin_at_flips": 0.0343,
+      "mean_abs_lp_diff": 0.007893,
+      "max_abs_lp_diff": 0.3009
+    },
+    "merged_bf16_vs_fp32_ref": {
+      "top1_agreement": 0.992864,
+      "flips": 81,
+      "median_ref_margin_at_flips": 0.0341,
+      "mean_abs_lp_diff": 0.007768,
+      "max_abs_lp_diff": 0.2392
+    },
+    "merged_vs_unmerged_bf16": {
+      "top1_agreement": 0.995331,
+      "flips": 53,
+      "median_ref_margin_at_flips": 0.0477,
+      "mean_abs_lp_diff": 0.008219,
+      "max_abs_lp_diff": 0.3159
+    },
+    "nll_fp32_ref": 0.557973,
+    "nll_unmerged_bf16": 0.557833,
+    "nll_merged_bf16": 0.557918
+  },
+  "probes": {
+    "probe_positions": 295,
+    "max_abs_merge_error": 3.25,
+    "max_abs_adapter_effect": 12.7109,
+    "mean_abs_merge_error": 0.02293,
+    "mean_abs_adapter_effect": 0.49251,
+    "ratio": 0.2557,
+    "ratio_mean": 0.0466,
+    "ratio_flag": true
+  },
+  "checkpoint_sha256": {
+    "checkpoint": "/vol/checkpoints/sft-from-base-seed1",
+    "files": {
+      "config.json": "d9c045068c4bc9d4eb806c7a99692a89ca03854112816c6be6117cf0ad1cdda2",
+      "generation_config.json": "20b4a7795892537036d0f85dc0023fa7a23ac366876a03e3e51991ac7a3b5861",
+      "model.safetensors": "05d48266eca101ac73095f0719d93d4ee007a9273bef07361865d1feb875763d",
+      "processor_config.json": "ece2373c2ae391bce18785a1810543bc6173a1f28b6767cffab2c35dbea5f002",
+      "special_tokens_map.json": "486a0ad6c426d698f63d5332a78923f0529789f6f0a32fbc86433cd7dcc14693",
+      "tekken.json": "e29d19ea32eb7e26e6c0572d57cb7f9eca0f4420e0e0fe6ae1cf3be94da1c0d6",
+      "tokenizer.json": "577575622324b2e099e2648be26bdeb5e5815ffe66d7004e9e3ddbf421db6bf1",
+      "tokenizer_config.json": "f3a437d1214f6b61c8eae19d1256b0ebbf567793f6dcc1f63f4a30b829f85235"
+    },
+    "sha256": "272cbcb28872f325f56bfe52a01ea197b91dc003c75cca5b17fb4daea66884a6"
+  }
+}

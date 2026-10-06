@@ -26,6 +26,7 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | cpt-8b-lr2x | 6.713 | -2.42% | -0.0245 [-0.0335, -0.0172] | 8.220 | +0.85% | +0.0085 [+0.0068, +0.0102] | 5.442 | -12.01% |
 | cpt-8b-seed1 | 6.718 | -2.35% | -0.0238 [-0.0307, -0.0180] | 8.165 | +0.17% | +0.0017 [+0.0002, +0.0030] | 5.687 | -8.05% |
 | sft-from-base | 7.008 | +1.86% | +0.0184 [+0.0166, +0.0211] | 8.234 | +1.01% | +0.0100 [+0.0091, +0.0110] | 6.311 | +2.05% |
+| sft-from-base-seed1 | 7.010 | +1.89% | +0.0187 [+0.0169, +0.0214] | 8.251 | +1.22% | +0.0121 [+0.0110, +0.0133] | 6.316 | +2.13% |
 | sft-from-cpt | 6.872 | -0.11% | -0.0011 [-0.0071, +0.0051] | 8.061 | -1.11% | -0.0111 [-0.0144, -0.0081] | 5.800 | -6.23% |
 | sft-from-cpt-seed1 | 6.867 | -0.20% | -0.0020 [-0.0078, +0.0044] | 8.066 | -1.04% | -0.0105 [-0.0138, -0.0074] | 5.789 | -6.39% |
 
@@ -57,34 +58,35 @@ Perplexity in %, the gold-answer log-probability in nats per answer, the rest in
 | sft-from-cpt | cpt-8b-replay10 | 154 | 2.70M | 1,790 | 0.50 | 0.50 | 1.96 | 55 | 0.427 | 0.5592 / 0.5771 | 1.1655 / 1.3040 | 1.9832 / 2.0341 | epoch 1 |
 | sft-from-base | base-8b-hf | 154 | 2.70M | 1,834 | 0.48 | 0.48 | 1.89 | 55 | 0.435 | 0.5592 / 0.5790 | 1.2134 / 1.3765 | 2.0178 / 2.0723 | epoch 1 |
 | sft-from-cpt-seed1 | cpt-8b-replay10 | 154 | 2.70M | 1,737 | 0.54 | 0.54 | 2.12 | 55 | 0.362 | 0.5586 / 0.5804 | 1.1696 / 1.3126 | 1.8940 / 2.1049 | epoch 1 |
+| sft-from-base-seed1 | base-8b-hf | 154 | 2.70M | 2,022 | 0.45 | 0.45 | 1.79 | 55 | 0.364 | 0.5580 / 0.5782 | 1.2347 / 1.3453 | 1.9116 / 2.0432 | epoch 1 |
 
 B4 (pre-registered, amended before training): epoch 2 unless the closed-book or the definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is shown, not used. $ at 3.95 per GPU-hour (assumed).
 
 ## Results next to the noise
 
-| metric | instruct-8b | base-8b-hf | sft-from-base | cpt-8b-replay10 | sft-from-cpt | sft-from-cpt-seed1 | noise (Stage 3) | noise (Stage 2) |
-|---|---|---|---|---|---|---|---|---|
-| unseen gold-answer log-prob (nats) | -8.581 | -6.822 | -6.780 | -6.157 | -6.426 | -6.168 | 0.258 | 0.033 |
-| seen gold-answer log-prob (nats) | -8.008 | -6.722 | -5.409 | -6.356 | -5.120 | -4.873 | 0.247 | 0.032 |
-| qa_unseen | 0.084 | 0.116 | 0.110 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
-| qa_seen | 0.114 | 0.126 | 0.245 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
-| qa_ident (identifiers) | 0.031 | 0.078 | 0.125 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
-| grounded_acc | 0.898 | 0.843 | 0.926 | 0.778 | 0.907 | 0.935 | 2.8 | 3.7 |
-| cite_supported | 0.787 | 0.083 | 0.870 | 0.037 | 0.861 | 0.880 | 3.3 | 3.7 |
-| halluc_rate (lower is better) | 0.013 | 0.895 | 0.066 | 0.934 | 0.053 | 0.013 | 3.9 | 3.3 |
-| false_abstain (lower is better) | 0.074 | 0.009 | 0.000 | 0.000 | 0.000 | 0.009 | 0.9 | 0.0 |
-| vocab_seen | 0.802 | 0.713 | 0.911 | 0.713 | 0.891 | 0.901 | 3.1 | 4.6 |
-| vocab_unseen | 0.771 | 0.697 | 0.761 | 0.688 | 0.780 | 0.817 | 4.0 | 4.3 |
-| MMLU | 0.761 | 0.767 | 0.767 | 0.766 | 0.766 | 0.770 | 0.4 | 0.3 |
-| GSM8K | 0.855 | 0.793 | 0.792 | 0.791 | 0.814 | 0.792 | 2.2 | 1.1 |
-| HellaSwag | 0.801 | 0.801 | 0.795 | 0.800 | 0.794 | 0.799 | 0.6 | 0.4 |
+| metric | instruct-8b | base-8b-hf | sft-from-base | sft-from-base-seed1 | cpt-8b-replay10 | sft-from-cpt | sft-from-cpt-seed1 | noise (Stage 3) | noise (Stage 2) |
+|---|---|---|---|---|---|---|---|---|---|
+| unseen gold-answer log-prob (nats) | -8.581 | -6.822 | -6.780 | -6.741 | -6.157 | -6.426 | -6.168 | 0.258 | 0.033 |
+| seen gold-answer log-prob (nats) | -8.008 | -6.722 | -5.409 | -5.249 | -6.356 | -5.120 | -4.873 | 0.247 | 0.032 |
+| qa_unseen | 0.084 | 0.116 | 0.110 | 0.097 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
+| qa_seen | 0.114 | 0.126 | 0.245 | 0.234 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
+| qa_ident (identifiers) | 0.031 | 0.078 | 0.125 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
+| grounded_acc | 0.898 | 0.843 | 0.926 | 0.898 | 0.778 | 0.907 | 0.935 | 2.8 | 3.7 |
+| cite_supported | 0.787 | 0.083 | 0.870 | 0.880 | 0.037 | 0.861 | 0.880 | 3.3 | 3.7 |
+| halluc_rate (lower is better) | 0.013 | 0.895 | 0.066 | 0.013 | 0.934 | 0.053 | 0.013 | 3.9 | 3.3 |
+| false_abstain (lower is better) | 0.074 | 0.009 | 0.000 | 0.009 | 0.000 | 0.000 | 0.009 | 0.9 | 0.0 |
+| vocab_seen | 0.802 | 0.713 | 0.911 | 0.911 | 0.713 | 0.891 | 0.901 | 3.1 | 4.6 |
+| vocab_unseen | 0.771 | 0.697 | 0.761 | 0.752 | 0.688 | 0.780 | 0.817 | 4.0 | 4.3 |
+| MMLU | 0.761 | 0.767 | 0.767 | 0.768 | 0.766 | 0.766 | 0.770 | 0.4 | 0.3 |
+| GSM8K | 0.855 | 0.793 | 0.792 | 0.790 | 0.791 | 0.814 | 0.792 | 2.2 | 1.1 |
+| HellaSwag | 0.801 | 0.801 | 0.795 | 0.799 | 0.800 | 0.794 | 0.799 | 0.6 | 0.4 |
 
 Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in nats). Noise = max(the seed gap, the SE): Stage 3 for sft-from-cpt vs sft-from-cpt-seed1, Stage 2 for cpt-8b vs cpt-8b-seed1. The SE is binomial on the metric's items, lm-eval's stderr, or for gold_lp the paired per-item SE of the twins on that half. Starts: sft-from-cpt from cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the bar.
 
 ## B7's first line: what CPT bought, measured after SFT
 
-- **unseen gold_lp, sft-from-cpt - sft-from-base:** +0.355 nats per answer [95% CI +0.146, +0.575; 155 items, 61% up]; noise 0.258 (seed gap 0.258, paired SE 0.109): beyond the noise: CPT bought something that survives SFT. qa_unseen 0.136 vs 0.110, reported, not argued.
-- **seen gold_lp, sft-from-cpt - sft-from-base:** +0.289 nats per answer [95% CI +0.088, +0.470; 167 items, 66% up]; noise 0.247 (seed gap 0.247, paired SE 0.097): beyond the noise: CPT bought something that survives SFT. qa_seen 0.281 vs 0.245, reported, not argued.
+- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
 
 ## Checks
 
@@ -102,6 +104,7 @@ Merge gate (B5, amended): over all 11,351 sft_val completion positions against a
 | sft-from-cpt | 5 of 11 | 1.005 | 0.03% | 99.60% | 0.0516 | `db8ddabfc9a8` | yes |
 | sft-from-base | 1 of 11 | 0.965 | 0.02% | 99.67% | 0.046 | `7c6458a78404` | yes |
 | sft-from-cpt-seed1 | -8 of 11 | 0.978 | 0.02% | 99.54% | 0.0427 | `5f805f85ed59` | yes |
+| sft-from-base-seed1 | 11 of 11 | 0.984 | 0.02% | 99.53% | 0.0466 | `272cbcb28872` | yes |
 
 Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):
 
@@ -111,3 +114,4 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 | sft-from-cpt | 0.7724 | 9.0197 | 163.4 | 0.7567 | 0.8646 | 0.98 | 98.8% of 80 |
 | sft-from-base | 0.79 | 9.3114 | 185.3 | 0.7765 | 0.8847 | 0.95 | 98.8% of 80 |
 | sft-from-cpt-seed1 | 0.7799 | 9.1733 | 196.4 | 0.7719 | 0.837 | 0.97 | 98.8% of 80 |
+| sft-from-base-seed1 | 0.8026 | 9.3672 | 190.8 | 0.7955 | 0.8533 | 1.0 | 98.8% of 80 |
