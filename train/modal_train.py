@@ -306,6 +306,36 @@ def perplexity(model: str, run_name: str, only: str = "") -> None:
     vol.commit()
 
 
+def b4_checkpoint(run_name: str) -> str:
+    """B4 (amended 2026-10-06) applied to the run's own train_summary.json, for an unattended
+    chain: epoch 2 unless the closed-book or the definition sft_val loss rose from the end of
+    epoch 1 to the end of epoch 2, then epoch 1. Decided from the loss curve only, written to
+    /vol/results/runs/<run>/b4.json before the merge, and returned as that epoch's checkpoint-N."""
+    import json
+
+    vol.reload()
+    summary = json.loads(Path(f"/vol/checkpoints/_train/{run_name}/train_summary.json").read_text())
+    v = summary["val_loss_by_format_epoch_end"]
+    rose = {f: v["2"][f] > v["1"][f] for f in ("closed_book", "definition")}
+    epoch = 1 if any(rose.values()) else 2
+    ckpt = f"checkpoint-{summary['steps_per_epoch'] * epoch}"
+    if not Path(f"/vol/checkpoints/_train/{run_name}/{ckpt}/adapter_config.json").exists():
+        raise RuntimeError(f"{run_name}: B4 picked {ckpt}, which has no adapter")
+    decision = {
+        "run": run_name,
+        "epoch": epoch,
+        "checkpoint": ckpt,
+        "rose": rose,
+        "val_loss_by_format_epoch_end": v,
+    }
+    out = Path(f"/vol/results/runs/{run_name}/b4.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(decision, indent=2) + "\n")
+    vol.commit()
+    print(f"B4: {decision}")
+    return ckpt
+
+
 def wait_for_weights(ckpt: Path, timeout_s: int = 900) -> None:
     """A checkpoint written by another app (a merge launched separately) shows up only once that
     app's volume commit lands; eval containers started before then find no weights. Reload until
@@ -343,6 +373,8 @@ def pipeline(
     if "train" in steps:
         fn = train_fsdp if gpus == 2 else train
         print(fn.remote(config, run_name, overrides, smoke))
+    if merge_from == "b4":  # the pre-registered rule picks the epoch, before anything is merged
+        merge_from = b4_checkpoint(run_name)
     if "merge" in steps:
         model = merge.remote(run_name, "" if "train" in steps else model, merge_from)
     if "mergecheck" in steps:
@@ -384,7 +416,7 @@ def main(
     overrides: str = "",
     smoke: bool = False,
     chat: bool = False,  # KPI eval and sampling in the chat template: every SFT/DPO/GRPO checkpoint
-    merge_from: str = "",  # e.g. checkpoint-77: merge that epoch's adapter (B4), not the final one
+    merge_from: str = "",  # checkpoint-77: merge that epoch's adapter; "b4": apply B4 after training
     sample_jobs: str = "eos,diversity",  # eval/sample.py jobs for the sample step
 ) -> None:
     """Checks the arguments locally, before any container starts, then starts pipeline."""

@@ -61,9 +61,10 @@ SFT_COLORS = {
     "sft-from-cpt": "#2a78d6",
     "sft-from-base": "#eb6834",
     "sft-from-cpt-seed1": "#2a78d6",
+    "sft-from-base-seed1": "#eb6834",
     "sft-from-cpt-lr2e-4": "#1baf7a",
 }
-TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1"}  # same config as another run, another seed
+TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1", "sft-from-base-seed1"}  # another seed of a config
 PPL_METRICS = [
     ("ppl_train", "train slice\n(seen once by CPT)"),
     ("ppl_domain_val", "domain val\n(held-out documents)"),
@@ -608,6 +609,7 @@ SFT_COLUMNS = [
     "instruct-8b",
     "base-8b-hf",
     "sft-from-base",
+    "sft-from-base-seed1",
     "cpt-8b-replay10",
     "sft-from-cpt",
     "sft-from-cpt-seed1",
@@ -827,8 +829,37 @@ def sft_delta_table() -> str:
     return "\n".join(lines)
 
 
+def mean_lp(runs: list[str], half: str) -> dict[str, float]:
+    """Per-item gold_lp averaged over runs (items every run has)."""
+    per = [item_lp(r, half) for r in runs]
+    ids = set.intersection(*(set(x) for x in per))
+    return {i: sum(x[i] for x in per) / len(per) for i in ids}
+
+
+def bootstrap_diff(a: dict, b: dict, n_boot: int = 10_000) -> dict:
+    """Mean per-item difference b - a, its paired SE and 95% bootstrap CI over items (seeded)."""
+    ids = sorted(set(a) & set(b))
+    d = np.array([b[i] - a[i] for i in ids])
+    boot = d[np.random.default_rng(0).integers(0, len(d), size=(n_boot, len(d)))].mean(axis=1)
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    return {
+        "n": len(d),
+        "mean": float(d.mean()),
+        "se": float(d.std(ddof=1) / math.sqrt(len(d))),
+        "ci": (float(lo), float(hi)),
+        "up": float((d > 0).mean()),
+    }
+
+
 def b7_first_line() -> str:
-    """B7's first line: gold_lp by half, sft-from-cpt - sft-from-base, against the noise."""
+    """B7's first line: gold_lp by half, CPT arm - base arm, against the noise.
+
+    One seed per arm (pre-registered 2026-10-06): sft-from-cpt - sft-from-base, noise = max(the
+    CPT arm's seed gap, the paired per-item SE). With a seed twin on both arms (2026-10-06,
+    fixed before sft-from-base-seed1's results): the difference of the arm means, noise =
+    max(its run-variance SD, sqrt(gap_cpt^2 + gap_base^2) / 2, and the paired per-item SE of the
+    averaged runs); beyond the noise needs the item-bootstrap CI to exclude 0 and the difference
+    to exceed the noise."""
     m = {}
     for r in SFT_COLORS:
         f = RUNS / r / "metrics.json"
@@ -836,31 +867,48 @@ def b7_first_line() -> str:
             m[r] = json.loads(f.read_text())
     if not all(r in m for r in ("sft-from-cpt", "sft-from-base")):
         return ""
+    two_arm = all(r in m for r in ("sft-from-cpt-seed1", "sft-from-base-seed1"))
     out = []
     for half in ("unseen", "seen"):
-        c = paired_lp("sft-from-base", "sft-from-cpt", half)
+        key = f"gold_lp_{half}"
+        if two_arm:
+            cpt = ["sft-from-cpt", "sft-from-cpt-seed1"]
+            base = ["sft-from-base", "sft-from-base-seed1"]
+            c = bootstrap_diff(mean_lp(base, half), mean_lp(cpt, half))
+            gap_c = abs(m[cpt[0]][key] - m[cpt[1]][key])
+            gap_b = abs(m[base[0]][key] - m[base[1]][key])
+            run_sd = math.sqrt(gap_c**2 + gap_b**2) / 2
+            floor = max(run_sd, c["se"])
+            label = "mean of 2 CPT-arm runs - mean of 2 base-arm runs"
+            detail = (
+                f"run-variance SD {run_sd:.3f} from seed gaps {gap_c:.3f} (CPT arm) and "
+                f"{gap_b:.3f} (base arm), paired SE {c['se']:.3f}; the difference is "
+                f"{c['mean'] / run_sd:.1f} run SD"
+            )
+        else:
+            c = paired_lp("sft-from-base", "sft-from-cpt", half)
+            seed = (
+                abs(m["sft-from-cpt"][key] - m["sft-from-cpt-seed1"][key])
+                if "sft-from-cpt-seed1" in m
+                else None
+            )
+            floor = max(x for x in (seed, c["se"]) if x is not None)
+            label = "sft-from-cpt - sft-from-base"
+            seed_txt = "" if seed is None else f"seed gap {seed:.3f}, CPT arm only; "
+            detail = f"{seed_txt}paired SE {c['se']:.3f}"
         if not c:
             continue
-        key = f"gold_lp_{half}"
-        seed = (
-            abs(m["sft-from-cpt"][key] - m["sft-from-cpt-seed1"][key])
-            if "sft-from-cpt-seed1" in m
-            else None
-        )
-        floor = max(x for x in (seed, c["se"]) if x is not None)
         lo, hi = c["ci"]
         verdict = (
             "beyond the noise: CPT bought something that survives SFT"
             if (lo > 0 or hi < 0) and abs(c["mean"]) > floor
-            else "inside the noise: CPT's value is not observable at this scale"
+            else "inside the noise: CPT's value is not distinguishable at this scale"
         )
-        qa = {r: m[r].get(f"qa_{half}") for r in ("sft-from-cpt", "sft-from-base")}
-        seed_txt = "" if seed is None else f"seed gap {seed:.3f}, "
         out.append(
-            f"- **{half} gold_lp, sft-from-cpt - sft-from-base:** {c['mean']:+.3f} nats per answer "
-            f"[95% CI {lo:+.3f}, {hi:+.3f}; {c['n']} items, {c['up']:.0%} up]; noise "
-            f"{floor:.3f} ({seed_txt}paired SE {c['se']:.3f}): {verdict}. qa_{half} "
-            f"{qa['sft-from-cpt']:.3f} vs {qa['sft-from-base']:.3f}, reported, not argued."
+            f"- **{half} gold_lp, {label}:** {c['mean']:+.3f} nats per answer [95% CI over items "
+            f"{lo:+.3f}, {hi:+.3f}; {c['n']} items, {c['up']:.0%} up]; noise {floor:.3f} "
+            f"({detail}): {verdict}. The item CI conditions on these training runs; run variance "
+            "enters only through the noise."
         )
     return "\n".join(out)
 
@@ -937,6 +985,7 @@ def checks_table() -> str:
 CHAT_ROWS = (
     "instruct-8b",
     "sft-from-base",
+    "sft-from-base-seed1",
     "sft-from-cpt",
     "sft-from-cpt-seed1",
     "sft-from-cpt-lr2e-4",

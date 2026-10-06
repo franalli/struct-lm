@@ -715,6 +715,7 @@ govern.
 | LoRA | r 64, alpha 128, dropout 0.05, all seven projections of the language model (178M trainable) |
 | optimiser and schedule | AdamW, LR 1e-4 linear to 0, 3% warmup, 32 sequences per step, 2 epochs (154 steps), one H100 |
 | checkpoint rule | epoch 2 unless the closed-book or definition sft_val loss rose from epoch 1 to epoch 2 |
+| gradient weight by format | token-weighted loss: replay 75%, grounded 16%, closed-book 4.6%, definition 4.3%, abstain 0.7% of the 179k completion tokens |
 
 The training loss is token-weighted, so the 500 replay answers (general Tulu 3 instructions, long
 completions) carry 75% of the gradient weight. Grounded answers carry 16%, and the recall formats
@@ -790,68 +791,90 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 | sft-from-cpt-seed1 | 0.7799 | 9.1733 | 196.4 | 0.7719 | 0.837 | 0.97 | 98.8% of 80 |
 <!-- stage3-tables:end -->
 
-**Findings**, against the pre-registered reading:
-1. **CPT bought something that survives SFT, modestly.**
-   - On the unseen half, SFT from the CPT checkpoint gives the gold answer +0.36 nats more
-     log-probability per answer than SFT from the base: 95% CI [+0.15, +0.58], 61% of items up.
-     That clears the noise floor (0.26 nats, the seed gap) by 1.4x.
-   - Before SFT the lead was about +0.67 nats, in base format, so about half of it is still
-     visible.
-   - Unseen qa_acc moved +2.6 points against 2.7 of noise: reported, not argued.
-   - The margin is thin: SFT's seed-to-seed spread on `gold_lp` is 8x CPT's, and the base arm has
-     no seed twin.
-2. **SFT taught the facts it showed.**
-   - SFT alone took the base's seen half from 12.6% to 24.5% closed-book, and its seen-half
-     definitions from 71% to 91%. On top of CPT, the seen half reaches 28.1%.
-   - The unseen half barely moves, which is what the halves exist to show. The seen chunks were
-     forced into the SFT pool by design.
-3. **Against Instruct, the bar:**
-
-   | metric | SFT from CPT | Instruct |
-   |---|---|---|
-   | closed-book | 21% | 10% |
-   | identifiers | 20% | 3% |
-   | definitions | 83% | 79% |
-   | cited answers backed by the cited passages | 86% | 79% |
-   | grounded accuracy | 91% | 90% |
-   | false refusals | 0% | 7% |
-   | hallucination on unanswerable questions | 5.3% | 1.3% |
-
-   - **Beats it:** closed-book, identifiers, definitions and cited answers.
-   - **Matches it:** grounded accuracy.
-   - **Better:** it refuses no answerable question.
-   - **Worse:** hallucination on unanswerable questions, at the edge of the run-to-run spread; the
-     seed twin has 1.3%.
-4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
-5. **It stops.**
+**What holds.**
+1. **At 2,436 records, the recall formats overfit in the second epoch, in all three runs.**
+   - Closed-book and definition val loss bottomed at the end of epoch 1 and rose through epoch 2,
+     while train loss kept falling: the set was being memorised.
+   - The pre-registered rule (amended before training to read those formats, not the mixture mean)
+     caught it on every run and took epoch 1.
+   - For a domain SFT set this size, one epoch is the budget, and the recall formats are where to
+     watch for overfitting.
+2. **It stops.**
    - Every KPI answer, 98.75% of sampled answers and 100% of bench requests end on `</s>`.
-   - End-to-end latency at one request is 159 ms, against the CPT checkpoint's 1,753 ms (Serving).
-6. **Diversity is within the pre-registered 10% of Instruct.** Distinct-4 is −4.7% and entropy
-   −8.0%, at half Instruct's answer length, so entropy is near the line. Stage 4 samples at
-   T >= 0.8.
-7. **Two gates were amended before the evals they govern, and both amendments are recorded.**
-   - **The step-1 loss band.** It assumed recall answers, but the first batch was passage copy. It
-     is now read per format.
-   - **The merge gate.** 3 probes and 295 positions put a 99% line 2 flips from failing, and the CPT
-     run's merge failed on 4 flips of near-tie noise. The amended gate compares the merge against
-     an fp32 reference over all 11,351 positions: it adds 5 flips to bf16's own 74. Every gated
+   - End-to-end latency at one request is 159 ms, against the CPT checkpoint's 1,753 ms, at the same
+     per-token speed (Serving).
+3. **It cites and it doesn't over-refuse.**
+   - Cited answers backed by the cited passages: 86.1% against Instruct's 78.7%.
+   - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
+   - Grounded accuracy matches Instruct (90.7% vs 89.8%).
+4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
+
+**What is weaker than a summary would make it.**
+1. **What CPT bought passes the pre-registered rule, at 1.4 SD of run variance.**
+   - **The comparison:** on the unseen half, SFT from the CPT checkpoint gives the gold answer +0.355
+     nats more log-probability than SFT from the base. The per-item bootstrap CI over the 155 items
+     is [+0.146, +0.575], and the noise floor is 0.258, the seed gap.
+   - **The floor is measured on one arm only.** A seed gap of 0.258 on the CPT arm means each run
+     has a run-to-run SD around 0.18. So the difference of two single runs has an SD around 0.26,
+     and +0.355 is 1.4 SD.
+   - **The bootstrap CI** excludes zero, but it conditions on these two training runs: it does not
+     include run variance.
+   - **What happens next:** `sft-from-base-seed1` gives the base arm its own seed twin, so the floor
+     is measured where it is used. If the difference falls inside the two-arm floor, the result is
+     "not distinguishable at this scale".
+   - Unseen qa_acc is 0.136 against 0.110 (+2.6 points, noise 2.7), reported, not argued.
+2. **The gain over Instruct on closed-book facts is retention, not capability.** The seen half's
+   facts were in the training set by design; the unseen half's were not.
+
+   | closed-book | seen half: retention of trained facts | unseen half: transfer |
+   |---|---|---|
+   | instruct-8b | 19/167 (11.4%) | 13/155 (8.4%) |
+   | cpt-8b-replay10 (start) | 25/167 (15.0%) | 17/155 (11.0%) |
+   | sft-from-base | 41/167 (24.5%) | 17/155 (11.0%) |
+   | **sft-from-cpt** | **47/167 (28.1%)** | **21/155 (13.5%)** |
+   | identifiers, instruct-8b | 2/30 | 0/34 |
+   | identifiers, sft-from-cpt | 10/30 | 3/34 (its CPT start: 3/34) |
+
+   - **Seen half:** a client wants the model to know their documents, and SFT delivers that here,
+     about 2.5x Instruct.
+   - **Unseen half:** 13.5% against Instruct's 8.4% sits inside the noise floor. Every unseen
+     identifier it gets right, its CPT start already had.
+3. **Replay carried the gradient.**
+   - 500 general Tulu 3 answers are 20% of the records, but their long completions are 75% of the
+     token-weighted loss. The closed-book and definition records the seen half measures are 9%.
+   - The run was mostly general instruction tuning with a domain component.
+4. **Hallucination on unanswerable questions is 4 of 76 against Instruct's 1 of 76** (5.3% vs 1.3%).
+   The seed twin also has 1 of 76, so the difference is a few items, at the edge of the run-to-run
+   spread. Both are inside the pre-registered target (< 20%).
+5. **Diversity passes its line on length-confounded numbers.**
+   - **The numbers:** distinct-4 −4.7% and entropy −8.0% against Instruct, inside the
+     pre-registered 10%.
+   - **The confound:** answers are half Instruct's length, a style the teacher's short completions
+     taught. Pooled entropy and distinct-4 move with length.
+   - **Why it matters for Stage 4:** if 4 samples per prompt at T 0.7 come out near-identical, DPO
+     pairs have no margin. It is checked on the first 20 prompts before sampling the pool.
+6. **Two gates were amended before the evals they govern** (both recorded in `decisions.md`).
+   - **The step-1 loss band** assumed recall answers. It is now read per format.
+   - **The merge gate's 3 probes** (295 positions) put a 99% line 2 flips from failing. The CPT
+     run's merge failed on 4 flips of near-tie noise. The amended gate compares the merge against an
+     fp32 reference over all 11,351 positions: it adds 5 flips to bf16's own 74. Every gated
      checkpoint's sha256 matches the one evaluated.
-8. **One epoch.** All three runs' recall-format val loss bottomed at the end of epoch 1 and rose in
-   epoch 2 while train loss kept falling, so the rule took epoch 1 each time.
 
 #### What I would do differently (Stage 3)
 
-1. **Size a gate's sample for its threshold, and reference it to the exact function.** A 99%
-   agreement line on 295 positions is two flips from failing, and comparing two bf16 models
-   measures bf16's own near-tie noise. The fp32-referenced, full-set comparison costs a few GPU
-   minutes and should have been the gate from the start.
-2. **Give both arms of the control a seed twin.** The noise floor for "what CPT bought" comes from
-   the CPT arm alone. A second sft-from-base run (0.5 GPU-h) would make the comparison's noise
-   two-sided.
-3. **Look at the gradient shares before freezing the loss.** Replay's long answers carry 75% of
-   the token-weighted loss, and the recall formats the seen half measures 9%. That surfaced after
-   the smoke run, from a number misread on the smoke batch. Per-record or per-format weighting,
-   decided with the data, would have aimed the gradient at the facts.
+1. **Look at the gradient shares before freezing the loss.**
+   - Replay's long answers carry 75% of the token-weighted loss, and the recall formats the seen
+     half measures 9%, so the run was mostly Tulu training.
+   - It surfaced only after the smoke run, from a number misread on the smoke batch.
+   - Per-record or per-format weighting, or a replay token cap, decided with the data, would have
+     aimed the gradient at the facts.
+2. **Give both arms of the control a seed twin from the start.** "What CPT bought" was first read
+   against a noise floor from one arm. A second sft-from-base run is 0.5 GPU-h; it is running now.
+3. **Size a gate's sample for its threshold, and reference it to the exact function.**
+   - A 99% agreement line on 295 positions is two flips from failing.
+   - Comparing two bf16 models measures bf16's own near-tie noise.
+   - The fp32-referenced, full-set comparison costs a few GPU minutes and should have been the gate
+     from the start.
 4. **Pre-register sanity bands per format.** A mixture's token mean hides the formats that matter,
    and the step-1 band failed for that reason, not for a bug.
 5. **Find the minimum, don't bracket it.** All three runs overfit in epoch 2. An eval every ~15
@@ -960,13 +983,15 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   more probable (`gold_lp` +0.59 nats per answer), which SFT can build on.
 - **Why `cpt-8b-replay10` goes forward:** LoRA with replay costs almost nothing in forgetting.
 
-**Stage 3 (SFT) earned what it was built for.**
-- **The seen half:** the closed-book facts SFT showed nearly doubled (28% from 15%).
-- **Grounding and citation:** they beat Instruct (cited answers backed by the passages 86% vs
-  79%), with no false refusals.
-- **Stopping:** the model now stops after an answer.
-- **CPT's contribution survives SFT:** unseen-half `gold_lp` is +0.36 nats against the SFT-only
-  control, CI [+0.15, +0.58], outside the noise by a thin margin.
+**Stage 3 (SFT):**
+- **Holds:**
+  - The model stops: 159 ms against 1,753 ms end to end.
+  - It cites better than Instruct and never refuses an answerable question.
+  - The recall formats overfit in epoch 2, which the pre-registered rule caught on every run.
+- **Retention, not capability:** the seen half's closed-book score (28% from 15%; facts that were
+  in the training set) is retention. The unseen half moved inside the noise.
+- **CPT's contribution passes the rule at 1.4 SD of run variance,** on a floor measured on one arm.
+  The base arm's seed twin decides whether it stands.
 - **Going forward:** `sft-from-cpt` (epoch 1) is the Stage 3 checkpoint; `train/configs/dpo.yaml`
   starts from it.
 
@@ -1013,7 +1038,10 @@ tokens max; generated by `train/report.py` from `results/bench/`).
 ### 6. What I'd do next
 
 **From Stage 3:**
-- **A seed twin for the SFT-only control,** so "what CPT bought" has two-sided noise.
+- **The SFT-only control's seed twin** (`sft-from-base-seed1`) is running. It decides whether
+  "what CPT bought" stands with two-sided noise.
+- **Check sample diversity before building DPO pairs:** 4 samples per prompt at T 0.7 on the first
+  20 prompts. Near-identical samples give pairs with no margin.
 - **Weight the loss per format.** SFT's token-weighted loss gives the 500 replay answers 75% of the
   gradient and the closed-book and definition records, the ones the seen half measures, 9%.
   Normalising per record or per format, or capping replay's share, would aim the gradient at the

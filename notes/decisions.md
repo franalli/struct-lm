@@ -2844,3 +2844,60 @@ introduced.
 - **The adapters** are kept in `checkpoints/_train/` (rule 12).
 - **CPT stays in the chain** (the retrospective's CPT-control rule): the sft-from-base control
   shows a positive, if modest, effect on the measure the pre-registration named.
+
+## 2026-10-06: Stage 3 read, qualified; sft-from-base-seed1 instead of lr2e-4; two-arm reading fixed before it reports (user decisions)
+**What holds:**
+- **Serving:** 159 ms vs 1,753 ms, and every request stops.
+- **Citation and refusal:** cite_supported 0.861 vs 0.787; false refusals 0 vs 0.074.
+- **The checkpoint finding:** at 2,436 records the recall formats overfit in epoch 2, and the
+  amended rule caught it on all three runs. This one is kept prominent in the README.
+
+**What is weaker than the first summary read** (now in the README):
+- **The first line passes the rule at 1.4 SD of run variance, on a floor measured on one arm.**
+  - A seed gap of 0.258 on the CPT arm means a per-run SD around 0.18. So the difference of two
+    single runs has an SD around 0.26, and +0.355 is 1.4 SD.
+  - The per-item bootstrap CI excludes zero but conditions on these two training runs: it doesn't
+    include run variance.
+- **The gain over Instruct on closed-book facts is in the seen half: retention of facts in the
+  training set.**
+  - seen 47/167 vs Instruct 19/167;
+  - unseen 21/155 vs 13/155, inside the floor;
+  - identifiers: seen 10/30 vs 2/30, unseen 3/34 vs 0/34, and every unseen identifier it gets
+    right, its CPT start already had.
+
+  The README shows the halves side by side with that label.
+- **Replay carried 75% of the gradient** (9% for the recall formats). This is in the hyperparameter
+  table and is item 1 of "what I would do differently".
+- **Hallucination on unanswerable questions is 4 of 76 against Instruct's 1 of 76** (seed twin: 1
+  of 76).
+- **Diversity is length-confounded.** Answers are half Instruct's length, a teacher-style artefact.
+  Stage 4 checks 4 samples per prompt at T 0.7 on its first 20 prompts before sampling the pool:
+  near-identical samples would give DPO pairs no margin.
+
+**Calls:**
+- **lr2e-4:** skipped.
+- **sft-from-base-seed1:** launched instead. It is the base arm's seed twin (seed 1, data_seed 1,
+  so the same data order as sft-from-cpt-seed1).
+  - It runs as one unattended chain: train; B4, applied by `modal_train.py --merge-from b4` from
+    its own loss curve and written to `results/runs/sft-from-base-seed1/b4.json` before the merge;
+    merge; the amended gate; evals.
+  - It is read tomorrow morning.
+- **smoke-sft:** its merged checkpoint is deleted from the volume (its numbers are above). Its
+  0.7 GB adapter in `checkpoints/_train/smoke-sft` stays under rule 12 unless the user says
+  otherwise.
+- **Stage 4:** starts tomorrow by sampling from sft-from-cpt, epoch 1.
+- **Stage 5:** the task set is Thursday's gate. It is built Wednesday evening while DPO trains, or
+  GRPO doesn't launch Thursday.
+
+**Two-arm reading of the first line (fixed now, before sft-from-base-seed1 reports; `report.py
+b7_first_line`):**
+- **The difference:** Δ = mean(sft-from-cpt, sft-from-cpt-seed1) − mean(sft-from-base,
+  sft-from-base-seed1), on unseen-half `gold_lp`.
+- **Run-variance SD of Δ:** each arm's per-run variance is estimated from its seed gap as
+  gap^2 / 2, and each arm mean averages 2 runs. So SD(Δ) = sqrt(gap_cpt^2 + gap_base^2) / 2.
+- **Noise:** max(SD(Δ), the paired per-item SE of the run-averaged difference). This keeps the
+  original rule's convention of the difference against one SD of its own run noise, now measured
+  on both arms.
+- **Beyond the noise:** the item-bootstrap CI excludes 0 and Δ > noise. Otherwise the README's
+  first line becomes "CPT's value is not distinguishable at this scale", and that is the result.
+- **Also reported:** Δ in run-SD units, the single-run pairs, and unseen qa_acc (not argued).
