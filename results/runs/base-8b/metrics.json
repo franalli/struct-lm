@@ -6,6 +6,7 @@
   "vocab_seen": 0.7228,
   "vocab_unseen": 0.7156,
   "halluc_rate": 0.8816,
+  "false_abstain": 0.0093,
   "n": {
     "domain_qa": 0,
     "grounded": 108,

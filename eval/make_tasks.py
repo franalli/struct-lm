@@ -717,10 +717,11 @@ def main() -> None:
         "--task-version",
         type=int,
         choices=(1, 2, 3),
-        default=2,
+        default=3,
         help="1: the 130-item domain_qa frozen 2026-09-27 (no second supplement, no locator "
-        "filter, kinds or cap; results/table_v1.md); 2: the grown set (finalize_qa_v2); 3: v2 "
-        "with the few-shot split off by passage, for the next from-scratch rebuild",
+        "filter, kinds or cap; results/table_v1.md); 2: the grown set (finalize_qa_v2; "
+        "results/table_v2.md); 3 (default, committed from Stage 3): v2 with the few-shot split "
+        "off by passage",
     )
     ap.add_argument(
         "--only",

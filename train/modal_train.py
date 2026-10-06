@@ -1,4 +1,4 @@
-"""Stage 2 on Modal: CPT training, merge, perplexity and the eval harness, chained remotely.
+"""Stages 2-3 on Modal: CPT or SFT training, merge, perplexity and the eval harness, chained remotely.
 
   M=.venv/bin/modal   # always from the repo root (the images copy train/ and eval/ from there)
   $M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-cpt --smoke --steps train,merge,ppl
@@ -9,12 +9,23 @@
   $M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-fsdp2 --gpus 2 \
       --steps train --overrides "training.gradient_accumulation_steps=4 training.gradient_checkpointing=false training.eval_strategy=no run.stop_at_step=100"
 
-Steps, in order: train (cpt.py; 2 GPUs: accelerate + configs/fsdp2.yaml) -> merge (merge.py into
-/vol/checkpoints/<run>) -> ppl, eval and latency in parallel (eval/perplexity.py; eval/modal_app.py's
-lm_eval and kpi_eval --generate-only; latency only when asked for, since it measures the
-architecture and serving setup, not the weights), each in its own container. Without --model, the
-checkpoint evaluated is /vol/checkpoints/<run>. The KPI eval runs without --chat: every Stage 2
-checkpoint is a base model (rule 2), and main() refuses an Instruct one.
+Stage 3 (SFT, a config with `stage: sft`, train/sft.py; reasons in notes/decisions.md, Stage 3b):
+  $M run train/modal_train.py --config train/configs/sft.yaml --run-name smoke-sft --smoke \
+      --steps noop,train,merge,mergecheck,sample --sample-jobs template
+  $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt --steps train
+  $M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-154 --chat \
+      --steps merge,mergecheck,ppl,eval,latency,sample
+
+Steps, in order: noop (merge_check.py noop: an untrained adapter on the run's start checkpoint,
+merged, must equal it; CPU, alongside the rest) -> train (cpt.py or sft.py by the config's stage;
+2 GPUs: accelerate + configs/fsdp2.yaml, CPT only) -> merge (merge.py into /vol/checkpoints/<run>;
+--merge-from picks an epoch's checkpoint-N instead of the final adapter) -> mergecheck (B5's gate:
+the evals don't start if it fails) -> ppl, eval, latency and sample in parallel (eval/perplexity.py;
+eval/modal_app.py's lm_eval and kpi_eval --generate-only; latency only when asked for, since it
+measures the serving setup more than the weights; sample: eval/sample.py's --sample-jobs), each in
+its own container. Without --model, the checkpoint evaluated is /vol/checkpoints/<run>. The KPI
+eval runs with --chat for chat checkpoints (SFT on) and without for base models (rule 2): main()
+requires --chat for a run named sft/dpo/grpo and refuses an Instruct one.
 
 main() makes exactly one remote call, pipeline.remote(), and the chain runs inside that CPU
 container: with --detach, only the call in flight survives the client disconnecting, so a chain
@@ -38,7 +49,7 @@ for _d in (Path(__file__).resolve().parents[1] / "eval", Path("/root/eval")):
         sys.path.insert(0, str(_d))
         break
 from modal_app import app as eval_app
-from modal_app import kpi_eval, latency, lm_eval
+from modal_app import kpi_eval, latency, lm_eval, sample
 
 app = modal.App("struct-lm-train").include(eval_app)
 vol = modal.Volume.from_name("struct-lm", create_if_missing=True)
@@ -78,7 +89,7 @@ COMMON = {
 }
 # eval = lm-eval + KPI generation; latency is its own step: it depends on the architecture and the
 # serving setup, not on these weights, so it is measured per deployed checkpoint, not per ablation
-STEPS = ("train", "merge", "ppl", "eval", "latency")
+STEPS = ("noop", "train", "merge", "mergecheck", "ppl", "eval", "latency", "sample")
 
 
 def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> list[str]:
@@ -96,14 +107,20 @@ def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> l
 
 @app.function(**COMMON, gpu="H100", timeout=6 * 3600)
 def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
-    """cpt.py in-process on one H100, committing the volume on every save and eval."""
+    """cpt.py or sft.py (the config's `stage`) in-process on one H100, committing the volume on
+    every save and eval."""
     import os
 
     os.chdir("/vol")
     sys.path.insert(0, "/root/train")
-    import cpt
     from common import parse_config
     from transformers import TrainerCallback
+
+    cfg = parse_config(cpt_args(config, run_name, overrides, smoke))
+    if cfg.get("stage") == "sft":
+        import sft as stage
+    else:
+        import cpt as stage
 
     class Commit(TrainerCallback):
         def on_save(self, args, state, control, **kwargs):
@@ -112,7 +129,7 @@ def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict
         def on_evaluate(self, args, state, control, **kwargs):
             vol.commit()
 
-    summary = cpt.train(parse_config(cpt_args(config, run_name, overrides, smoke)), [Commit()])
+    summary = stage.train(cfg, [Commit()])
     vol.commit()
     return summary
 
@@ -147,14 +164,17 @@ def train_fsdp(config: str, run_name: str, overrides: list[str], smoke: bool) ->
 
 
 @app.function(**COMMON, cpu=8, memory=98304, timeout=2 * 3600)
-def merge(run_name: str, source: str = "") -> str:
+def merge(run_name: str, source: str = "", adapter: str = "") -> str:
     """merge.py on CPU: the adapter (or full weights) of checkpoints/_train/<run> into
     checkpoints/<run>. LoRA or full, and the base, come from the run's train_summary.json.
 
     With `source` (a hub id), re-save that model through the same path instead: a no-op "merge"
     that gives the base exactly the files a merged checkpoint has (HF only, no Mistral-native
     params.json / consolidated.safetensors, config written by the same transformers), so vLLM
-    evaluates base and fine-tuned checkpoints identically (notes/decisions.md, base-8b-hf)."""
+    evaluates base and fine-tuned checkpoints identically (notes/decisions.md, base-8b-hf).
+
+    With `adapter` (e.g. "checkpoint-77"), merge that trainer checkpoint's adapter instead of the
+    final one: SFT keeps one per epoch, and B4's rule may pick epoch 1."""
     import json
 
     vol.reload()
@@ -164,8 +184,10 @@ def merge(run_name: str, source: str = "") -> str:
     else:
         src = Path(f"/vol/checkpoints/_train/{run_name}")
         summary = json.loads((src / "train_summary.json").read_text())
+        if adapter and not (src / adapter / "adapter_config.json").exists():
+            raise RuntimeError(f"{src / adapter}: no adapter_config.json")
         how = (
-            ["--adapter", str(src)]
+            ["--adapter", str(src / adapter) if adapter else str(src)]
             if summary["lora"]
             else ["--full", str(src), "--base", summary["base"]]
         )
@@ -174,6 +196,64 @@ def merge(run_name: str, source: str = "") -> str:
     )
     vol.commit()
     return out
+
+
+@app.function(**COMMON, cpu=8, memory=98304, timeout=2 * 3600)
+def noop_control(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
+    """merge_check.py noop on the run's start checkpoint (model.init_from after overrides): an
+    untrained adapter, merged by merge.py, must give the start back tensor for tensor (the
+    retrospective's no-op control, before a stage's training). /vol/results/noop/<start>.json."""
+    import json
+
+    sys.path.insert(0, "/root/train")
+    from common import parse_config
+
+    vol.reload()
+    start = parse_config(cpt_args(config, run_name, overrides, smoke))["model"]["init_from"]
+    name = Path(start).name
+    cmd = [
+        sys.executable,
+        "/root/train/merge_check.py",
+        "noop",
+        "--start",
+        start,
+        "--config",
+        f"/root/{config}",
+        "--work",
+        f"/vol/scratch/noop-{name}",
+        "--out",
+        f"/vol/results/noop/{name}.json",
+    ]
+    proc = subprocess.run(cmd, cwd="/vol", check=False)  # commit the json, then raise
+    vol.commit()
+    if proc.returncode:
+        raise RuntimeError(f"no-op control failed for {start}: /vol/results/noop/{name}.json")
+    return json.loads(Path(f"/vol/results/noop/{name}.json").read_text())
+
+
+@app.function(**COMMON, gpu="H100", timeout=2 * 3600)
+def merge_check(run_name: str, adapter: str = "") -> None:
+    """merge_check.py check: start + adapter (unmerged) against /vol/checkpoints/<run> on sft_val
+    and 3 probe records; writes /vol/results/runs/<run>/merge_check.json and raises on failure."""
+    vol.reload()
+    src = Path(f"/vol/checkpoints/_train/{run_name}") / adapter
+    cmd = [
+        sys.executable,
+        "/root/train/merge_check.py",
+        "check",
+        "--adapter",
+        str(src),
+        "--merged",
+        f"/vol/checkpoints/{run_name}",
+        "--val",
+        "data/sft/sft_val.jsonl",
+        "--out",
+        f"/vol/results/runs/{run_name}/merge_check.json",
+    ]
+    proc = subprocess.run(cmd, cwd="/vol", check=False)  # commit the json, then raise
+    vol.commit()
+    if proc.returncode:
+        raise RuntimeError(f"{run_name}: merge check failed (merge_check.json); never serve it")
 
 
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
@@ -212,27 +292,36 @@ def pipeline(
     gpus: int,
     overrides: list[str],
     smoke: bool,
+    chat: bool = False,
+    merge_from: str = "",
+    sample_jobs: str = "eos,diversity",
 ) -> None:
     """The chain, on a CPU container that mostly waits. Each step's function commits its writes
     and each later one reloads the volume, so a step sees what the previous one wrote."""
+    calls = {}
+    if "noop" in steps:  # independent of training: runs alongside it
+        calls["noop"] = noop_control.spawn(config, run_name, overrides, smoke)
     if "train" in steps:
         fn = train_fsdp if gpus == 2 else train
         print(fn.remote(config, run_name, overrides, smoke))
     if "merge" in steps:
-        model = merge.remote(run_name, "" if "train" in steps else model)
+        model = merge.remote(run_name, "" if "train" in steps else model, merge_from)
+    if "mergecheck" in steps:
+        merge_check.remote(run_name, merge_from)  # raises on failure: nothing below runs
     model = model or f"/vol/checkpoints/{run_name}"
-    if model.startswith("/vol/"):
+    if model.startswith("/vol/") and set(steps) & {"ppl", "eval", "latency", "sample"}:
         wait_for_weights(Path(model))
-    calls = {}
     if "ppl" in steps:
         calls["ppl"] = perplexity.spawn(model, run_name)
     if "eval" in steps:
         # lm_eval and kpi_eval write separate dirs; with --generate-only nothing merges them on
         # Modal (scoring and the table row happen locally, rule 4), so they can run in parallel.
         calls["lm_eval"] = lm_eval.spawn(model, run_name, "mistral")
-        calls["kpi_eval"] = kpi_eval.spawn(model, run_name, False, None, False, "mistral", True)
+        calls["kpi_eval"] = kpi_eval.spawn(model, run_name, chat, None, False, "mistral", True)
     if "latency" in steps:
         calls["latency"] = latency.spawn(model, run_name, "mistral")
+    if "sample" in steps:
+        calls["sample"] = sample.spawn(model, run_name, sample_jobs, chat, "hf")
     # Wait for every call before failing: raising on the first error (FunctionCall.gather) ends
     # this function and with it the app, which cancels the calls still running.
     failed = []
@@ -255,6 +344,9 @@ def main(
     gpus: int = 1,
     overrides: str = "",
     smoke: bool = False,
+    chat: bool = False,  # KPI eval and sampling in the chat template: every SFT/DPO/GRPO checkpoint
+    merge_from: str = "",  # e.g. checkpoint-77: merge that epoch's adapter (B4), not the final one
+    sample_jobs: str = "eos,diversity",  # eval/sample.py jobs for the sample step
 ) -> None:
     """Checks the arguments locally, before any container starts, then starts pipeline."""
     todo = [s.strip() for s in steps.split(",") if s.strip()]
@@ -271,5 +363,28 @@ def main(
             "--model is for an existing model: --steps ppl,eval, or merge to re-save it"
         )
     if "instruct" in (model + config).lower():
-        raise SystemExit("Stage 2 checkpoints are base models; evaluate Instruct with modal_app.py")
-    pipeline.remote(config, run_name, model, todo, gpus, overrides.split(), smoke)
+        raise SystemExit("Instruct isn't trained here; evaluate it with eval/modal_app.py")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
+    from run_eval import needs_chat
+
+    chat_ckpt = needs_chat(model, run_name) or "sft" in Path(config).stem
+    if set(todo) & {"eval", "sample"} and chat_ckpt and not chat:
+        raise SystemExit(f"{run_name} is a chat checkpoint: its KPI eval and samples need --chat")
+    if chat and not chat_ckpt:
+        raise SystemExit(f"--chat on {run_name or model}, which isn't a chat checkpoint (rule 2)")
+    if gpus == 2 and "sft" in Path(config).stem:
+        raise SystemExit("SFT runs on one GPU (train/sft.py has no FSDP path)")
+    if merge_from and "merge" not in todo:
+        raise SystemExit("--merge-from applies to the merge step")
+    pipeline.remote(
+        config,
+        run_name,
+        model,
+        todo,
+        gpus,
+        overrides.split(),
+        smoke,
+        chat,
+        merge_from,
+        sample_jobs,
+    )

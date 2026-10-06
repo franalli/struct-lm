@@ -132,8 +132,8 @@ The 325 scored items against each other: 0 exact duplicate questions; 608 pairs 
 | domain_qa seen: questions | 167 | 166 | 83 | 20 | 2 | 22.5% |
 | domain_qa seen: answers | 167 | 5 | 4 | 4 | 4 | 2.4% |
 | vocab seen: definitions | 101 | 100 | 6 | 3 | 0 | 3.2% |
-| domain_qa unseen: questions | 158 | 158 | 51 | 9 | 0 | 13.8% |
-| domain_qa unseen: answers | 158 | 10 | 4 | 4 | 4 | 2.5% |
+| domain_qa unseen: questions | 155 | 155 | 49 | 8 | 0 | 13.4% |
+| domain_qa unseen: answers | 155 | 10 | 4 | 4 | 4 | 2.5% |
 | vocab unseen: definitions | 109 | 109 | 0 | 0 | 0 | 0.0% |
 | grounded: questions | 108 | 108 | 4 | 3 | 0 | 1.9% |
 | adversarial: questions | 76 | 76 | 1 | 0 | 0 | 0.6% |
@@ -143,7 +143,7 @@ Exact reuse (normalised text):
 | eval half | items | question inside an SFT prompt | answer = an SFT closed-book answer, same document |
 |---|---|---|---|
 | domain_qa seen | 167 | 0 | 78 |
-| domain_qa unseen | 158 | 0 | 4 |
+| domain_qa unseen | 155 | 0 | 4 |
 
 | eval half | items | term defined in SFT |
 |---|---|---|

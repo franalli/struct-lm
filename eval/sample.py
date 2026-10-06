@@ -1,0 +1,116 @@
+"""Sampled generations from a checkpoint through the KPI eval's vLLM engine (run_eval.make_llm), for
+checks that need more than the greedy KPI outputs. One engine load serves every job asked for:
+
+  template   the five SFT template prompts (eval/sft_template_prompts.jsonl, one per format),
+             1 token each: vLLM's prompt_token_ids, which tests/test_template.py compares with the
+             trainer's (B1's vLLM half)
+  eos        20 prompts of the Stage 4 pool (data/dpo/prompts.jsonl, 4 per format by a fixed hash)
+             x 4 samples at temperature 0.8, up to 1,024 tokens: does </s> end generation (B5)
+  diversity  eval/diversity_prompts.jsonl (100 prompts) x 1 sample at temperature 0.7, up to 1,024
+             tokens: distinct-4, token entropy and length, scored by eval/diversity.py (B6)
+
+  python eval/sample.py --model /vol/checkpoints/sft-from-cpt --run-name sft-from-cpt --chat \
+      --jobs eos,diversity
+  On Modal: eval/modal_app.py::sample, or modal_train.py --steps ...,sample
+
+Writes <results-dir>/runs/<run>/samples/<job>.jsonl: per prompt its id, format, prompt_token_ids
+and every sample's text, token ids and finish_reason ("stop" is </s>: no stop strings are set;
+"length" is the cap). Seeded (seed 0), so a rerun samples the same outputs.
+"""
+
+import argparse
+import hashlib
+import json
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from run_eval import make_llm, write_jsonl
+
+HERE = pathlib.Path(__file__).parent
+JOBS = {
+    "template": {"prompts": HERE / "sft_template_prompts.jsonl", "n": 1, "temperature": 0.0, "max_tokens": 1},
+    "eos": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 4, "temperature": 0.8, "max_tokens": 1024, "per_format": 4},
+    "diversity": {"prompts": HERE / "diversity_prompts.jsonl", "n": 1, "temperature": 0.7, "max_tokens": 1024},
+}  # fmt: skip
+
+
+def h(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def prompts_for(job: str) -> list[dict]:
+    """[{id, format, prompt}] for a job. The Stage 4 pool stores the prompt as a message list."""
+    spec = JOBS[job]
+    rows = [json.loads(line) for line in spec["prompts"].read_text().splitlines()]
+    out = []
+    for r in rows:
+        p = r["prompt"]
+        text = p if isinstance(p, str) else p[0]["content"]
+        out.append({"id": r["id"], "format": r.get("format"), "prompt": text})
+    if "per_format" in spec:  # a fixed-hash pick per format
+        picked = []
+        for f in sorted({r["format"] for r in out}):
+            rows_f = sorted(
+                (r for r in out if r["format"] == f), key=lambda r: h(f"{job}:{r['id']}")
+            )
+            picked += rows_f[: spec["per_format"]]
+        out = picked
+    return out
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--run-name", required=True)
+    ap.add_argument("--jobs", default="eos,diversity", help=f"comma-separated, from {list(JOBS)}")
+    ap.add_argument("--chat", action="store_true", help="the model's chat template (llm.chat)")
+    ap.add_argument("--results-dir", default="results")
+    ap.add_argument("--tokenizer-mode", default="mistral")
+    ap.add_argument("--config-format", default="hf", choices=("hf", "auto"))
+    ap.add_argument("--max-model-len", type=int, default=8192)
+    args = ap.parse_args()
+    jobs = [j for j in args.jobs.split(",") if j]
+    if unknown := set(jobs) - set(JOBS):
+        ap.error(f"unknown jobs {sorted(unknown)}")
+    from vllm import SamplingParams
+
+    llm = make_llm(args.model, 1, args.max_model_len, args.tokenizer_mode, args.config_format)
+    out_dir = pathlib.Path(args.results_dir) / "runs" / args.run_name / "samples"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for job in jobs:
+        spec, items = JOBS[job], prompts_for(job)
+        params = SamplingParams(
+            n=spec["n"], temperature=spec["temperature"], max_tokens=spec["max_tokens"], seed=0
+        )
+        if args.chat:
+            outs = llm.chat([[{"role": "user", "content": it["prompt"]}] for it in items], params)
+        else:
+            outs = llm.generate([it["prompt"] for it in items], params)
+        rows = []
+        for it, o in zip(items, outs):
+            samples = [
+                {
+                    "text": c.text,
+                    "token_ids": list(c.token_ids),
+                    "n_tokens": len(c.token_ids),
+                    "finish_reason": c.finish_reason,
+                }
+                for c in o.outputs
+            ]
+            rows.append(
+                {
+                    "id": it["id"],
+                    "format": it["format"],
+                    "prompt_token_ids": list(o.prompt_token_ids),
+                    "samples": samples,
+                }
+            )
+        write_jsonl(out_dir / f"{job}.jsonl", rows)
+        flat = [s for r in rows for s in r["samples"]]
+        stopped = sum(s["finish_reason"] == "stop" for s in flat)
+        print(f"{job}: {len(rows)} prompts x {spec['n']}, stopped on </s> {stopped}/{len(flat)}")
+
+
+if __name__ == "__main__":
+    main()

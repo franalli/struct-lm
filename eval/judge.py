@@ -35,9 +35,13 @@ class Judge:
     The cache is committed with the results, so anyone can `run_eval.py --rescore` a
     committed run and get identical numbers without an API key: every lookup hits.
     `calls` counts successful cache misses (real API calls); `failures` counts answers the judge
-    couldn't grade after all retries, with the most recent error in `last_error`."""
+    couldn't grade after all retries, with the most recent error in `last_error`.
 
-    def __init__(self, cache_path: str | os.PathLike):
+    Paced: API calls start at least 60 / rpm * 1.03 s apart, just under the key's limit (30 a
+    minute, shared with make_tasks.py and the SFT builder), as api_eval.py paces. Without it a
+    rescore bursts into the limit and spends its retries on 429s (8 verdicts failed at Stage 0)."""
+
+    def __init__(self, cache_path: str | os.PathLike, rpm: int = 30):
         from mistralai.client import Mistral  # lazy, so --no-judge runs need no API client
 
         self.client = Mistral(
@@ -54,6 +58,7 @@ class Judge:
         self.calls = 0
         self.failures = 0
         self.last_error = ""
+        self.interval, self.next_start = 60 / rpm * 1.03, 0.0
 
     def __call__(self, rubric: str, prompt: str) -> dict | None:
         """Return {"score": 0|1, "reason": str} for one answer, or None if the judge failed.
@@ -64,14 +69,16 @@ class Judge:
                 answer), so keying on it means a verdict is reused only for the identical
                 prompt: rewording a rubric invalidates its old verdicts automatically.
 
-        Retries up to 5 times with exponential backoff (1, 2, 4, 8, 16 s). If every attempt
-        fails, returns None and caches nothing, so the next rescore retries that item. The
+        Up to 7 attempts with exponential backoff between them (1, 2, ... 64 s, ~2 min in all).
+        If every attempt fails, returns None and caches nothing, so the next rescore retries that item. The
         caller leaves failed items out of the metric (see run_eval.score) rather than
         counting them as 0 against the model."""
         key = hashlib.sha256(json.dumps([JUDGE_MODEL, rubric, prompt]).encode()).hexdigest()
         if key in self.cache:
             return self.cache[key]
-        for attempt in range(7):  # backoff totals ~63 s, past a per-minute rate-limit window
+        for attempt in range(7):  # backoff totals ~127 s, past a per-minute rate-limit window
+            time.sleep(max(0.0, self.next_start - time.monotonic()))
+            self.next_start = time.monotonic() + self.interval
             try:
                 r = self.client.chat.complete(
                     model=JUDGE_MODEL,

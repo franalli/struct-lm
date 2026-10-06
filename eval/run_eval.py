@@ -30,6 +30,7 @@ import glob
 import hashlib
 import json
 import pathlib
+import re
 import statistics
 import sys
 
@@ -58,6 +59,9 @@ TASKS = ["domain_qa", "grounded", "vocab", "adversarial"]
 #   vocab_recall    vocab: fraction of definitions the judge accepts
 #   vocab_seen, vocab_unseen  vocab_recall split the same way as qa_seen / qa_unseen
 #   halluc_rate     adversarial: fraction that answered instead of abstaining (lower is better)
+#   false_abstain   grounded: fraction answered with the abstain phrase although the passages hold
+#                     the answer (rule-based, scorers.abstained; lower is better). From Stage 3,
+#                     whose SFT set teaches the phrase: the cost side of a lower halluc_rate
 #   gold_lp, gold_lp_seen, gold_lp_unseen  domain_qa: mean log-probability, in nats per item, of
 #                     the gold answer (eval/gold_lp.py; higher is better), all items and by half;
 #                     computed in the generation engine, so blank for runs generated earlier
@@ -79,6 +83,7 @@ COLUMNS = [
     "vocab_seen",
     "vocab_unseen",
     "halluc_rate",
+    "false_abstain",
     "gold_lp",
     "gold_lp_seen",
     "gold_lp_unseen",
@@ -95,6 +100,14 @@ COLUMNS = [
     "ppl_postcutoff",
 ]
 PPL = ("ppl_train", "ppl_domain_val", "ppl_general_val", "ppl_postcutoff")
+# Checkpoints trained on chat-format data (Stage 3 on: run names and merged paths like sft-from-cpt,
+# smoke-sft, dpo-..., grpo-...), which the KPI eval must run with --chat (rule 2), like Instruct.
+CHAT_STAGE = re.compile(r"(^|[/_-])(sft|dpo|grpo)([/_-]|$)")
+
+
+def needs_chat(*names: str | None) -> bool:
+    """True when a model id / path or run name is a chat checkpoint: Instruct or Stage 3+."""
+    return any(n and ("instruct" in n.lower() or CHAT_STAGE.search(n.lower())) for n in names)
 
 
 def load_jsonl(path: pathlib.Path) -> list[dict]:
@@ -174,6 +187,9 @@ def generate(
         # vLLM returns outputs in input order, so zip lines them back up with their items.
         for it, o in zip(batch, outs):
             it["output"] = o.outputs[0].text
+            # "stop" (EOS or a stop string) or "length" (hit max_tokens): whether the model ends
+            # its answers, which Stage 2's CPT weakened (README, Serving)
+            it["finish_reason"] = o.outputs[0].finish_reason
             if chat and task in CHAT_GEN:  # no "\n" stop was used: keep the answer line only
                 it["raw_output"], it["output"] = it["output"], answer_line(it["output"])
         print(f"generated {len(batch):4d} {task}")
@@ -286,6 +302,10 @@ def score(items: list[dict], judge, seen: set[str] | None = None) -> tuple[list[
             ids = {c["chunk_id"] for c in r["context"]}
             rec["cite_valid"] = citations_valid(out, ids)
             buckets["cite_valid"].append(rec["cite_valid"])
+            # Every grounded item is answerable from its passages, so the abstain phrase here
+            # is a false refusal. By rule; the judge's grounded_acc already scores it 0.
+            rec["false_abstain"] = int(abstained(out, ABSTAIN_PHRASE))
+            buckets["false_abstain"].append(rec["false_abstain"])
             if not substance(out):
                 # Empty or citation-only: nothing to grade. Scored by rule, since the judge
                 # passed some of these.
@@ -550,9 +570,9 @@ def main() -> None:
     tasks = [t for t in args.tasks.split(",") if t]
     if unknown := set(tasks) - set(TASKS):
         ap.error(f"unknown tasks {sorted(unknown)}; choose from {TASKS}")
-    if args.model and "instruct" in args.model.lower() and not args.chat:
-        # KPI eval always runs chat checkpoints in chat format (notes/decisions.md).
-        raise SystemExit("an Instruct checkpoint must be evaluated with --chat")
+    if needs_chat(args.model, args.run_name) and not args.chat:
+        # KPI eval always runs chat checkpoints in chat format (rule 2, notes/decisions.md).
+        raise SystemExit("a chat checkpoint (Instruct, SFT/DPO/GRPO) must be evaluated with --chat")
 
     results = pathlib.Path(args.results_dir)
     run_dir = results / "runs" / args.run_name
@@ -644,6 +664,7 @@ def main() -> None:
                     "output": it["output"],
                     # chat one-line tasks: the full reply before scorers.answer_line
                     **({"raw_output": it["raw_output"]} if "raw_output" in it else {}),
+                    "finish_reason": it["finish_reason"],
                     **{k: it[k] for k in GOLD_FIELDS if k in it},
                 }
                 for it in items

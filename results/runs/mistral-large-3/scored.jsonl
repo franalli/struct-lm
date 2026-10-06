@@ -1,6 +1,5 @@
 {"task": "domain_qa", "id": "qa-0001", "correct": true, "output": "0.2 f'_c"}
 {"task": "domain_qa", "id": "qa-0002", "correct": false, "output": "3 in."}
-{"task": "domain_qa", "id": "qa-0003", "correct": false, "output": "20%"}
 {"task": "domain_qa", "id": "qa-0004", "correct": false, "output": "5 ppm"}
 {"task": "domain_qa", "id": "qa-0005", "correct": false, "output": "1.5 ft/yr"}
 {"task": "domain_qa", "id": "qa-0006", "correct": false, "output": "0.5"}
@@ -53,7 +52,6 @@
 {"task": "domain_qa", "id": "qa-0053", "correct": false, "output": "6.10.4.2.2"}
 {"task": "domain_qa", "id": "qa-0054", "correct": false, "output": "Do nothing"}
 {"task": "domain_qa", "id": "qa-0055", "correct": false, "output": "50 km"}
-{"task": "domain_qa", "id": "qa-0056", "correct": true, "output": "L/500"}
 {"task": "domain_qa", "id": "qa-0057", "correct": false, "output": "0.01 ft"}
 {"task": "domain_qa", "id": "qa-0058", "correct": false, "output": "0.2 s"}
 {"task": "domain_qa", "id": "qa-0059", "correct": false, "output": "0.40"}
@@ -265,7 +263,6 @@
 {"task": "domain_qa", "id": "qa-1140", "correct": false, "output": "0.5"}
 {"task": "domain_qa", "id": "qa-1141", "correct": false, "output": "FEMA P-2012"}
 {"task": "domain_qa", "id": "qa-1142", "correct": false, "output": "NIST GCR 17-917-46v3"}
-{"task": "domain_qa", "id": "qa-1143", "correct": false, "output": "6.13.2.7"}
 {"task": "domain_qa", "id": "qa-1144", "correct": false, "output": "0.05"}
 {"task": "domain_qa", "id": "qa-1145", "correct": false, "output": "75%"}
 {"task": "domain_qa", "id": "qa-1146", "correct": false, "output": "70%"}

@@ -2387,3 +2387,194 @@ and the clean ones beside them) measure the Mistral judge's defect recall under 
 
 Keep whichever catches the framing errors. Groundedness labels for DPO pairs were to come from this
 judge, and it passed every defect the audit found.
+
+## 2026-10-06: SFT set v1 ships as frozen; dataset hash 70f47740 (user decision)
+**Context:** the Stage 3b gate expected the cleanup to land at ~2,650-2,750 records with a 5%
+val split stratified by kind, drawn with the eval chunks' hash. The cleanup had already run
+(entry above): 2,516 records, val drawn otherwise.
+**Options:** ship v1 as frozen, re-split val to the spec, or re-split grouping by every chunk.
+**Chose:** ship v1 as frozen. `sft_val` exists for one job, the epoch-1 vs epoch-2 loss comparison
+(B4) on the same 80 records. A re-split would cost a contamination rerun, the tests and a fresh
+`review.md` read, for no gain to that comparison.
+- **Dataset hash** (sha256 of `data/sft/SHA256SUMS`; every Stage 3 run cites it, and `sft.py`
+  refuses files that don't match):
+  `70f47740bd973dc47f43d74c826b1bca3a82bb3e50379fe3ccc44179566ab4b6`. It covers
+  `train.jsonl` `49b216d4…6876` (2,436) and `sft_val.jsonl` `8b210969…85` (80).
+- **sft_val is loss-curve only, not a metric.** It is 5% of each format's holdable records
+  (eval-seen records always train), grouped by fact chunk, picked by a sha256 rank (salt `sft-val`):
+  grounded 27, replay 25, closed-book 15, abstain 12, definition 1. Nothing is reported on it
+  except the loss curve and the final loss.
+- **13 chunk ids reach both splits** through neighbour or distractor passages (grouping uses the
+  fact chunk only). They shift epoch 1's and epoch 2's val loss the same way, so the rule is
+  unbiased:
+
+  | chunk | in val as | in train as |
+  |---|---|---|
+  | fema-p-2082-1:p456:c1 | distractor | source |
+  | fema-p-2082-1:p457:c1 | source | distractor |
+  | fhwa-nhi-15-047:p1671:c0 | distractor | distractor |
+  | fhwa-nhi-15-047:p1688:c0 | distractor | distractor |
+  | nist-gcr-14-917-30:p128:c0 | distractor | source |
+  | nist-gcr-22-917-50:p465:c0 | distractor | distractor |
+  | nist-gcr-22-917-50:p466:c0 | source | distractor |
+  | nist-gcr-22-917-50:p468:c0 | source (a cited neighbour) | source |
+  | usace-em-1110-2-1417:p75:c0 | distractor | distractor |
+  | usace-em-1110-2-1421:p54:c0 | distractor | source |
+  | usace-em-1110-2-2301:p56:c0 | distractor | distractor |
+  | usace-em-1110-2-3006-2024apr22:p62:c0 | distractor | distractor |
+  | usace-em-1110-2-3400:p87:c2 | distractor | distractor |
+
+- **Other gate facts:** FEMA P-2335 has 26 records in the set (the eval had no wrong number, so no
+  task change for it). No record exceeds 4,096 tokens (max 2,875); `tests/test_template.py` checks
+  that on the training tensors. Contamination section 6 was rerun on eval v3 (next entry):
+  0 leaked chunks, control 40/40, no eval question in a prompt, 0 unseen vocab terms defined.
+**Revisit if:** the epoch-end val losses differ by less than the run-to-run spread of the noise
+run's (then the rule is reading noise, and the write-up says so).
+
+## 2026-10-06: Stage 3b pre-registration: trainer, checkpoint rule, merge check, reading (user decisions)
+**Context:** written before any Stage 3 GPU launch, so nothing below can be fitted to the runs.
+It covers the plan's B1-B8, with the user's decisions of today on four forks and two forced
+changes.
+
+**Eval v3 from Stage 3 on.** `make_tasks.py --task-version 3` rebuilt from the LLM cache (0 new
+calls). It equals v2 minus qa-0003 and qa-0056 (a few-shot item's passage) and qa-1143 (an
+identifier the 20% cap holds back once the set shrinks; now in `held_back.jsonl`). All three are
+in the unseen half, so domain_qa is 322 (seen 167, unseen 155). Every other file is
+byte-identical, as is the few-shot set, so the prompts don't change.
+- `results/table.md` is frozen as `results/table_v2.md`.
+- The new `table.md` (v3, plus a `false_abstain` column: grounded answers that use the abstain
+  phrase, by rule) was rebuilt by rescoring every row from its saved generations, with 0 judge
+  calls. Non-QA columns are unchanged.
+- The tests pin v1 and v2 by hash and check that v3 rebuilds the committed files.
+
+**Starting points and the bar on v3** (from the new table):
+
+| run | qa_seen | qa_unseen | gold_lp_unseen | MMLU | GSM8K |
+|---|---|---|---|---|---|
+| cpt-8b-replay10 (start of sft-from-cpt) | 0.150 | 0.110 | -6.157 | 0.766 | 0.791 |
+| base-8b-hf (start of sft-from-base) | 0.126 | 0.116 | -6.822 | 0.767 | 0.793 |
+
+- **instruct-8b (the bar):** qa_acc 0.099, qa_ident 0.031, grounded_acc 0.898,
+  cite_supported 0.787, halluc_rate 0.013, false_abstain 0.074, vocab_recall 0.786.
+- **Stage 2 seed gaps on v3** (cpt-8b vs cpt-8b-seed1): qa_acc 1.6 points, qa_seen 2.4,
+  qa_unseen 0.6, gold_lp_unseen 0.017 nats, MMLU 0.2, GSM8K 0.2.
+- **Binomial SE of a half:** 2.5-2.8 points.
+
+**Trainer (B2), as configured in `train/configs/sft.yaml`:**
+
+| item | value |
+|---|---|
+| model | `Mistral3ForConditionalGeneration` (Stage 2's class; LoRA regex on `language_model`, vision tower frozen, no image ever fed), bf16 base, SDPA |
+| starts | `checkpoints/cpt-8b-replay10`; control `checkpoints/base-8b-hf` (the Base-2512 weights re-saved by `merge.py`) |
+| data | pre-tokenised by `train/sft_data.py` (mistral-common, the eval's `--chat` rendering): `input_ids` = `[1, 3, prompt, 4, answer, 2]`, `completion_mask` 0 through `[/INST]`; TRL's dataset prep off |
+| loss | `completion_only_loss`, `loss_type: nll`; `num_items_in_batch` token mean over the 4 micro-batches |
+| length | max_length 4,096, no packing, no padding-free |
+| LoRA | r 64, alpha 128, dropout 0.05, q/k/v/o/gate/up/down, bias none: 178,257,920 trainable parameters, 238 modules |
+| optimiser | AdamW (fused) (0.9, 0.999), eps 1e-8, weight decay 0, clip 1.0 |
+| schedule | LR 1e-4, linear to 0, warmup 0.03 (5 steps) |
+| batch | 8 x 4 = 32 sequences on one H100 (fallback 4 x 8) |
+| length of run | 2 epochs, 77 steps each, 154 in total |
+| precision | bf16, TF32, fp32 adapters, gradient checkpointing (non-reentrant) |
+| eval and saves | eval every 50 steps and at each epoch end; save each epoch, both kept |
+| seeds | seed / data_seed 0 (noise run: 1 / 1) |
+
+- **Forced, not chosen:**
+  - **`loss_type: nll`.** TRL 0.29.1 has no `chunked_nll` (only `nll` and `dft`).
+  - **Pre-tokenisation is the main path.** TRL has no Mistral backend. transformers'
+    `MistralCommonBackend` refuses a prompt + completion conversation in its default mode
+    (`test`) and drops `return_assistant_tokens_mask` without a word.
+- **Chosen today (user):** Stage 2's VLM class and SDPA, not `Ministral3ForCausalLM` +
+  flash-attention-2. Same modules, and `merge.py` and `perplexity.py` stay unchanged. A text-only
+  class renames the weights, and a key map is where a silent no-op merge would come from. The
+  image has no flash-attn build. SDPA wastes some padding, minutes at 2,436 records.
+- **Logged checks, each failing the run if false:**
+  - the trainable count equals r * (in + out) over the 7 projections x 34 layers from the config,
+    and every trainable name is a `lora_` weight under `language_model`;
+  - at step 1, `num_items_in_batch` equals the completion tokens of the 4 micro-batches, and the
+    logged loss is their token mean. The mean of per-micro-batch means is logged beside it (the
+    Tulu 3 gradient-accumulation bug).
+
+**B1 (blocks launch):**
+- **`tests/test_template.py`, on the Mac, on the exact tensors** (`sft_data.encode` through TRL's
+  collator):
+  - the prompt ids equal mistral-common's `encode_chat_completion` (vLLM's `llm.chat` path) and
+    `MistralCommonBackend(mode="agnostic")`;
+  - the sequence is `[1, 3, ..., 4, ..., 2]`, with every other id a text token (>= 1,000, so no
+    system-prompt, image or tool token);
+  - labels are -100 on the prompt and the padding, and the masked span decodes to the completion
+    exactly;
+  - the batch keys are `input_ids` / `attention_mask` / `labels` only;
+  - all 2,516 records are within 4,096 tokens and equal to `n_tokens`.
+- **The smoke run (`smoke-sft`)** adds:
+  - one real step on 32 records (the 8 longest as micro-batch 1), loss expected in 1.5-3 nats;
+  - the vLLM prompt ids of the 5 template prompts, compared with the trainer's;
+  - the no-op control on both starts;
+  - the merge check on the 1-step adapter.
+
+**No-op control (retrospective rule):** an untrained adapter (B = 0) on each start, merged by
+`merge.py`, must equal the start tensor for tensor (`merge_check.py noop`,
+`results/noop/<start>.json`).
+
+**B4, checkpoint rule:** per run, epoch 2 unless the end-of-epoch-2 `val_loss` is above the
+end-of-epoch-1 one; then epoch 1.
+- `val_loss` is the token-mean NLL over all `sft_val` completion tokens, computed by `sft.py` at
+  each epoch end (not the trainer's batch-weighted `eval_loss`, which is logged beside it).
+- It is decided from the loss curve only, and written here before that run's merge and eval.
+
+**B5, merge check (user decision: loss + agreement, not max-abs < 1e-2).** At logit magnitudes of
+10-30, bf16's rounding step alone is 0.06-0.125, so a 1e-2 max-abs rule would fail every correct
+merge.
+- **Pass:** the merged model's `sft_val` token-mean loss is within 0.5% of start + adapter's
+  (PEFT, unmerged, both bf16), and top-1 next-token agreement is >= 99% over the completion
+  positions of 3 val records. This is the Stage 2 `ppl_val_slice` convention.
+- **Printed:** max|merged − (start+adapter)|, max|(start+adapter) − start| and their ratio. It is
+  flagged above 0.05: a merge error that isn't well under a tenth of the adapter's own effect is
+  looked at even when the rule passes.
+- **On failure:** the evals don't start (`modal_train.py` runs `mergecheck` before them).
+
+**B6: per merged run, v3, `--chat`:**
+- the KPI eval, and lm-eval (never chat);
+- perplexity (reference only);
+- latency with the new stop-before-cap rate and mean output tokens. The bench's prompt sample
+  shifts slightly from Stage 2's, since the pool lost 3 items;
+- `eval/sample.py`: eos (20 Stage 4 prompts x 4 at T 0.8, pass at 95% ending on `</s>`) and
+  diversity (100 prompts at T 0.7: 50 held-out Tulu 3, 25 grounded, 25 vocab). Diversity also
+  runs for instruct-8b.
+- The judge is paced at 30 a minute, with the cache guard on.
+
+**B7, reading (user decision: noise = max(seed gap, SE), the Stage 2 convention):**
+1. **First line: sft-from-cpt vs sft-from-base on unseen `gold_lp`.** A paired bootstrap over the
+   155 unseen items gives a 95% CI.
+   - CPT bought something that survives SFT if the CI excludes 0 and |delta| > the noise. The
+     noise is max(|sft-from-cpt − sft-from-cpt-seed1|, the paired per-item SE of the delta).
+   - Otherwise the README says "CPT's value is not observable at this scale".
+   - Unseen `qa_acc` is reported beside it and not argued over: at ~2.5-2.8 points of SE per half
+     it will most likely sit inside the floor.
+2. **Against the instruct-8b bar:** expected to beat it on identifiers and vocab and to match it
+   on grounded and citation. No claim on general benchmarks.
+3. **Guard, a format or mask bug:** an SFT run's `qa_seen` or `qa_unseen` below its own start's
+   (0.150 / 0.110 from cpt-8b-replay10; 0.126 / 0.116 from base-8b-hf) by more than the noise.
+   Response: re-run B1 before anything else. This replaces "below ~0.145", which is cpt-8b's
+   overall qa_acc; replay10's unseen half is already under it.
+4. **Guard, general benchmarks:**
+   - MMLU or GSM8K down against the start by more than the noise + 1 point is flagged. The noise
+     is 0.3 / 1.1, Stage 2's README column.
+   - More than 3 points fails the run. The fallbacks are epoch 1 or a 5e-5 rerun, asked before any
+     GPU.
+5. **The seen vs unseen gap is reported.** Seen chunks were forced into the pool by design.
+6. **Abstain targets:** halluc_rate < 0.20 (unanswerable abstained > 80%) and false_abstain < 0.05.
+7. **Diversity:** distinct-4 and entropy within 10% of instruct-8b. Otherwise the write-up says
+   the teacher's style collapsed the student, and notes it for Stage 4's sampling temperature.
+
+**Runs:** sft-from-cpt, sft-from-base and sft-from-cpt-seed1, identical but for the start and the
+seed. sft-from-cpt-lr2e-4 is optional, only after the three are evaluated.
+
+**Failure modes, decided in advance:**
+- **OOM:** 4 x 8.
+- **Flat loss over 20 steps:** B1 first.
+- **val_loss rising in epoch 1:** stop, then read the generations and the per-format val loss.
+- **No `</s>` in the step-50 generations:** fix the data writer and refreeze; never patch at
+  inference.
+- **A failed merge check:** never served.
+**Revisit if:** the smoke run's step-1 loss is outside 1.5-3 nats (template or mask), or its peak
+memory leaves under ~8 GB (go to 4 x 8 before the main runs).

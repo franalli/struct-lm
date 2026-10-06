@@ -245,7 +245,33 @@ def memorization(model: str, run_name: str, config_format: str = "hf") -> None:
     vol.commit()
 
 
-WHICH = ("lm", "kpi", "both", "latency")
+@app.function(**COMMON)
+def sample(model: str, run_name: str, jobs: str, chat: bool, config_format: str = "hf") -> None:
+    """eval/sample.py: sampled generations (template / eos / diversity jobs) through the KPI eval's
+    engine, written to /vol/results/runs/<run_name>/samples/<job>.jsonl. cwd=/vol, where the Stage 4
+    prompt pool (data/dpo/prompts.jsonl, the eos job) is uploaded with `modal volume put`.
+      modal run eval/modal_app.py --which sample --model ... --run-name instruct-8b --chat \
+          --sample-jobs diversity --config-format auto"""
+    vol.reload()
+    cmd = [
+        sys.executable,
+        "/root/eval/sample.py",
+        "--model",
+        model,
+        "--run-name",
+        run_name,
+        "--jobs",
+        jobs,
+        "--results-dir",
+        "/vol/results",
+        "--config-format",
+        config_format,
+    ]
+    subprocess.run(cmd + (["--chat"] if chat else []), check=True, cwd="/vol")
+    vol.commit()
+
+
+WHICH = ("lm", "kpi", "both", "latency", "sample")
 
 
 @app.local_entrypoint()
@@ -261,19 +287,24 @@ def main(
     tasks: str = "",  # KPI only: e.g. "domain_qa" regenerates that task and keeps the others
     config_format: str = "hf",  # KPI only: "auto" to extend Stage 0's native-path hub runs
     gold_lp_only: bool = False,  # KPI only: recompute gold_lp in the saved generations, no generation
+    sample_jobs: str = "diversity",  # sample only: eval/sample.py jobs (template, eos, diversity)
 ) -> None:
     """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
-    bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi) or
-    "latency" (serving benchmark only; it ignores chat, limit, no_judge and generate_only).
+    bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi),
+    "latency" (serving benchmark only; it ignores chat, limit, no_judge and generate_only) or
+    "sample" (eval/sample.py's --sample-jobs).
 
     `chat` applies to the KPI eval only: chat checkpoints always run it with their chat
     template, and lm-eval never uses one (see run_lm_eval.sh). `limit` 0 means all items
     (Modal flags can't be None)."""
     if which not in WHICH:  # an unknown value would otherwise match no branch and do nothing
         raise SystemExit(f"--which must be one of {', '.join(WHICH)}, got {which!r}")
-    if which in ("kpi", "both") and "instruct" in model.lower() and not chat:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from run_eval import needs_chat
+
+    if which in ("kpi", "both", "sample") and needs_chat(model, run_name) and not chat:
         # Checked here so the mistake fails locally, before a GPU container starts.
-        raise SystemExit("KPI eval of an Instruct checkpoint must use --chat")
+        raise SystemExit("KPI eval of a chat checkpoint (Instruct, SFT/DPO/GRPO) must use --chat")
     if which in ("lm", "both"):
         lm_eval.remote(model, run_name, tokenizer_mode)  # first, so kpi_eval can merge its numbers
     if which in ("kpi", "both"):
@@ -291,3 +322,5 @@ def main(
         )
     if which == "latency":
         latency.remote(model, run_name, tokenizer_mode)
+    if which == "sample":
+        sample.remote(model, run_name, sample_jobs, chat, config_format)

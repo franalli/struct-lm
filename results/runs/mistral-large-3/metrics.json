@@ -1,12 +1,12 @@
 {
-  "qa_acc": 0.28,
-  "qa_num": 0.2477,
-  "qa_ident": 0.4462,
+  "qa_acc": 0.2795,
+  "qa_num": 0.2455,
+  "qa_ident": 0.4531,
   "qa_term": 0.1842,
   "qa_seen": 0.2754,
-  "qa_unseen": 0.2848,
+  "qa_unseen": 0.2839,
   "n": {
-    "domain_qa": 325,
+    "domain_qa": 322,
     "grounded": 0,
     "vocab": 0,
     "adversarial": 0

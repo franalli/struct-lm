@@ -1,37 +1,66 @@
+# Stage 3 SFT: LoRA on the frozen SFT set v1 (data/sft/, hash in notes/decisions.md), two epochs.
+# Reasons: notes/decisions.md (Stage 3b pre-registration). Relative paths resolve against the repo
+# root locally and /vol on Modal (train/modal_train.py runs with cwd=/vol).
+#   sft-from-cpt         this file as is
+#   sft-from-base        --overrides "model.init_from=checkpoints/base-8b-hf"
+#   sft-from-cpt-seed1   --overrides "training.seed=1 training.data_seed=1"
+stage: sft  # modal_train.py dispatches on it (train/sft.py, not cpt.py)
+
 model:
-  # Stage 2's continuing checkpoint (notes/decisions.md: replay adopted by the ablation rule);
-  # a relative path, so /vol/checkpoints/cpt-8b-replay10 when run on Modal with cwd=/vol
+  # Stage 2's continuing checkpoint (cpt-8b-replay10, merged); the control run starts from
+  # base-8b-hf, the Base-2512 weights re-saved by merge.py, so both starts load the same way
   init_from: checkpoints/cpt-8b-replay10
   dtype: bfloat16
+  attn_implementation: sdpa  # Stage 2's path; the image has no flash-attn
 
 lora:
-  r: 32
-  lora_alpha: 64
+  r: 64
+  lora_alpha: 128
   lora_dropout: 0.05
+  bias: none
+  # the 238 modules CPT trained: text layers only; bare names / all-linear would hit the vision tower
   target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
-  # text layers only; bare names / all-linear would also hit the vision tower
 
 data:
+  dir: data/sft  # SHA256SUMS: the run refuses any other files
   train: data/sft/train.jsonl
-  validation: data/sft/sft_val.jsonl
+  val: data/sft/sft_val.jsonl  # loss curve only (B4's checkpoint rule), not a metric
+
+run:
+  results_dir: results
 
 training:
-  output_dir: checkpoints/sft
-  num_train_epochs: 3
-  per_device_train_batch_size: 8
+  output_dir: checkpoints/_train/sft-from-cpt
+  run_name: sft-from-cpt
+  num_train_epochs: 2  # 2,436 records / 32 = 77 steps per epoch, 154 in total
+  per_device_train_batch_size: 8  # OOM fallback 4 x 8: same 32 sequences, same LR
   gradient_accumulation_steps: 4
-  learning_rate: 2.0e-4
-  lr_scheduler_type: cosine
-  warmup_steps: 0.03  # transformers 5: a float in [0, 1) is a ratio of total steps
-  max_length: 4096
+  per_device_eval_batch_size: 8
+  learning_rate: 1.0e-4
+  lr_scheduler_type: linear  # to 0
+  warmup_steps: 0.03  # transformers 5: a float in [0, 1) is a ratio of total steps (5 steps)
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  # pre-tokenised input_ids + completion_mask (train/sft_data.py): loss on the answer and its </s>
+  completion_only_loss: true
+  assistant_only_loss: false
+  loss_type: nll  # TRL 0.29 has nll and dft only
+  max_length: 4096  # TRL's default 1,024 would cut the grounded records; none exceeds 2,875
   packing: false
-  assistant_only_loss: true
+  padding_free: false
   bf16: true
   tf32: true  # fp32 matmuls on TF32 tensor cores (decisions.md, numeric precision)
   gradient_checkpointing: true
-  logging_steps: 10
-  eval_strategy: epoch
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  logging_steps: 1
+  eval_strategy: steps
+  eval_steps: 50  # plus one at each epoch end (sft.py), where B4 reads val_loss
   save_strategy: epoch
-  report_to: wandb
-  run_name: sft
-  seed: 42
+  save_total_limit: null  # both epochs kept: B4 may pick epoch 1
+  report_to: none  # the curve is results/runs/<run>/train_log.jsonl
+  seed: 0
+  data_seed: 0

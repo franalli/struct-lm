@@ -1,5 +1,5 @@
 """The Stage 3 SFT set (data/sft/) against rule 10 and the trainer's format, checked on the frozen
-files, plus the frozen v2 eval it was built against. The SFT checks are skipped until
+files, plus the frozen eval it is checked against. The SFT checks are skipped until
 data/sft/train.jsonl exists; the generator-prompt audit also needs the builder's call cache
 (data/sft/.cache, gitignored)."""
 
@@ -38,8 +38,9 @@ def sums(path: Path) -> dict[str, str]:
     return {name: h for h, name in (line.split() for line in path.read_text().splitlines())}
 
 
-def test_eval_v2_frozen():
-    """The eval the SFT set was decontaminated against (rule 9): v2, 2026-10-04."""
+def test_eval_frozen():
+    """The eval the SFT set is decontaminated against (rule 9): v3 from Stage 3, which is v2
+    (2026-10-04, what the set was built against) minus three unseen items, so v2's checks hold."""
     for name, h in sums(TASKS / "SHA256SUMS").items():
         assert sha(TASKS / name) == h, name
 

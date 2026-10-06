@@ -74,11 +74,12 @@ set -a; . ./.env; set +a
 ```
 
 - `--task-version 1` rebuilds the 2026-09-27 eval (130-item domain_qa, `results/table_v1.md`) byte
-  for byte. `2` (default) is the grown set: after rejects it tags `answer_kind`, removes layout
+  for byte. `2` is the grown set: after rejects it tags `answer_kind`, removes layout
   locators (`qa_rules.is_locator` -> `locators.jsonl`) and holds identifiers to 20% of the set
   (`held_back.jsonl`). Reviewer tag corrections live in `eval/tasks/answer_kinds.jsonl`. v2 tags
-  `fewshot_passage_overlap` on qa-0003 / qa-0056 (same passage as a few-shot item, other facts);
-  `3` is v2 with the few-shot split off by passage (322 items, v2 ids kept), for the next rebuild.
+  `fewshot_passage_overlap` on qa-0003 / qa-0056 (same passage as a few-shot item, other facts).
+  `3` (default) is v2 with the few-shot split off by passage (322 items, v2 ids kept; qa-1143 moves
+  to `held_back.jsonl`): the committed set from Stage 3 on (`results/table_v2.md` froze v2's table).
 
 `chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt` (the 234
 train documents when the eval was frozen), so corpus expansion can't resample the reviewed tasks;
@@ -251,14 +252,48 @@ make sft-data                               # all steps below, in order
   the rubric: a wrong framing, overclaim, scope or example value is a defect even when the answer
   value is right. Then re-audit a fresh sample (`sample N` names the round).
 
+### Stage 3: SFT training and eval (Modal)
+
+```bash
+M=.venv/bin/modal
+# data on the volume after any SFT data change (the run refuses files that don't match SHA256SUMS)
+for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
+$M volume put --force struct-lm data/dpo/prompts.jsonl data/dpo/prompts.jsonl   # the eos sample job
+# smoke: no-op control, 1 step on 32 records, merge, merge check, vLLM template prompt ids
+$M run train/modal_train.py --config train/configs/sft.yaml --run-name smoke-sft --smoke --chat \
+  --steps noop,train,merge,mergecheck,sample --sample-jobs template
+$M run train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-base --steps noop \
+  --overrides "model.init_from=checkpoints/base-8b-hf"            # CPU: no-op control of the other start
+# runs (train only), then B4's rule on the epoch-end val_loss, then merge the chosen epoch + eval
+$M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt --steps train
+$M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-base --steps train \
+  --overrides "model.init_from=checkpoints/base-8b-hf"
+$M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt-seed1 --steps train \
+  --overrides "training.seed=1 training.data_seed=1"
+$M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-154 --chat \
+  --steps merge,mergecheck,ppl,eval,latency,sample
+$M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8B-Instruct-2512-BF16 \
+  --run-name instruct-8b --chat --sample-jobs diversity --config-format auto
+# pull (runs/<run> includes samples/ and merge_check.json; results/noop/), then score with --chat
+.venv/bin/python eval/run_eval.py --run-name sft-from-cpt --rescore --chat --lm-eval-dir results/lm_eval \
+  --ppl-dir results/ppl --model /vol/checkpoints/sft-from-cpt
+.venv/bin/python eval/diversity.py score sft-from-cpt     # -> results/diversity/<run>.json
+```
+
+- `train/sft.py` trains on pre-tokenised records (`train/sft_data.py`: mistral-common, the eval's
+  `--chat` rendering, `completion_mask`); `tests/test_template.py` is the gate on those tensors.
+  Every reason and the pre-registered rules: `notes/decisions.md`, Stage 3b pre-registration.
+- SFT checkpoints are chat models: `--chat` for their KPI eval and samples, never for lm-eval
+  (`run_eval.needs_chat` refuses otherwise for run names with sft/dpo/grpo).
+
 ## Decisions (rules to keep)
 
 1. **Copyright:** only public-domain US federal documents. ASCE 7, the AISC manual and the 2025
    NSBA handbook are excluded. Check any new source before adding it to `sources.csv`.
 2. **Chat format:** lm-eval never uses the chat template, for any checkpoint; the KPI eval always
    runs chat checkpoints (Instruct, SFT/DPO/GRPO) with `--chat`, base models without. Enforced:
-   `run_lm_eval.sh` exits on `CHAT=1`, `modal_app.py` and `run_eval.py` refuse an Instruct model
-   without `--chat`, `merge_lm_eval` skips chat-template results files. (lm-eval renders the
+   `run_lm_eval.sh` exits on `CHAT=1`, `modal_app.py`, `modal_train.py` and `run_eval.py` refuse a
+   chat checkpoint (Instruct, or a run name / path with sft, dpo or grpo) without `--chat`, `merge_lm_eval` skips chat-template results files. (lm-eval renders the
    template to text and re-encodes it, so Mistral control tokens arrive as ordinary text.)
 3. **Tokenizer and vLLM loading:** Tekken via mistral-common, `tokenizer_mode=mistral` everywhere
    (vLLM, lm-eval, `extract.py`), `limit_mm_per_prompt={"image": 0}`, and `config_format=hf`
@@ -296,8 +331,9 @@ make sft-data                               # all steps below, in order
    outputs with no definition line. Give the judge only what the verdict depends on (the
    adversarial rubric sees no passages). After any rubric change, hand-check verdicts against the
    gold text before trusting the numbers.
-9. **Eval tasks** (v2, 2026-10-04: domain_qa 325, grounded 108, vocab 210, adversarial 76 = 719 items +
-   3 few-shot, every one reviewed; v1 of 2026-09-27 had domain_qa 130, frozen before Stage 2,
+9. **Eval tasks** (v3 from Stage 3: domain_qa 322, grounded 108, vocab 210, adversarial 76 = 716
+   items + 3 few-shot, every one reviewed; v2 of 2026-10-04 had domain_qa 325; v1 of 2026-09-27
+   had domain_qa 130, frozen before Stage 2,
    sampled from the 234 train documents pinned in `eval/tasks/eval_docs.txt`): filters run post-cap
    and only remove items; per-task RNG streams; supplementary grounded/adversarial/domain_qa items
    have ids >= 501 and are sampled after every other task, and the second domain_qa supplement
@@ -340,14 +376,9 @@ make sft-data                               # all steps below, in order
 - Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/`, and about
   `common` / `packing` / `modal_app` imports in `train/`, are false positives (`sys.path` imports;
   vLLM and lm-eval are only installed in the Modal image).
-- SFT/DPO/GRPO are not wired into `train/modal_train.py` yet, and their configs still say
-  `report_to: wandb` (no W&B secret exists; Stage 2 logs to `results/runs/<run>/train_log.jsonl`).
-  `sft.yaml` starts from `checkpoints/cpt-8b-replay10`; `tf32: true` is on from Stage 3.
-- `train/sft.py` still expects `{"messages": [...]}` with `assistant_only_loss`, which needs a chat
-  template with generation markers that no checkpoint here has. The SFT set is conversational
-  `prompt` / `completion` (TRL masks the prompt itself), and training must render it as
-  mistral-common does for the eval's `--chat` path (`[INST]...[/INST]answer</s>`, no system
-  prompt): Part B of Stage 3.
+- DPO/GRPO are not wired into `train/modal_train.py` yet, and their configs still say
+  `report_to: wandb` (no W&B secret exists; runs log to `results/runs/<run>/train_log.jsonl`).
+  SFT is wired (`stage: sft`); `tf32: true` is on from Stage 3.
 - Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
   modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

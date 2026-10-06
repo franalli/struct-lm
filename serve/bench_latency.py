@@ -5,6 +5,9 @@ Streams completions and measures, per concurrency level:
   ITL   inter-token latency        (decode-bound)
   E2E   end-to-end request latency
   tok/s aggregate output throughput
+  stop  share of requests the model ended itself (finish_reason "stop": </s>) before --max-tokens,
+        and their mean output tokens (the server's usage count). E2E depends on both: a model
+        that never stops (Stage 2's CPT checkpoint) runs every request to the cap
 Reports p50/p95. Compare bf16 vs AWQ at the same concurrency for the write-up.
 """
 
@@ -35,10 +38,16 @@ async def one_request(client: AsyncOpenAI, model: str, prompt: str, max_tokens: 
         max_tokens=max_tokens,
         temperature=0.0,
         stream=True,
+        stream_options={"include_usage": True},  # the last chunk carries the token counts
     )
+    finish, out_tokens = None, None
     async for chunk in stream:
         if chunk.choices and chunk.choices[0].delta.content:
             stamps.append(time.perf_counter())
+        if chunk.choices and chunk.choices[0].finish_reason:
+            finish = chunk.choices[0].finish_reason
+        if chunk.usage:
+            out_tokens = chunk.usage.completion_tokens
     end = time.perf_counter()
     gaps = [b - a for a, b in pairwise(stamps)]
     return {
@@ -46,6 +55,8 @@ async def one_request(client: AsyncOpenAI, model: str, prompt: str, max_tokens: 
         "itl": statistics.mean(gaps) if gaps else 0.0,
         "e2e": end - t0,
         "n_tokens": len(stamps),
+        "finish": finish,
+        "out_tokens": out_tokens,
     }
 
 
@@ -63,6 +74,8 @@ async def run_level(client, model, prompts, concurrency, max_tokens) -> dict:
         "concurrency": concurrency,
         "requests": len(rs),
         "tok_per_s": round(sum(r["n_tokens"] for r in rs) / wall, 1),
+        "stop_rate": round(sum(r["finish"] == "stop" for r in rs) / len(rs), 3),
+        "mean_out_tokens": round(statistics.fmean(r["out_tokens"] or 0 for r in rs), 1),
     }
     for k in ("ttft", "itl", "e2e"):
         vals = [r[k] for r in rs]

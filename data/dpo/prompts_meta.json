@@ -1,0 +1,14 @@
+{
+  "source": "data/sft/train.jsonl",
+  "sft_dataset_hash": "70f47740bd973dc47f43d74c826b1bca3a82bb3e50379fe3ccc44179566ab4b6",
+  "prompts": 2419,
+  "duplicates_dropped": 17,
+  "by_format": {
+    "closed_book": 1129,
+    "replay": 475,
+    "grounded": 374,
+    "definition": 258,
+    "abstain": 183
+  },
+  "sha256": "1810718dfb35a3ffa40ce9ba2a13203ced0a6f3759bb3cdc97b1eb7e0bad12d1"
+}
