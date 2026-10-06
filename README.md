@@ -89,6 +89,27 @@ Row zero, from [`results/table.md`](results/table.md) (eval v2, 4 October 2026; 
   while SFT and DPO bring citation and refusal behaviour up to the instruct model's level or beyond,
   and the general-capability columns stay flat.
 
+**Why the instruct model is the bar.** `Ministral-3-8B-Instruct-2512` (the BF16 HF checkpoint) is
+Mistral's own instruct post-trained version of the base trained on here (model card).
+- **Same model:** the same 8B dense weights and architecture, the same Tekken tokenizer and the same
+  vision tower. Every difference between it and the SFT runs comes from post-training data and
+  method, not model size.
+- **The business claim:** it is what a client would deploy off the shelf. So beating it is "an 8B
+  tuned on your corpus beats the stock 8B on your questions".
+
+**How it is scored: without its default system prompt.** Its HF chat template
+(`chat_template.jinja`) inserts a default system prompt ("You are Ministral-3-8B-Instruct-2512, a
+Large Language Model (LLM) created by Mistral AI...") when none is given. The eval doesn't use that
+template.
+- **The KPI eval** renders every chat model through the same `--chat` path: vLLM with
+  `tokenizer_mode=mistral`, that is mistral-common's `encode_chat_completion` of one user turn.
+  It renders `<s>[INST] prompt [/INST]` with no system prompt.
+- **The serving benchmark** goes through the same rendering, and lm-eval uses no chat template at
+  all (rule 2).
+- **So the comparison is on the template the eval renders, the one the SFT models were trained in,
+  not the template Mistral ships for the instruct model.** Its default system prompt might change
+  its refusal and citation behaviour; that was not measured here.
+
 ### Scope
 
 This is the same pipeline shape as a production engagement at roughly 1% scale. It leaves out the

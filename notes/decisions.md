@@ -3081,3 +3081,24 @@ knowledge. It did not generalise to unseen facts, which was never a target.**
 - Allen-Zhu & Li 2023, "Physics of Language Models, Part 3.1": QA fine-tuning extracts knowledge
   only when pre-training exposed it with variety.
 - Gekhman et al. 2024: fine-tuning on unknown facts is learned slowly and raises hallucination.
+
+## 2026-10-06: The instruct bar, and how it is scored (README note; user review)
+**Why it is the bar:** `Ministral-3-8B-Instruct-2512` (BF16) is Mistral's instruct post-trained
+version of the same base (model card: "instruct post-trained version", 256k context).
+- **Same model:** same weights and architecture, same tokenizer, same vision tower. The differences
+  from the SFT runs are post-training data and method, not size.
+- **The business claim:** it is the off-the-shelf deployment.
+- **Not stated in the README:** the recipe Mistral used (SFT distillation from a larger model,
+  then online DPO). The model card doesn't describe it, so it waits for a citable source.
+
+**How it is scored: without its default system prompt (verified 2026-10-06).**
+- The HF `chat_template.jinja` inserts a `default_system` prompt ("You are
+  Ministral-3-8B-Instruct-2512, a Large Language Model (LLM) created by Mistral AI ...") when none
+  is given.
+- The KPI eval's `--chat` path renders through vLLM `tokenizer_mode=mistral`, that is mistral-common
+  `encode_chat_completion` of a single user turn. Its ids are `[1, 3, ..., 4]` with no
+  `[SYSTEM_PROMPT]` (id 17), checked on the instruct repo's own `tekken.json`. The serving benchmark
+  uses the same rendering, and lm-eval none (rule 2).
+- So instruct-8b was scored on the template the eval renders (the SFT models' training format), not
+  the one Mistral ships. Its default system prompt might shift its refusal and citation behaviour;
+  that wasn't measured.
