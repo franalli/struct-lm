@@ -913,6 +913,56 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - **sft-from-base-seed1's merge** passed the amended gate at its line: exactly 11 added flips of 11
      allowed, with log-prob error 0.98x and val loss within 0.02%.
 
+**Scored against its pre-registered targets:** one miss, by a few items.
+
+| target (B7, fixed before training) | result | verdict |
+|---|---|---|
+| CPT's advantage survives SFT (unseen `gold_lp` beyond the floor) | +0.46 nats, all four pairings positive | pass; the SD multiple rests on one seed pair per arm |
+| beat Instruct on identifiers | 0.203 vs 0.031 | pass |
+| beat Instruct on vocab | 0.833 vs 0.786 | pass, narrowly (1.5x the noise) |
+| match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation |
+| guards: no half below its start; MMLU and GSM8K within noise | all four runs | pass |
+| abstain: > 80% on unanswerable, < 5% false refusals | 94.7%; 0% | pass |
+| diversity within 10% of Instruct | distinct-4 −4.7%, entropy −8.0% | pass, length-confounded |
+| stops before the cap; latency | 100%; 159 ms vs 1,753 ms | pass |
+| hallucination at or under Instruct | 4 of 76 vs 1 of 76 | miss, inside the run-to-run spread (the seed twin has 1 of 76) |
+
+**What SFT did, and what it didn't.** SFT did its job, behaviour and the facts it was shown, and
+it did not erase CPT's knowledge. It did not generalise to unseen facts, which was never a
+target.
+- **Behaviour is SFT's own, and the deliverable.** Answer form, citations that are valid and
+  supported, abstaining without over-refusing, and stopping. This is where it beats Instruct
+  outright.
+- **The facts it was shown are SFT's own too.** The seen half doubled in both arms: 0.150 → 0.281
+  from CPT and 0.126 → 0.245 from the base. Most of that gain is SFT teaching the facts in its
+  data, not CPT's knowledge surfacing.
+- **What is CPT-specific is the arm difference.** SFT preserved CPT's knowledge and made it usable
+  in chat form. Starting from CPT rather than the base is worth +0.46 nats on unseen `gold_lp`,
+  +3.6 points on the seen half and +8.6 on identifiers (about 1.7 SE). It is real by the rule and
+  smaller than the seen-half gain.
+  - Unseen accuracy differs by +2.9 points between the arms (0.133 vs 0.104). That is inside the
+    binomial noise, so it isn't the evidence; `gold_lp` is.
+  - Whether this is "the same" knowledge CPT added (+0.66 nats over the base, in base format)
+    can't be computed across the format split. The arm difference is consistent with it.
+- **SFT added no unseen knowledge in either arm.**
+  - Unseen accuracy moved 0.116 → 0.104 (base arm) and 0.110 → 0.133 (CPT arm), both inside the
+    noise.
+  - The only unseen effect in the whole table is CPT's. The unseen half is bounded by what the
+    weights knew before SFT: pretraining plus 19M tokens of CPT.
+  - This is the textbook division of labour. Continued pre-training puts knowledge in;
+    fine-tuning teaches behaviour and makes stored facts extractable.
+    - QA fine-tuning extracts facts only when pre-training exposed them with enough variety
+      (Allen-Zhu & Li 2023, "Physics of Language Models, Part 3.1").
+    - Fine-tuning on facts a model doesn't know is learned slowly and raises hallucination rather
+      than knowledge (Gekhman et al. 2024).
+- **The lever for the unseen half is upstream.**
+  - Only more, and more varied, CPT exposure acts on unseen facts here: paraphrased and
+    restructured corpus text, not one pass over concatenated documents (Stage 2's "what I would
+    do differently", item 3). DPO and GRPO shape behaviour on prompts, as SFT does, and won't move
+    it.
+  - Mistral Large 3 answers 28.4% of the same unseen questions, so the questions are answerable.
+    The ceiling here is how much the weights know.
+
 #### What I would do differently (Stage 3)
 
 1. **Look at the gradient shares before freezing the loss.**
@@ -1048,6 +1098,9 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - The recall formats overfit in epoch 2, which the pre-registered rule caught on every run.
 - **Retention, not capability:** the seen half's closed-book score (28% from 15%; facts that were
   in the training set) is retention. The unseen half moved inside the noise.
+- **Attribution:** SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
+  knowledge. It did not generalise to unseen facts, which was never a target; only more varied CPT
+  exposure acts on those.
 - **CPT's contribution survives SFT:** unseen-half `gold_lp` is +0.46 nats over the SFT-only
   control (arm means of two seeds each), 3.6 SD of run variance measured on both arms. Pass/fail
   closed-book accuracy doesn't resolve it.

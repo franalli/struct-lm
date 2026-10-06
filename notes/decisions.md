@@ -3046,3 +3046,38 @@ convention; the other two criteria (0.98x, 0.02%) say there is no defect. One RE
 
 **Kept:** "matches Large 3 on the seen half" (28.1% vs 27.5%), with its label: facts that were in
 the training set, which Large 3 never saw.
+
+## 2026-10-06: Stage 3 scored against its targets; attribution of the gains (user review)
+**Scorecard (B7 targets, fixed before training):** every target passes but one.
+- **Miss:** hallucination 4 of 76 against Instruct's 1 of 76, inside the run-to-run spread (the
+  seed twin has 1 of 76).
+- **Passes with a caveat:**
+  - CPT's advantage surviving (the 1-df caveat on the SD multiple);
+  - vocab against Instruct, narrowly;
+  - diversity (length-confounded).
+
+The README's Stage 3 section has the table.
+
+**Attribution: SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
+knowledge. It did not generalise to unseen facts, which was never a target.**
+- **Behaviour is SFT's own:** answer form, valid and supported citations, abstaining without
+  over-refusing, stopping.
+- **Seen-half facts are mostly SFT's own:** the seen half doubled in both arms.
+- **CPT-specific:** the arm difference (+0.46 nats unseen `gold_lp`, +3.6 points seen, +8.6 on
+  identifiers).
+- **No unseen knowledge from SFT in either arm:** unseen qa_acc 0.116 → 0.104 base arm, 0.110 →
+  0.133 CPT arm, both inside the noise. The only unseen effect in the table is CPT's.
+- **The lever on unseen facts is upstream:** more varied CPT exposure (Stage 2 retrospective item
+  3). Stages 4 and 5 shape behaviour, as SFT does.
+
+**Corrections to the review text it came from:**
+- **The +2.9-point unseen qa_acc gap between the arms** (0.133 vs 0.104) is inside binomial noise.
+  It is not evidence for CPT knowledge surfacing; `gold_lp` is.
+- **"The same effect as CPT's +0.66 nats" and "the CPT arm may have given a little back"** both
+  subtract across the base/chat format split, which the previous entry rules out. "Consistent
+  with" is as far as the data goes.
+
+**References** are cited from memory, not re-checked here:
+- Allen-Zhu & Li 2023, "Physics of Language Models, Part 3.1": QA fine-tuning extracts knowledge
+  only when pre-training exposed it with variety.
+- Gekhman et al. 2024: fine-tuning on unknown facts is learned slowly and raises hallucination.
