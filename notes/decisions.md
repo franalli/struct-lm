@@ -2639,3 +2639,27 @@ of epoch 1 to the end of epoch 2. Then epoch 1.
   The smoke's mean ratio wasn't measured, so its max ratio (0.25) is the stand-in, unless the
   smoke merge check is rerun.
 - If a trained run comes in worse on either, that is a finding, not a rounding story.
+
+## 2026-10-06: B4 outcomes: sft-from-cpt and sft-from-base both take epoch 1 (pre-registered rule applied)
+**Context:** the amended rule says epoch 2 unless the closed-book or the definition `sft_val` loss
+rose from the end of epoch 1 to the end of epoch 2; then epoch 1. It was read from the loss curves
+only (`train_summary.json` `val_loss_by_format_epoch_end`), before any merge or eval of these runs.
+
+| run | closed-book, epoch 1 -> 2 | definition, epoch 1 -> 2 | overall val_loss, 1 -> 2 | picks |
+|---|---|---|---|---|
+| sft-from-cpt | 1.166 -> 1.304 | 1.983 -> 2.034 | 0.559 -> 0.577 | epoch 1, `checkpoint-77` |
+| sft-from-base | 1.213 -> 1.377 | 2.018 -> 2.072 | 0.559 -> 0.579 | epoch 1, `checkpoint-77` |
+
+- **Both recall formats rose in both runs,** and so did the mixture mean, so the amended and the
+  original rule agree here.
+- **Where epoch 2 went:** the train loss kept falling (final 10-step means 0.43 and 0.43), so
+  epoch 2 mostly memorised the train set.
+- **Health:**
+  - no failure mode fired;
+  - the step-1 `num_items_in_batch` checks passed (1,907 completion tokens; logged loss = token
+    mean);
+  - the step-50 generations ended on `</s>` 10 of 10 in both runs.
+- **Cost:** 154 steps on one H100, about 0.48-0.50 GPU-h each (~1,800 tokens/s, padded SDPA
+  batches), peak 54.7 GB.
+- sft-from-cpt-seed1 gets the same rule when it finishes.
+- The merges below use `--merge-from checkpoint-77`.
