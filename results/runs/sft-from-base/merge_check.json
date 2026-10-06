@@ -1,0 +1,21 @@
+{
+  "check": "merge",
+  "start": "checkpoints/base-8b-hf",
+  "adapter": "/vol/checkpoints/_train/sft-from-base/checkpoint-77",
+  "merged": "/vol/checkpoints/sft-from-base",
+  "val_tokens": 11351,
+  "val_loss_unmerged": 0.559034,
+  "val_loss_merged": 0.558905,
+  "val_loss_rel_diff": 0.000231,
+  "top1_agreement": 1.0,
+  "probe_positions": 295,
+  "max_abs_merge_error": 4.2554,
+  "max_abs_adapter_effect": 11.8359,
+  "ratio": 0.3595,
+  "mean_abs_merge_error": 0.02327,
+  "mean_abs_adapter_effect": 0.50601,
+  "ratio_mean": 0.046,
+  "ratio_flag": true,
+  "rule": "|val loss rel diff| <= 0.005 and top-1 agreement >= 0.99",
+  "passed": true
+}

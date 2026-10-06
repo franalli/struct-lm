@@ -257,6 +257,30 @@ def merge_check(run_name: str, adapter: str = "") -> None:
 
 
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
+def merge_diagnose(run_name: str, adapter: str = "") -> None:
+    """merge_check.py diagnose after a failed merge check: argmax flips and log-prob error of the
+    merged and the unmerged bf16 model against an fp32 reference, over every sft_val completion
+    position. /vol/results/runs/<run>/merge_diagnose.json.
+      modal run train/modal_train.py::merge_diagnose --run-name sft-from-cpt --adapter checkpoint-77"""
+    vol.reload()
+    cmd = [
+        sys.executable,
+        "/root/train/merge_check.py",
+        "diagnose",
+        "--adapter",
+        str(Path(f"/vol/checkpoints/_train/{run_name}") / adapter),
+        "--merged",
+        f"/vol/checkpoints/{run_name}",
+        "--val",
+        "data/sft/sft_val.jsonl",
+        "--out",
+        f"/vol/results/runs/{run_name}/merge_diagnose.json",
+    ]
+    subprocess.run(cmd, cwd="/vol", check=True)
+    vol.commit()
+
+
+@app.function(**COMMON, gpu="H100", timeout=2 * 3600)
 def perplexity(model: str, run_name: str, only: str = "") -> None:
     """eval/perplexity.py -> /vol/results/ppl/<run>.json. only="postcutoff" adds the post-cutoff
     set to an existing json (needs /vol/data/exposure/postcutoff.jsonl):

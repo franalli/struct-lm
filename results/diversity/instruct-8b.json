@@ -1,0 +1,24 @@
+{
+  "run": "instruct-8b",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.8104,
+    "entropy": 9.7998,
+    "mean_len": 343.2,
+    "stop_rate": 0.82
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.8099,
+    "entropy": 9.6529,
+    "mean_len": 585.9,
+    "stop_rate": 0.64
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.817,
+    "entropy": 8.7283,
+    "mean_len": 100.5,
+    "stop_rate": 1.0
+  }
+}

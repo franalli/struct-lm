@@ -2663,3 +2663,40 @@ only (`train_summary.json` `val_loss_by_format_epoch_end`), before any merge or 
   batches), peak 54.7 GB.
 - sft-from-cpt-seed1 gets the same rule when it finishes.
 - The merges below use `--merge-from checkpoint-77`.
+
+## 2026-10-06: sft-from-cpt's merge check failed; diagnostic and its reading fixed before it runs (user decision)
+**What failed:** B5's merge check on `sft-from-cpt` (epoch 1, `checkpoint-77`). Top-1 agreement
+between the merged checkpoint and start + adapter was 98.64% over the 295 probe positions (4 argmax
+flips), against the pre-registered >= 99% (at most 2 flips). The pipeline stopped before any eval,
+as designed. `sft-from-base` passed (100%) and is being evaluated.
+
+**What is already known:**
+- the val loss of the merged model is within 0.03% of start + adapter's over all 11,351 sft_val
+  tokens;
+- the adapter is fp32 (476 tensors, max |B| 0.0037), its config is as trained, and the merge was
+  already fp32 on CPU;
+- the typical merge error matches the passing run's: mean-abs merge error / adapter effect is
+  0.027 / 0.524 (0.052) against 0.023 / 0.506 (0.046) for sft-from-base.
+- **The max-based ratio did come in worse than the smoke's 0.25** (0.74 cpt, 0.36 base), which the
+  previous entry calls a finding.
+- **"fp32 CPU merge again"** (the pre-registered response) would rebuild the identical checkpoint,
+  since the merge is deterministic.
+
+**Hypothesis:** the flips are near-tied argmaxes that bf16 inference flips anyway, and 295
+positions are too few for a 99% threshold.
+
+**Test:** `merge_check.py diagnose` covers all 11,351 sft_val completion positions. It compares the
+merged bf16 checkpoint and the unmerged bf16 model (start bf16 + fp32 adapter: what serving the
+adapter would give, the noise floor) against an fp32 reference (start in fp32 + the fp32 adapter,
+unmerged). It reports flips, the reference's logit margin at each flip, and mean |delta log-prob of
+the target|. It runs for sft-from-cpt and, as the passing comparison, sft-from-base.
+
+**Reading, fixed now:** the merge is as faithful as bf16 inference if both hold:
+- it adds at most 0.1% of positions (11) in flips over the unmerged bf16 model;
+- its mean |delta log-prob| against the reference is at most 1.5x the unmerged bf16 model's.
+
+**Then:**
+- **If both hold,** the failure was the probe's power. The user decides whether to amend B5's
+  gate to this full-val comparison, applied to all three runs, and release sft-from-cpt's evals on
+  the existing merged checkpoint.
+- **If not,** the merge has a real defect and is investigated; nothing is served.
