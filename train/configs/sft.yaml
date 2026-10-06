@@ -59,6 +59,7 @@ training:
   logging_steps: 1
   eval_strategy: steps
   eval_steps: 50  # plus one at each epoch end (sft.py), where B4 reads val_loss
+  eval_on_start: true  # step 0: the start checkpoint's val loss and generations, the curve's origin
   save_strategy: epoch
   save_total_limit: null  # both epochs kept: B4 may pick epoch 1
   report_to: none  # the curve is results/runs/<run>/train_log.jsonl

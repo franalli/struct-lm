@@ -1,0 +1,10 @@
+{
+  "check": "noop",
+  "start": "checkpoints/base-8b-hf",
+  "lora_b_max_abs": 0.0,
+  "tensors": 531,
+  "differ": 0,
+  "examples": [],
+  "max_abs_diff": 0.0,
+  "passed": true
+}

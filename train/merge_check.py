@@ -126,6 +126,7 @@ def check(args) -> dict:
     m_sum, _ = nll(merged, val)
     u_loss, m_loss = u_sum / n, m_sum / n
     merge_err = effect = 0.0
+    err_sum = eff_sum = 0.0
     agree = total = 0
     for r in probes:
         u = completion_logits(unmerged, r)
@@ -134,6 +135,8 @@ def check(args) -> dict:
             s = completion_logits(unmerged, r)
         merge_err = max(merge_err, float((m.float() - u.float()).abs().max()))
         effect = max(effect, float((u.float() - s.float()).abs().max()))
+        err_sum += float((m.float() - u.float()).abs().mean()) * u.shape[0]
+        eff_sum += float((u.float() - s.float()).abs().mean()) * u.shape[0]
         agree += int((m.argmax(-1) == u.argmax(-1)).sum())
         total += u.shape[0]
     rel = abs(m_loss / u_loss - 1)
@@ -152,6 +155,11 @@ def check(args) -> dict:
         "max_abs_merge_error": round(merge_err, 4),
         "max_abs_adapter_effect": round(effect, 4),
         "ratio": None if ratio is None else round(ratio, 4),
+        # the same comparison in means over every logit of the probe positions: the max is one
+        # logit of ~38M, a tail statistic; the mean shows the typical size of each effect
+        "mean_abs_merge_error": round(err_sum / total, 5),
+        "mean_abs_adapter_effect": round(eff_sum / total, 5),
+        "ratio_mean": round(err_sum / eff_sum, 4) if eff_sum else None,
         "ratio_flag": ratio is None or ratio > RATIO_FLAG,
         "rule": f"|val loss rel diff| <= {LOSS_TOL} and top-1 agreement >= {AGREE_MIN}",
         "passed": rel <= LOSS_TOL and agree / total >= AGREE_MIN,

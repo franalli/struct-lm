@@ -1,0 +1,8 @@
+{"step": 0, "dataset_hash": "70f47740bd973dc47f43d74c826b1bca3a82bb3e50379fe3ccc44179566ab4b6", "train": 2436, "val": 80, "init_from": "checkpoints/cpt-8b-replay10"}
+{"step": 0, "check": "trainable_params", "trainable": 178257920, "expected": 178257920, "lora_modules": 238, "stray": [], "passed": true}
+{"step": 1, "loss": 0.6855560541152954, "grad_norm": 3.898193836212158, "learning_rate": 0.0001, "entropy": 1.8554558455944061, "num_tokens": 29850.0, "mean_token_accuracy": 0.7482193261384964, "epoch": 1.0, "step_tokens": 29850, "step_time": 17.06, "tokens_per_s": 1749.7, "peak_mem_gb": 52.54}
+{"step": 1, "check": "num_items_in_batch", "micro_batches": 4, "completion_tokens": [574, 253, 120, 102], "num_items_in_batch": 1049, "passed": true, "logged_loss": 0.6855560541152954, "token_mean": 0.685556, "mean_of_means": 0.947712, "logged_is_token_mean": true}
+{"step": 1, "eval_loss": 0.6211547255516052, "eval_runtime": 11.3144, "eval_samples_per_second": 7.071, "eval_steps_per_second": 0.884, "eval_entropy": 1.706785225868225, "eval_num_tokens": 29850.0, "eval_mean_token_accuracy": 0.8319955110549927, "epoch": 1.0}
+{"step": 1, "epoch": 1.0, "val_loss": 0.629858, "val_loss_by_format": {"abstain": 0.386255, "closed_book": 1.647301, "definition": 2.016024, "grounded": 0.223504, "replay": 0.69673}, "val_tokens": 11351, "epoch_end": true}
+{"step": 1, "generations_ended_on_eos": 10, "of": 10}
+{"step": 1, "train_runtime": 53.4745, "train_samples_per_second": 0.598, "train_steps_per_second": 0.019, "total_flos": 3443349236711424.0, "train_loss": 0.6855560541152954, "epoch": 1.0}

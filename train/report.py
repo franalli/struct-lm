@@ -1,4 +1,5 @@
-"""Stage 2 training report: results/train_runs.md, results/curves/cpt.png and cpt_ppl.png.
+"""Training report: results/train_runs.md, results/curves/cpt.png, cpt_ppl.png (Stage 2) and
+sft.png, sft_kpi.png (Stage 3), plus the README's generated blocks.
 
   .venv/bin/python train/report.py [--usd-per-gpu-hour 3.95] [--scaling-run cpt-8b-fsdp2 --scaling-ref cpt-8b]
 
@@ -19,6 +20,14 @@ Figures (for the README): cpt.png has two panels, train loss (moving average) an
 trainer's evals on the 49 val windows, starting from base-8b's loss on the same windows at step 0);
 cpt_ppl.png has each merged run's perplexity change vs base-8b on the train slice, domain val and
 general val (results/ppl/<run>.json from eval/perplexity.py), with the pre-registered thresholds.
+
+Stage 3 (runs whose train_summary.json says stage "sft"; notes/decisions.md, Stage 3b
+pre-registration): the run table with B4's epoch-end val losses and the epoch the rule picks;
+sft.png (train loss and the token-mean sft_val loss, epoch boundary marked); sft_kpi.png (seen /
+unseen gold_lp and qa_acc for the starts, the SFT runs and the instruct bar); the change against
+each run's start next to the noise, max(seed gap, SE); B7's first line, the paired bootstrap of
+unseen gold_lp, sft-from-cpt - sft-from-base; and the merge checks, no-op controls, </s> and
+diversity results. They go into the README's <!-- stage3-tables --> block.
 """
 
 import argparse
@@ -48,7 +57,13 @@ COLORS = {
     "cpt-8b-lr2x": "#e87ba4",
     "cpt-8b-seed1": "#2a78d6",  # the main config again: its colour, drawn dashed / hatched
 }
-TWIN = {"cpt-8b-seed1"}  # same config as another run, another seed
+SFT_COLORS = {
+    "sft-from-cpt": "#2a78d6",
+    "sft-from-base": "#eb6834",
+    "sft-from-cpt-seed1": "#2a78d6",
+    "sft-from-cpt-lr2e-4": "#1baf7a",
+}
+TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1"}  # same config as another run, another seed
 PPL_METRICS = [
     ("ppl_train", "train slice\n(seen once by CPT)"),
     ("ppl_domain_val", "domain val\n(held-out documents)"),
@@ -398,6 +413,7 @@ RESULT_BLOCKS = (
             "cite_valid",
             "cite_supported",
             "halluc_rate",
+            "false_abstain",
             "vocab_recall",
             "vocab_seen",
             "vocab_unseen",
@@ -534,19 +550,24 @@ def delta_table() -> str:
 
 def serving_table() -> str:
     """results/bench/<run>.json (serve/bench_latency.py): p50 at 1 concurrent request, and
-    throughput at 1, 8 and 32. base-8b runs Mistral's native vLLM path, the rest the HF path."""
+    throughput at 1, 8 and 32. base-8b runs Mistral's native vLLM path, the rest the HF path.
+    Stop rate (requests ended by </s> before the 256-token cap) and mean output tokens at
+    concurrency 1 exist from Stage 3's bench on; earlier rows leave them blank."""
     rows = []
-    for r in ["base-8b", "instruct-8b", "base-8b-hf", "cpt-8b"]:
+    for r in ["base-8b", "instruct-8b", "base-8b-hf", "cpt-8b", *SFT_COLORS]:
         f = Path("results/bench") / f"{r}.json"
         if not f.exists():
             continue
         d = {x["concurrency"]: x for x in json.loads(f.read_text())}
+        stop, out_tok = d[1].get("stop_rate"), d[1].get("mean_out_tokens")
         rows.append(
             [
                 r,
                 f"{d[1]['ttft_p50_ms']:.1f}",
                 f"{d[1]['itl_p50_ms']:.1f}",
                 f"{d[1]['e2e_p50_ms']:,.0f}",
+                "" if stop is None else f"{stop:.0%}",
+                "" if out_tok is None else f"{out_tok:.0f}",
                 *(f"{d[c]['tok_per_s']:,.0f}" for c in (1, 8, 32)),
             ]
         )
@@ -555,12 +576,427 @@ def serving_table() -> str:
         "TTFT p50 (ms)",
         "ITL p50 (ms)",
         "E2E p50 (ms)",
+        "stop before cap",
+        "mean output tokens",
         "tok/s @1",
         "tok/s @8",
         "tok/s @32",
     ]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     return "\n".join([*lines, *("| " + " | ".join(r) + " |" for r in rows)])
+
+
+# ------------------------------------------------------------------------------------- Stage 3 ---
+SFT_SEED_PAIR = ("sft-from-cpt", "sft-from-cpt-seed1")
+SFT_ROWS = [  # (label, metrics.json key, kind, half / items key, or lm-eval task + stderr key)
+    ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen"),
+    ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen"),
+    ("qa_unseen", "qa_unseen", "kpi", "qa_unseen"),
+    ("qa_seen", "qa_seen", "kpi", "qa_seen"),
+    ("qa_ident (identifiers)", "qa_ident", "kpi", "qa_identifier"),
+    ("grounded_acc", "grounded_acc", "kpi", "grounded"),
+    ("cite_supported", "cite_supported", "kpi", "grounded"),
+    ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial"),
+    ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded"),
+    ("vocab_seen", "vocab_seen", "kpi", "vocab_seen"),
+    ("vocab_unseen", "vocab_unseen", "kpi", "vocab_unseen"),
+    ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
+    ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
+    ("HellaSwag", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
+]
+SFT_COLUMNS = [
+    "instruct-8b",
+    "base-8b-hf",
+    "sft-from-base",
+    "cpt-8b-replay10",
+    "sft-from-cpt",
+    "sft-from-cpt-seed1",
+    "sft-from-cpt-lr2e-4",
+]
+
+
+def epoch_rule(summary: dict) -> int | None:
+    """B4: epoch 2 unless the end-of-epoch-2 val_loss is above end-of-epoch-1's, then epoch 1."""
+    v = summary.get("val_loss_epoch_end") or {}
+    if "1" not in v or "2" not in v:
+        return None
+    return 1 if v["2"] > v["1"] else 2
+
+
+def sft_table(runs: dict, usd: float) -> str:
+    head = [
+        "run",
+        "start",
+        "steps",
+        "tokens trained",
+        "tokens/s",
+        "wall (h)",
+        "GPU-h",
+        "$",
+        "peak GB",
+        "final train loss",
+        "val_loss epoch 1",
+        "val_loss epoch 2",
+        "B4 picks",
+    ]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for name, (s, _) in runs.items():
+        v = s.get("val_loss_epoch_end") or {}
+        epoch = epoch_rule(s)
+        cells = [
+            name,
+            Path(s["base"]).name,
+            s["steps"],
+            f"{s['tokens'] * s['steps'] / max(1, s['steps_per_epoch']) / 1e6:.2f}M",
+            f"{s['tokens_per_s']:,.0f}" if s.get("tokens_per_s") else "",
+            f"{s['wall_s'] / 3600:.2f}",
+            f"{s['gpu_hours']:.2f}",
+            f"{s['gpu_hours'] * usd:.2f}",
+            f"{s['peak_mem_gb']:.0f}" if s.get("peak_mem_gb") else "",
+            f"{s['final_train_loss']:.3f}" if s.get("final_train_loss") else "",
+            f"{v['1']:.4f}" if "1" in v else "",
+            f"{v['2']:.4f}" if "2" in v else "",
+            f"epoch {epoch}" if epoch else "",
+        ]
+        lines.append("| " + " | ".join(str(c) for c in cells) + " |")
+    return "\n".join(lines)
+
+
+def val_curve(log: list[dict]) -> list[tuple[int, float]]:
+    """(step, token-mean sft_val loss) at each evaluation, the last value if a step repeats."""
+    return sorted({r["step"]: r["val_loss"] for r in log if "val_loss" in r}.items())
+
+
+def plot_sft_loss(runs: dict, out: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, (ax_t, ax_v) = plt.subplots(1, 2, figsize=(12, 4.8), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    last_step = max(curve(log)[0][-1] for _, log in runs.values())
+    t_labels, v_labels = [], []
+    for name, (_, log) in runs.items():
+        color, ls = SFT_COLORS.get(name, INK_2), "--" if name in TWIN else "-"
+        x, y = curve(log)
+        ys = smooth(y)
+        ax_t.plot(x, ys, color=color, lw=2, ls=ls, label=name, solid_capstyle="round")
+        t_labels.append((name, x[-1], ys[-1], False))
+        if ev := val_curve(log):
+            ex, ey = zip(*ev)
+            ax_v.plot(ex, ey, marker="o", ls=ls, lw=2, ms=6, color=color, mec=SURFACE, mew=1.5)
+            v_labels.append((name, ex[-1], ey[-1], False))
+    epoch_step = next(iter(runs.values()))[0]["steps_per_epoch"]
+    for ax in (ax_t, ax_v):
+        ax.axvline(epoch_step, color=INK_2, lw=1, ls=":")
+        ax.annotate(
+            "end of epoch 1",
+            (epoch_step, 1),
+            xycoords=("data", "axes fraction"),
+            xytext=(4, -12),
+            textcoords="offset points",
+            fontsize=8,
+            color=INK_2,
+        )
+    style(ax_t, f"Train loss ({SMOOTH}-step moving average)", "optimizer step", "nats per token")
+    style(
+        ax_v,
+        "sft_val loss (token mean, 80 records; step 0 = the start)",
+        "optimizer step",
+        "nats per token",
+    )
+    for ax, labels in ((ax_t, t_labels), (ax_v, v_labels)):
+        ax.set_xlim(0, last_step * 1.3)
+        end_labels(ax, labels)
+    fig.suptitle("Stage 3 SFT: loss curves", color=INK, fontsize=11, x=0.01, ha="left")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    print(f"-> {out}")
+
+
+def item_lp(run: str, half: str | None = None) -> dict[str, float]:
+    """{domain_qa id: gold_lp} for a run, optionally one half (eval/tasks/sft_seen_chunks.txt)."""
+    path = RUNS / run / "generations.jsonl"
+    if not path.exists():
+        return {}
+    rows = (json.loads(line) for line in path.open())
+    lp = {x["id"]: x["gold_lp"] for x in rows if x["task"] == "domain_qa" and "gold_lp" in x}
+    if half is None:
+        return lp
+    seen = set(Path("eval/tasks/sft_seen_chunks.txt").read_text().split())
+    src = {}
+    for line in Path("eval/tasks/domain_qa.jsonl").read_text().splitlines():
+        r = json.loads(line)
+        src[r["id"]] = r["source_chunk"]
+    return {i: v for i, v in lp.items() if i in src and (src[i] in seen) == (half == "seen")}
+
+
+def paired_lp(a: str, b: str, half: str, n_boot: int = 10_000) -> dict:
+    """Mean per-item gold_lp difference b - a on one half, its paired SE and a 95% bootstrap
+    interval over items (seeded): B7's first line with a = sft-from-base, b = sft-from-cpt."""
+    x, y = item_lp(a, half), item_lp(b, half)
+    ids = sorted(set(x) & set(y))
+    if len(ids) < 2:
+        return {}
+    d = np.array([y[i] - x[i] for i in ids])
+    rng = np.random.default_rng(0)
+    boot = d[rng.integers(0, len(d), size=(n_boot, len(d)))].mean(axis=1)
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    return {
+        "n": len(d),
+        "mean": float(d.mean()),
+        "se": float(d.std(ddof=1) / math.sqrt(len(d))),
+        "ci": (float(lo), float(hi)),
+        "up": float((d > 0).mean()),
+    }
+
+
+def half_sizes() -> dict[str, int]:
+    seen = set(Path("eval/tasks/sft_seen_chunks.txt").read_text().split())
+    qa = [json.loads(line) for line in Path("eval/tasks/domain_qa.jsonl").read_text().splitlines()]
+    vocab = [json.loads(line) for line in Path("eval/tasks/vocab.jsonl").read_text().splitlines()]
+    return {
+        "qa_seen": sum(r["source_chunk"] in seen for r in qa),
+        "qa_unseen": sum(r["source_chunk"] not in seen for r in qa),
+        "vocab_seen": sum(r["source_chunk"] in seen for r in vocab),
+        "vocab_unseen": sum(r["source_chunk"] not in seen for r in vocab),
+        "qa_identifier": sum(r.get("answer_kind") == "identifier" for r in qa),
+    }
+
+
+def lm_se(run: str, task: str, key: str) -> float:
+    files = sorted((Path("results/lm_eval") / run).glob("**/results*.json"))
+    res = json.loads(files[-1].read_text())["results"] if files else {}
+    return res.get(task, {}).get(key, 0) * 100
+
+
+def noise(m: dict, pair: tuple[str, str], key: str, kind: str, extra, sizes: dict) -> float | None:
+    """max(|pair[0] - pair[1]|, pair[0]'s SE): binomial on its items, lm-eval's stderr, or for
+    gold_lp the paired per-item SE of the seed twins' difference on that half. In points for
+    rates, nats for gold_lp."""
+    a, b = (m.get(r, {}).get(key) for r in pair)
+    if a is None or b is None:
+        return None
+    if kind == "lp":
+        return max(abs(a - b), paired_lp(pair[1], pair[0], extra).get("se", 0))
+    if kind == "lm":
+        return max(abs(a - b) * 100, lm_se(pair[0], *extra))
+    n = sizes.get(extra) or m[pair[0]]["n"].get(extra, 0)
+    return max(abs(a - b) * 100, math.sqrt(a * (1 - a) / n) * 100 if n else 0)
+
+
+def sft_delta_table() -> str:
+    """Absolute values per run, with the noise of Stage 3 (the sft-from-cpt seed twins) and of
+    Stage 2 (cpt-8b vs cpt-8b-seed1) next to them, both max(seed gap, SE)."""
+    m = {}
+    for r in [*SFT_COLUMNS, "cpt-8b", "cpt-8b-seed1"]:
+        f = RUNS / r / "metrics.json"
+        if f.exists():
+            m[r] = json.loads(f.read_text())
+    if not all(r in m for r in SFT_SEED_PAIR):
+        return ""
+    sizes = half_sizes()
+    cols = [r for r in SFT_COLUMNS if r in m]
+    head = ["metric", *cols, "noise (Stage 3)", "noise (Stage 2)"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra in SFT_ROWS:
+        n3 = noise(m, SFT_SEED_PAIR, key, kind, extra, sizes)
+        if n3 is None:
+            continue
+        n2 = noise(m, ("cpt-8b", "cpt-8b-seed1"), key, kind, extra, sizes)
+        unit = "{:.3f}" if kind == "lp" else "{:.1f}"
+        cells = [label] + ["" if m[r].get(key) is None else f"{m[r][key]:.3f}" for r in cols]
+        cells += [unit.format(n3), "" if n2 is None else unit.format(n2)]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def b7_first_line() -> str:
+    """B7's first line: gold_lp by half, sft-from-cpt - sft-from-base, against the noise."""
+    m = {}
+    for r in SFT_COLORS:
+        f = RUNS / r / "metrics.json"
+        if f.exists():
+            m[r] = json.loads(f.read_text())
+    if not all(r in m for r in ("sft-from-cpt", "sft-from-base")):
+        return ""
+    out = []
+    for half in ("unseen", "seen"):
+        c = paired_lp("sft-from-base", "sft-from-cpt", half)
+        if not c:
+            continue
+        key = f"gold_lp_{half}"
+        seed = (
+            abs(m["sft-from-cpt"][key] - m["sft-from-cpt-seed1"][key])
+            if "sft-from-cpt-seed1" in m
+            else None
+        )
+        floor = max(x for x in (seed, c["se"]) if x is not None)
+        lo, hi = c["ci"]
+        verdict = (
+            "beyond the noise: CPT bought something that survives SFT"
+            if (lo > 0 or hi < 0) and abs(c["mean"]) > floor
+            else "inside the noise: CPT's value is not observable at this scale"
+        )
+        qa = {r: m[r].get(f"qa_{half}") for r in ("sft-from-cpt", "sft-from-base")}
+        seed_txt = "" if seed is None else f"seed gap {seed:.3f}, "
+        out.append(
+            f"- **{half} gold_lp, sft-from-cpt - sft-from-base:** {c['mean']:+.3f} nats per answer "
+            f"[95% CI {lo:+.3f}, {hi:+.3f}; {c['n']} items, {c['up']:.0%} up]; noise "
+            f"{floor:.3f} ({seed_txt}paired SE {c['se']:.3f}): {verdict}. qa_{half} "
+            f"{qa['sft-from-cpt']:.3f} vs {qa['sft-from-base']:.3f}, reported, not argued."
+        )
+    return "\n".join(out)
+
+
+def checks_table() -> str:
+    """Merge checks (B5), no-op controls, </s> on sampled answers and diversity, per run."""
+    out = []
+    noop = sorted(Path("results/noop").glob("*.json")) if Path("results/noop").exists() else []
+    if noop:
+        out.append("No-op control (an untrained adapter, merged, against its start):\n")
+        out.append("| start | tensors | differ | max abs diff | passed |\n|---|---|---|---|---|")
+        for f in noop:
+            r = json.loads(f.read_text())
+            out.append(
+                f"| {f.stem} | {r['tensors']} | {r['differ']} | {r['max_abs_diff']} | "
+                f"{'yes' if r['passed'] else 'NO'} |"
+            )
+    rows = []
+    for name in SFT_COLORS:
+        f = RUNS / name / "merge_check.json"
+        if f.exists():
+            r = json.loads(f.read_text())
+            rows.append(
+                f"| {name} | {r['val_loss_unmerged']:.4f} | {r['val_loss_merged']:.4f} | "
+                f"{r['val_loss_rel_diff']:.2%} | {r['top1_agreement']:.1%} | "
+                f"{r['max_abs_merge_error']} | {r['max_abs_adapter_effect']} | {r['ratio']} | "
+                f"{'yes' if r['passed'] else 'NO'} |"
+            )
+    if rows:
+        out.append(
+            "\nMerge check (B5: merged val loss within 0.5% of start + adapter, top-1 agreement "
+            ">= 99%; the ratio is flagged above 0.05):\n"
+        )
+        out.append(
+            "| run | val loss, adapter | val loss, merged | diff | top-1 agreement | max merge "
+            "error | max adapter effect | ratio | passed |\n|" + "---|" * 9
+        )
+        out += rows
+    rows = []
+    for name in ["instruct-8b", *SFT_COLORS]:
+        f = Path("results/diversity") / f"{name}.json"
+        if not f.exists():
+            continue
+        r = json.loads(f.read_text())
+        d, g = r.get("diversity", {}), r.get("diversity_general", {})
+        dm, e = r.get("diversity_domain", {}), r.get("eos", {})
+        rows.append(
+            f"| {name} | {d.get('distinct_4', '')} | {d.get('entropy', '')} | "
+            f"{d.get('mean_len', '')} | {g.get('distinct_4', '')} | {dm.get('distinct_4', '')} | "
+            f"{d.get('stop_rate', '')} | "
+            + (f"{e['eos_stop_rate']:.1%} of {e['samples']}" if e else "")
+            + " |"
+        )
+    if rows:
+        out.append(
+            "\nDiversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over "
+            "output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):\n"
+        )
+        out.append(
+            "| run | distinct-4 | entropy (bits) | mean length | distinct-4 general | "
+            "distinct-4 domain | stopped (T 0.7) | stopped (eos job) |\n|" + "---|" * 8
+        )
+        out += rows
+    return "\n".join(out)
+
+
+def plot_sft_kpi(out: Path) -> None:
+    """Seen / unseen gold_lp and qa_acc for the starts, the SFT runs and the instruct bar."""
+    names = [r for r in SFT_COLUMNS if (RUNS / r / "metrics.json").exists()]
+    if not any(r in names for r in SFT_COLORS):
+        return
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    m = {r: json.loads((RUNS / r / "metrics.json").read_text()) for r in names}
+    colors = {
+        **SFT_COLORS,
+        "instruct-8b": "#52514e",
+        "base-8b-hf": "#c9c7c1",
+        "cpt-8b-replay10": "#9fc3ef",
+    }
+    sizes = half_sizes()
+    fig, (ax_lp, ax_qa) = plt.subplots(1, 2, figsize=(12, 4.8), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    width = 0.8 / len(names)
+    for j, r in enumerate(names):
+        for ax, keys, scale in (
+            (ax_lp, ("gold_lp_seen", "gold_lp_unseen"), 1),
+            (ax_qa, ("qa_seen", "qa_unseen"), 100),
+        ):
+            vals = [m[r].get(k) for k in keys]
+            xs = [i - 0.4 + width * (j + 0.5) for i in range(2)]
+            err = (
+                [
+                    math.sqrt(v * (1 - v) / sizes[k]) * 100 if v is not None else 0
+                    for v, k in zip(vals, keys)
+                ]
+                if ax is ax_qa
+                else None
+            )
+            ax.bar(
+                xs,
+                [(v or 0) * scale for v in vals],
+                width,
+                yerr=err,
+                color=colors.get(r, INK_2),
+                edgecolor=SURFACE,
+                lw=1.5,
+                hatch="//" if r in TWIN else None,
+                label=r,
+                error_kw={"ecolor": INK_2, "lw": 1, "capsize": 2},
+            )
+    sizes_txt = (f"seen half ({sizes['qa_seen']})", f"unseen half ({sizes['qa_unseen']})")
+    for ax, title, ylabel in (
+        (ax_lp, "Gold-answer log-probability (nats per answer, higher is better)", "nats"),
+        (ax_qa, "Closed-book qa_acc (%, +-1 binomial SE)", "%"),
+    ):
+        ax.set_xticks(range(2), sizes_txt)
+        style(ax, title, "", ylabel)
+    ax_lp.legend(frameon=False, fontsize=8, labelcolor=INK, loc="lower left")
+    fig.suptitle(
+        "Stage 3: closed-book knowledge by half", color=INK, fontsize=11, x=0.01, ha="left"
+    )
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    print(f"-> {out}")
+
+
+def stage3_md(runs: dict, usd: float) -> str:
+    md = "## Training runs\n\n" + sft_table(runs, usd)
+    md += (
+        "\n\nB4 (pre-registered): epoch 2 unless its end-of-epoch val_loss (token mean over the "
+        f"80 sft_val records) is above epoch 1's. $ at {usd} per GPU-hour (assumed).\n"
+    )
+    if deltas := sft_delta_table():
+        md += (
+            "\n## Results next to the noise\n\n" + deltas + "\n\nValues as fractions (gold_lp "
+            "in nats per answer); noise in points (gold_lp in nats). Noise = max(the seed gap, the "
+            "SE): Stage 3 for sft-from-cpt vs sft-from-cpt-seed1, Stage 2 for cpt-8b vs "
+            "cpt-8b-seed1. The SE is binomial on the metric's items, lm-eval's stderr, or for "
+            "gold_lp the paired per-item SE of the twins on that half. Starts: sft-from-cpt from "
+            "cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the bar.\n"
+        )
+    if first := b7_first_line():
+        md += "\n## B7's first line: what CPT bought, measured after SFT\n\n" + first + "\n"
+    if checks := checks_table():
+        md += "\n## Checks\n\n" + checks + "\n"
+    return md
 
 
 def main() -> None:
@@ -570,9 +1006,12 @@ def main() -> None:
     ap.add_argument("--scaling-ref", default="cpt-8b")
     ap.add_argument("--readme", default="README.md", help="'' to leave the README alone")
     args = ap.parse_args()
-    runs = {d.name: r for d in sorted(RUNS.iterdir()) if d.is_dir() and (r := load(d))}
-    if not runs:
+    every = {d.name: r for d in sorted(RUNS.iterdir()) if d.is_dir() and (r := load(d))}
+    if not every:
         raise SystemExit(f"no train_summary.json + train_log.jsonl under {RUNS}")
+    runs = {k: v for k, v in every.items() if v[0].get("stage") != "sft"}
+    sft = {k: v for k, v in every.items() if v[0].get("stage") == "sft"}
+    sft_runs = {r: sft[r] for r in [*[r for r in SFT_COLORS if r in sft], *sorted(sft)]}
     order = [*[r for r in COLORS if r in runs], *[r for r in runs if r not in COLORS]]
     runs = {r: runs[r] for r in order}
     md = "## Training runs\n\n" + table(runs, args.usd_per_gpu_hour)
@@ -595,20 +1034,29 @@ def main() -> None:
             "gold-answer log-probability in nats per answer, the rest in points. noise = max(the "
             "seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for "
             "the log-probability the paired per-item difference): a change smaller than it is not "
-            "a result. QA rows are on the 325-item domain_qa (eval v2), so cpt-8b-full, whose "
-            "weights were deleted, has none.\n"
+            "a result. QA rows are on the 322-item domain_qa (eval v3; Stage 2 was first read on "
+            "v2's 325, results/table_v2.md), so cpt-8b-full, whose weights were deleted, has "
+            "none.\n"
         )
-    Path("results/train_runs.md").write_text(md)
-    print(md)
+    md3 = stage3_md(sft_runs, args.usd_per_gpu_hour) if sft_runs else ""
+    Path("results/train_runs.md").write_text(
+        "# Stage 2: CPT\n\n" + md + ("\n# Stage 3: SFT\n\n" + md3 if md3 else "")
+    )
+    print(md + md3)
     if args.readme:
-        # the README nests these under "#### Stage 2": its own headings go two levels down
+        # the README nests these under "#### Stage N": their own headings go two levels down
         update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
+        if md3:
+            update_readme(Path(args.readme), "stage3-tables", re.sub(r"(?m)^## ", "##### ", md3))
         update_readme(Path(args.readme), "results-table", results_table())
         update_readme(Path(args.readme), "serving-table", serving_table())
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
     plot_loss(runs, base_val, Path("results/curves/cpt.png"))
     if BASE in ppl and len(ppl) > 1:
         plot_ppl(ppl, Path("results/curves/cpt_ppl.png"))
+    if sft_runs:
+        plot_sft_loss(sft_runs, Path("results/curves/sft.png"))
+        plot_sft_kpi(Path("results/curves/sft_kpi.png"))
 
 
 if __name__ == "__main__":
