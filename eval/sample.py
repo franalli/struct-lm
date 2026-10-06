@@ -8,6 +8,9 @@ checks that need more than the greedy KPI outputs. One engine load serves every 
              x 4 samples at temperature 0.8, up to 1,024 tokens: does </s> end generation (B5)
   diversity  eval/diversity_prompts.jsonl (100 prompts) x 1 sample at temperature 0.7, up to 1,024
              tokens: distinct-4, token entropy and length, scored by eval/diversity.py (B6)
+  dpo_probe  the first 20 prompts of the Stage 4 pool x 4 samples at temperature 0.7, up to 1,024
+             tokens: whether samples collapse to one answer before DPO pairs are built
+             (eval/diversity.py collapse; stop rule in notes/decisions.md, 2026-10-06)
 
   python eval/sample.py --model /vol/checkpoints/sft-from-cpt --run-name sft-from-cpt --chat \
       --jobs eos,diversity
@@ -32,6 +35,7 @@ JOBS = {
     "template": {"prompts": HERE / "sft_template_prompts.jsonl", "n": 1, "temperature": 0.0, "max_tokens": 1},
     "eos": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 4, "temperature": 0.8, "max_tokens": 1024, "per_format": 4},
     "diversity": {"prompts": HERE / "diversity_prompts.jsonl", "n": 1, "temperature": 0.7, "max_tokens": 1024},
+    "dpo_probe": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 4, "temperature": 0.7, "max_tokens": 1024, "first": 20},
 }  # fmt: skip
 
 
@@ -48,6 +52,8 @@ def prompts_for(job: str) -> list[dict]:
         p = r["prompt"]
         text = p if isinstance(p, str) else p[0]["content"]
         out.append({"id": r["id"], "format": r.get("format"), "prompt": text})
+    if "first" in spec:  # the head of the file, in its fixed order
+        return out[: spec["first"]]
     if "per_format" in spec:  # a fixed-hash pick per format
         picked = []
         for f in sorted({r["format"] for r in out}):

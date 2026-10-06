@@ -2932,3 +2932,69 @@ b7_first_line`):**
 - **The read moved from 1.4 SD (one-arm floor) to 3.6 SD (two-arm floor).** The README carries the
   two-arm result, with the one-arm history in "what I would do differently".
 - **CPT stays in the chain;** sft-from-cpt, epoch 1, is the Stage 3 checkpoint as decided.
+
+## 2026-10-06: How the first line is stated; seed-gap asymmetry recorded; Stage 4's pre-pairing probe fixed before sampling (user decisions)
+**The SD multiple is not a p-value.**
+- **Why:** each arm's run SD comes from one seed pair, so its variance estimate has 1 degree of
+  freedom per arm. A 3.6 "SD" on 1-2 df is not the 3.6 sigma a reader would hear.
+- **The robust statement is the rank one:**
+  - every CPT run beats every base run (pairs +0.355, +0.315, +0.612, +0.573);
+  - the smallest pair difference (+0.32) exceeds the CPT arm's own seed gap (0.258);
+  - with 2 runs per arm, that ordering has an exact permutation probability of 1 in 6.
+- **The README's first line now reads:** passes the pre-registered rule; consistent in all four
+  pairings and on both halves; per-item CI [+0.276, +0.660]; the run-variance estimate rests on
+  one seed pair per arm, so the SD multiple is indicative, and a third seed per arm is what would
+  turn it into a test.
+- **Kept:** 3.6 and 2.5 SD stay in the table with that sentence under them, and the 1.4-SD
+  one-arm history stays in "what I would do differently". `report.py` prints the single-run pairs
+  and the 1-in-6 ordering next to the SD multiple.
+
+**Asymmetric seed gaps, recorded as observed:**
+- 0.258 on the CPT arm against 0.039 on the base arm (unseen `gold_lp`), a 6.6x ratio.
+- On 1 df each that ratio is well inside chance, so it isn't explained.
+- If a third seed ever runs, this is the first thing it settles.
+
+**Merge gate at exactly 11 of 11 (sft-from-base-seed1):** fine as reported. The 0.1% line is a
+convention; the other two criteria (0.98x, 0.02%) say there is no defect. One README sentence.
+
+**Stage 4's pre-pairing probe, fixed before any sampling.**
+- **Sampling** (`eval/sample.py` job `dpo_probe`): the first 20 prompts of
+  `data/dpo/prompts.jsonl` x 4 samples at T 0.7, from sft-from-cpt epoch 1. That is 8 closed-book,
+  7 definition, 3 grounded and 2 abstain prompts.
+- **Collapse** (`eval/diversity.py collapse`):
+  - a prompt collapses when all six pairwise token overlaps (multiset intersection over the
+    longer sample) are above 0.9;
+  - also reported: mean distinct-4 of the four samples pooled, everything per format.
+- **Stop rule:** more than a quarter of the **non-abstain** prompts collapse. Then temperature 1.0
+  and the system-prompt variants, before any pair is built.
+  - **Abstain is out of the share.** Four copies of the one correct sentence are the model being
+    right: no rejected sample exists, so the prompt yields no pair. That is a data-yield fact, not
+    narrowness.
+  - **Closed-book stays in the share,** since a collapse on a wrong answer is exactly the failure
+    on-policy DPO can't repair. It also gets its own line, so a confident-and-right collapse shows
+    as such.
+- **Pairable fraction** (`data/scripts/dpo_probe.py`, per format): prompts whose four samples hold
+  at least one chosen and one rejected under the Stage 4 scorer.
+  - **Scorers:**
+    - closed-book: the verifier (`sft_judge.same_fact` on the gold);
+    - abstain: the verifier (declines vs answers);
+    - grounded and definition: A5 judge margin >= 2 (`sft_judge.judge`, max − min score).
+  - **It doesn't gate; it sets the sampling budget.** Below half on any non-abstain format, that
+    format is sampled 8 per prompt instead of raising the temperature further.
+  - **Abstain pairs** form only when a sample hallucinates, which at 0.053 makes them thin. That is
+    accepted: SFT already meets the abstain targets.
+- **Dry run of both scorers** (stand-in: sft-from-cpt's eos samples, 4 prompts per format x 4 at
+  T 0.8; indicative only):
+  - **Collapse:** 0 of 16 non-abstain prompts. The teacher-style collapse risk looks not live;
+    tomorrow's probe at 0.7 confirms it or not.
+  - **Pairable:**
+    - closed-book: 3 of 4;
+    - abstain: 0 of 4 (all refused);
+    - **grounded: 0 of 4, every one of 16 samples judged 5.0;**
+    - **definition: 0 of 4, margins 0.6-1.6.**
+  - **Reading:** the A5 judge saturates at its ceiling on grounded and nearly so on definition. So
+    under margin >= 2 those formats yield almost no pairs, and 8 samples per prompt doesn't move a
+    ceiling.
+  - **Not acted on.** It is a 4-prompt stand-in, and it bears directly on the open Stage 4 item:
+    the preference judge's benchmark (the audit's labelled records, three judge prompts) comes
+    before any pair is labelled.

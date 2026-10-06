@@ -2,6 +2,7 @@
 
   .venv/bin/python eval/diversity.py build        # -> eval/diversity_prompts.jsonl (once; committed)
   .venv/bin/python eval/diversity.py score <run>  # samples -> results/diversity/<run>.json
+  .venv/bin/python eval/diversity.py collapse <run>  # dpo_probe samples -> results/diversity/<run>_collapse.json
 
 The prompts (100): 50 general instructions held out from the Tulu 3 SFT mixture (the replay
 source: same eligibility as data/scripts/sft_replay.py, none of the 500 replay rows, none of the
@@ -130,11 +131,94 @@ def score(run: str) -> None:
     print(json.dumps(res, indent=2))
 
 
+COLLAPSE_OVERLAP, COLLAPSE_STOP = 0.9, 0.25
+
+
+def overlap(a: list[int], b: list[int]) -> float:
+    """Token overlap of two samples: the multiset intersection of their token ids over the longer
+    one's length (1.0 = the same tokens, order aside)."""
+    if not a and not b:
+        return 1.0
+    ca, cb = Counter(a), Counter(b)
+    return sum((ca & cb).values()) / max(len(a), len(b))
+
+
+def collapse(run: str) -> None:
+    """Stage 4's pre-pairing check (stop rule fixed 2026-10-06, before sampling): per prompt of the
+    dpo_probe job, whether all 4 samples are near-duplicates (every pairwise token overlap above
+    0.9), and the distinct-4 of the 4 samples pooled. Stop if more than a quarter of the
+    non-abstain prompts collapse: temperature 1.0 and the system-prompt variants before any pair is
+    built. Abstain prompts are out of the share (their correct answer is one fixed sentence, so
+    collapse there is the model being right: a data-yield fact, not narrowness) and reported on
+    their own line; closed-book stays in the share (a collapse on a wrong answer is the failure
+    on-policy DPO can't repair) and is also reported on its own line."""
+    from itertools import combinations
+
+    rows = [
+        json.loads(line) for line in (REPO / f"results/runs/{run}/samples/dpo_probe.jsonl").open()
+    ]
+    per = []
+    for r in rows:
+        toks = [
+            s["token_ids"][:-1] if s["finish_reason"] == "stop" else s["token_ids"]
+            for s in r["samples"]
+        ]
+        pairs = [overlap(a, b) for a, b in combinations(toks, 2)]
+        grams, total = set(), 0
+        for t in toks:
+            for i in range(len(t) - 3):
+                grams.add(tuple(t[i : i + 4]))
+                total += 1
+        per.append(
+            {
+                "id": r["id"],
+                "format": r["format"],
+                "min_pair_overlap": round(min(pairs), 4),
+                "collapsed": all(x > COLLAPSE_OVERLAP for x in pairs),
+                "distinct_4": round(len(grams) / total, 4) if total else None,
+                "mean_len": round(sum(map(len, toks)) / len(toks), 1),
+            }
+        )
+
+    def summary(sel: list[dict]) -> dict:
+        d4 = [x["distinct_4"] for x in sel if x["distinct_4"] is not None]
+        return {
+            "prompts": len(sel),
+            "collapsed": sum(x["collapsed"] for x in sel),
+            "collapsed_share": round(sum(x["collapsed"] for x in sel) / len(sel), 4)
+            if sel
+            else None,
+            "mean_distinct_4": round(sum(d4) / len(d4), 4) if d4 else None,
+            "prompts_without_4grams": len(sel) - len(d4),
+            "mean_len": round(sum(x["mean_len"] for x in sel) / len(sel), 1) if sel else None,
+        }
+
+    gating = [x for x in per if x["format"] != "abstain"]
+    res = {
+        "run": run,
+        "rule": f"collapsed = every pairwise token overlap > {COLLAPSE_OVERLAP}; stop if the "
+        f"collapsed share of non-abstain prompts > {COLLAPSE_STOP}",
+        "non_abstain": summary(gating),
+        "all": summary(per),
+        "by_format": {
+            f: summary([x for x in per if x["format"] == f])
+            for f in sorted({x["format"] for x in per})
+        },
+        "per_prompt": per,
+    }
+    res["stop"] = res["non_abstain"]["collapsed_share"] > COLLAPSE_STOP
+    out = REPO / "results/diversity" / f"{run}_collapse.json"
+    out.write_text(json.dumps(res, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in res.items() if k != "per_prompt"}, indent=2))
+
+
 def main() -> None:
     if sys.argv[1:2] == ["build"]:
         build()
     elif sys.argv[1:2] == ["score"] and len(sys.argv) == 3:
         score(sys.argv[2])
+    elif sys.argv[1:2] == ["collapse"] and len(sys.argv) == 3:
+        collapse(sys.argv[2])
     else:
         raise SystemExit(__doc__)
 

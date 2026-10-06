@@ -764,8 +764,8 @@ Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in na
 
 ##### B7's first line: what CPT bought, measured after SFT
 
-- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
-- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT run on one side of every base run, an ordering with exact permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT run on one side of every base run, an ordering with exact permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
 
 ##### Checks
 
@@ -813,20 +813,28 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
    - Grounded accuracy matches Instruct (90.7% vs 89.8%).
 4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
-5. **CPT's contribution survives SFT, on a noise floor measured on both arms.**
-   - **The comparison:** on the unseen half, the two runs from the CPT checkpoint give the gold
-     answer +0.464 nats more log-probability than the two runs from the base, averaged over each
-     arm. The per-item CI is [+0.276, +0.660], and 68% of items are up.
-   - **Against run variance:** the floor estimated from both arms' seed gaps (0.258 and 0.039) is
-     0.130, so the difference is 3.6 run SD.
-   - **The floor is itself uncertain,** since each arm's SD rests on one pair. Taking the CPT arm's
-     larger gap for both arms still leaves 2.5 SD.
-   - **Single-run pairs:** all four CPT-minus-base pairs are positive, +0.32 to +0.61.
-   - **What the CI covers:** it conditions on these four training runs; run variance enters through
-     the floor.
-   - **How the read moved:** with one seed per arm it was 1.4 SD on a floor from the CPT arm alone.
-     The base arm's twin, run to settle it, widened the margin.
-   - **The seen half agrees** (+0.33 nats, 2.3 run SD).
+5. **CPT's contribution survives SFT.**
+   - **The rule:** it passes the pre-registered rule.
+   - **Consistency:** it holds in all four pairings of a CPT-start run with a base-start run, and
+     on both halves.
+   - **The per-item CI:** [+0.276, +0.660] nats per answer on the unseen half.
+   - **The run-variance estimate rests on one seed pair per arm,** so the SD multiple is indicative.
+     A third seed per arm is what would turn it into a test.
+
+   | unseen-half `gold_lp`, CPT arm − base arm (2 seeds each) | value |
+   |---|---|
+   | difference of arm means (nats per answer) | +0.464 |
+   | per-item 95% CI | [+0.276, +0.660], 68% of items up |
+   | the four single-run pairs | +0.355, +0.315, +0.612, +0.573 |
+   | run-variance floor from both seed gaps (0.258, 0.039) | 0.130, so 3.6 SD |
+   | the same with the CPT arm's gap on both arms | 0.182, so 2.5 SD |
+   | seen half, difference of arm means | +0.332 (2.3 SD) |
+
+   - **The SD multiples aren't sigmas.** They rest on 1 degree of freedom per arm, so read them as
+     indicative, not as a p-value.
+   - **The robust statement is the rank one.** Every CPT run beats every base run, and the smallest
+     of the four pair differences (+0.32) exceeds the CPT arm's own seed gap (0.258). With 2 runs
+     per arm, that ordering has an exact permutation probability of 1 in 6.
    - **Pass/fail:** unseen qa_acc is 13.2% against 10.3% between the arm means, inside the binomial
      noise: reported, not argued. The effect lives in the probabilities, as Stage 2's did.
 
