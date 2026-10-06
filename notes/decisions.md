@@ -3102,3 +3102,50 @@ version of the same base (model card: "instruct post-trained version", 256k cont
 - So instruct-8b was scored on the template the eval renders (the SFT models' training format), not
   the one Mistral ships. Its default system prompt might shift its refusal and citation behaviour;
   that wasn't measured.
+
+## 2026-10-06: Corrections from the doc review (/code-review); probe scorer fixed before any probe sampling
+**Stage 3 read, corrected:**
+- **Scorecard.** "Hallucination at or under Instruct" was never a B7 target. B7 listed Instruct's
+  0.013 as a reference, and its abstain target (halluc_rate < 0.20) passes.
+  - So every B7 target passes. The entry above saying "every target passes but one" is corrected
+    here.
+  - The README now shows hallucination against Instruct as not a target (4 of 76 vs 1, inside the
+    seed spread), and marks stopping and latency as B5/B6 checks.
+- **The guard row** now reads as pre-registered: no half below its start by more than the noise.
+  The base arm's unseen half (0.110 / 0.097 against 0.116) is below its start but inside the noise.
+- **Grounded after SFT is 0.90-0.94, not 0.91-0.94.** sft-from-base-seed1 scored 0.898, level with
+  Instruct. This corrects the "six additions" entry above.
+- **The instruct bar does not have "the same weights".** It shares the architecture, size,
+  tokenizer and vision tower and starts from the same base; its weights differ by Mistral's
+  post-training. This corrects the instruct-bar entry above.
+- **The ordering statement is one-sided:** "every CPT-arm run above every base-arm run", 1 in
+  C(4,2) = 6. `report.py` printed "on one side of" (two-sided, which would be 1 in 3) with 1 in 6;
+  it now prints the side and computes C(n_cpt + n_base, n_cpt).
+- **Stage 4's sampling temperature.** The Stage 3 read's "sample at T >= 0.8 rather than 0.7" is
+  superseded by the probe rule: the pool is sampled at T 0.7 unless the probe stops, then 1.0 with
+  the system-prompt variants. Pairable fraction sets the samples per prompt.
+
+**Probe scorer (`data/scripts/dpo_probe.py`), implementation fixed before any `dpo_probe` sampling,
+so the rule stays pre-registered:**
+- **Failed judge calls** were scored 1.0, which could make a fake pair against a 5.0 sibling. They
+  are now left out, a prompt with fewer than 2 scored samples isn't counted, and failures are
+  reported.
+- **Hard rules:** a sample failing one now scores the floor (1.0) for the margin, as the A5 judge's
+  own keep rule requires both. Before, `score` ignored hard rules.
+- **The abstain verifier** is now the SFT builder's (`sft_judge.verify`): cites a passage or runs
+  past 12 words = answered, otherwise declined, whatever the wording. Before, a paraphrased refusal
+  counted as an answer.
+- **`relabel`** now replaces every chunk id (multi-id brackets, made-up ids, the prompt's
+  `[doc:p12:c0]` example), so none reaches a judge prompt or the SFT builder's cache
+  (`tests/test_sft_data.py` passes).
+- **The dry run** on the stand-in gives the same per-format result with the fixes: closed-book 3/4,
+  grounded and definition 0/4 (hard rules all passed, so the judge's ceiling is the reason),
+  abstain 0/4.
+
+**Docs:**
+- **README:** the Quickstart shows SFT as wired, with the Stage 3 chain command. Lines still on v2
+  now say v3 or point to `table_v2.md`. "All three runs" is now four, and the SD multiples carry
+  the 1-df caveat everywhere.
+- **CLAUDE.md:** the probe commands, `--merge-from b4`, and rule 10 updated. Chat-template work is
+  done, the Stage 4 pool and probe are authorised, DPO labelling waits for the judge benchmark, and
+  GRPO data waits for the Stage 5 plan.

@@ -881,16 +881,25 @@ def b7_first_line() -> str:
             floor = max(run_sd, c["se"])
             label = "mean of 2 CPT-arm runs - mean of 2 base-arm runs"
             pairs = [m[x][key] - m[y][key] for x in cpt for y in base]
-            ranked = all(d > 0 for d in pairs) or all(d < 0 for d in pairs)
+            # one-sided: the chance that a random split of the runs puts every CPT-arm run above
+            # (or below) every base-arm run is 1 / C(n_cpt + n_base, n_cpt)
+            side = (
+                "above"
+                if all(d > 0 for d in pairs)
+                else "below"
+                if all(d < 0 for d in pairs)
+                else ""
+            )
+            odds = math.comb(len(cpt) + len(base), len(cpt))
             detail = (
                 f"run-variance SD {run_sd:.3f} from seed gaps {gap_c:.3f} (CPT arm) and "
                 f"{gap_b:.3f} (base arm), paired SE {c['se']:.3f}; the difference is "
                 f"{c['mean'] / run_sd:.1f} run SD, indicative only: each arm's SD rests on one "
                 f"seed pair (1 df). Single-run pairs {', '.join(f'{d:+.3f}' for d in pairs)}"
                 + (
-                    f"; every CPT run on one side of every base run, an ordering with exact "
-                    f"permutation probability 1 in {math.comb(4, 2)}"
-                    if ranked
+                    f"; every CPT-arm run {side} every base-arm run, an ordering with exact "
+                    f"one-sided permutation probability 1 in {odds}"
+                    if side
                     else ""
                 )
             )

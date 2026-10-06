@@ -9,9 +9,13 @@ prompts of data/dpo/prompts.jsonl x 4 samples at temperature 0.7). A prompt is p
 samples hold at least one chosen and one rejected under the Stage 4 scorer (decided 2026-10-06,
 before sampling; notes/decisions.md):
   closed_book   verifier: the answer line states the record's gold fact (sft_judge.same_fact)
-  abstain       verifier: chosen declines (the abstain sentence, nothing cited), rejected answers
+  abstain       verifier, as the SFT builder's (sft_judge.verify): a sample answered if it cites a
+                passage or runs past 12 words; otherwise it declined (chosen), whatever its wording
   grounded,     the A5 judge (sft_judge.judge: Mistral Large 3, the format's ch. 12 rubric, the
-  definition    gold fact as a hard rule) scores each sample; pairable if max - min >= 2
+  definition    gold fact as a hard rule) scores each sample; a sample failing a hard rule counts
+                at the floor (1.0), as the judge's own keep rule requires both. Pairable if max -
+                min >= 2. A failed judge call is left out, never scored; a prompt with fewer than
+                2 scored samples is not counted
   replay        no scorer yet: counted, not scored
 Pairable fraction doesn't gate: below half on a non-abstain format, that format is sampled 8 per
 prompt instead of raising temperature further. The judge is the SFT builder's, not benchmarked for
@@ -26,23 +30,26 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from sft_common import pmap, read_jsonl, set_rpm
+from sft_common import pmap, read_jsonl, report_failures, set_rpm
 from sft_judge import judge, same_fact
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
-from prompts import ABSTAIN_PHRASE
-from scorers import abstained, answer_line, citations
+from scorers import answer_line, citations
 
 REPO = Path(__file__).resolve().parents[2]
 WORK = REPO / "data/sft/work/judged.jsonl"
 MARGIN = 2.0
-CITE = re.compile(r"\[([^\[\]]+:p\d+:c\d+)\]")
+CHUNK_ID = re.compile(r"[\w.-]+:p\d+:c\d+\b")  # tests/test_sft_data.py's pattern
+FLOOR = 1.0
 
 
 def relabel(text: str, passages: list[dict]) -> str:
-    """The model cites chunk ids (the prompt shows them); the judge and verifier read [P1]-[P4]."""
+    """The model cites chunk ids (the prompt shows them); the judge and verifier read [P1]-[P4].
+    Every chunk id goes: one of the record's passages becomes its label, any other id (a made-up
+    one, the prompt's [doc:p12:c0] example) becomes "unknown", so no chunk id reaches a judge
+    prompt or the SFT builder's call cache (test_generator_prompts_clean)."""
     label = {p["chunk_id"]: p["label"] for p in passages}
-    return CITE.sub(lambda m: f"[{label.get(m[1], m[1])}]", text)
+    return CHUNK_ID.sub(lambda m: label.get(m[0], "unknown"), text)
 
 
 def verdicts(row: dict, rec: dict) -> dict:
@@ -53,18 +60,22 @@ def verdicts(row: dict, rec: dict) -> dict:
         ok = [same_fact(answer_line(t) or t, rec["gold"], rec["kind"]) for t in texts]
         return {"scorer": "verifier", "chosen": ok, "pairable": any(ok) and not all(ok)}
     if fmt == "abstain":
-        ok = [abstained(t, ABSTAIN_PHRASE) and not citations(t) for t in texts]
+        ok = [not (citations(t) or len(t.split()) > 12) for t in texts]
         return {"scorer": "verifier", "chosen": ok, "pairable": any(ok) and not all(ok)}
     if fmt in ("grounded", "definition"):
         items = [{**rec, "answer": relabel(t, rec.get("passages") or [])} for t in texts]
+        assert not any(CHUNK_ID.search(i["answer"]) for i in items)
         judged = pmap(judge, items)
-        scores = [j["score"] for j in judged]
+        scored = [j for j in judged if not j["failed_call"]]
+        eff = [j["score"] if all(j["hard"].values()) else FLOOR for j in scored]
         return {
             "scorer": "judge",
-            "scores": scores,
-            "hard_pass": [all(j["hard"].values()) for j in judged],
-            "margin": round(max(scores) - min(scores), 2),
-            "pairable": max(scores) - min(scores) >= MARGIN,
+            "scores": [j["score"] for j in scored],
+            "hard_pass": [all(j["hard"].values()) for j in scored],
+            "effective": eff,
+            "failed_calls": len(judged) - len(scored),
+            "margin": round(max(eff) - min(eff), 2) if len(eff) >= 2 else None,
+            "pairable": max(eff) - min(eff) >= MARGIN if len(eff) >= 2 else None,
         }
     return {"scorer": None, "pairable": None}
 
@@ -112,8 +123,10 @@ def main() -> None:
         "scorers": dict(Counter(x["scorer"] for x in per)),
         "per_prompt": per,
     }
+    res["failed_judge_calls"] = sum(x.get("failed_calls", 0) for x in per)
     out = REPO / "results/diversity" / f"{run}_pairable.json"
     out.write_text(json.dumps(res, indent=2) + "\n")
+    report_failures()
     print(json.dumps({k: v for k, v in res.items() if k != "per_prompt"}, indent=2))
 
 

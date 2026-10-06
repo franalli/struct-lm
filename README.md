@@ -56,7 +56,7 @@ the first two rows.
 
 | # | What it measures | Task | Metrics |
 |---|---|---|---|
-| 1 | Closed-book domain knowledge | 325 questions with exact or numeric answers from the corpus (130 until 2026-10-04) | `qa_acc`, by answer kind (`qa_num` / `qa_ident` / `qa_term`) and by SFT half (`qa_seen` / `qa_unseen`), plus the gold answer's log-probability (`gold_lp`) |
+| 1 | Closed-book domain knowledge | 322 questions with exact or numeric answers from the corpus (eval v3 from Stage 3; 325 in v2, 130 until 2026-10-04) | `qa_acc`, by answer kind (`qa_num` / `qa_ident` / `qa_term`) and by SFT half (`qa_seen` / `qa_unseen`), plus the gold answer's log-probability (`gold_lp`) |
 | 2 | Answering from given passages, with citations | 108 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
 | 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
 | 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
@@ -76,8 +76,9 @@ the exact refusal phrase) decided by rule first.
 
 ### Where it starts
 
-Row zero, from [`results/table.md`](results/table.md) (eval v2, 4 October 2026; the original
-130-item scores are in [`results/table_v1.md`](results/table_v1.md)):
+Row zero, from [`results/table_v2.md`](results/table_v2.md) (eval v2, 4 October 2026; the original
+130-item scores are in [`results/table_v1.md`](results/table_v1.md), and every row is rescored on
+v3's 322 items in [`results/table.md`](results/table.md)):
 
 - **The base model** finds the right answer in the passages 85% of the time but cites correctly only
   10% of the time, and answers 88% of unanswerable questions with something invented.
@@ -91,9 +92,10 @@ Row zero, from [`results/table.md`](results/table.md) (eval v2, 4 October 2026; 
 
 **Why the instruct model is the bar.** `Ministral-3-8B-Instruct-2512` (the BF16 HF checkpoint) is
 Mistral's own instruct post-trained version of the base trained on here (model card).
-- **Same model:** the same 8B dense weights and architecture, the same Tekken tokenizer and the same
-  vision tower. Every difference between it and the SFT runs comes from post-training data and
-  method, not model size.
+- **Same model, different post-training:** the same 8B dense architecture, Tekken tokenizer and
+  vision tower, starting from the same base. Its weights differ by Mistral's post-training, as the
+  SFT runs' differ by this repo's. So every difference between them comes from post-training data
+  and method, not model size.
 - **The business claim:** it is what a client would deploy off the shelf. So beating it is "an 8B
   tuned on your corpus beats the stock 8B on your questions".
 
@@ -208,7 +210,16 @@ $M run --detach train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 
 .venv/bin/python train/report.py   # results/train_runs.md, results/curves/*.png, README blocks
 ```
 
-SFT, DPO and GRPO (`train/sft.py`, `dpo.py`, `grpo.py`) are not wired into the Modal app yet.
+SFT is wired (a config with `stage: sft`; `train/sft.py`, pre-tokenised by `train/sft_data.py`).
+DPO and GRPO (`dpo.py`, `grpo.py`) are not wired into the Modal app yet.
+
+```bash
+# Stage 3: SFT (the set must match data/sft/SHA256SUMS on the volume), B4 and the merge gate run in
+# the chain; chat checkpoints are evaluated with --chat
+for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
+$M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt \
+  --merge-from b4 --chat --steps train,merge,mergecheck,ppl,eval,latency,sample
+```
 
 ### Evaluate (repeat per stage, including the base and instruct baselines)
 
@@ -630,7 +641,7 @@ and it needs repetition or augmentation to stick.
    _Re-read after Stage 3:_ the grounded cost was real and the citation one formatting.
    - **Grounded:** replay10's grounded_acc (0.843 → 0.778) is 1.8x the 3.7-point noise. Raw-text CPT
      eroding few-shot instruction behaviour is a known cost, and this is a clean instance of it.
-   - **Both are repairable:** SFT took both arms to grounded 0.91-0.94 and cite_valid 0.98-1.00.
+   - **Both are repairable:** SFT took both arms to grounded 0.90-0.94 and cite_valid 0.98-1.00.
 6. **C: two GPUs reproduce one-GPU training step for step, at 2.23x the tokens/s.** Per-step loss
    is within 0.04% (median), and both runs see the same batches. Per GPU that is 6,610 against
    5,939 tokens/s (+11%).
@@ -790,8 +801,8 @@ Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in na
 
 ##### B7's first line: what CPT bought, measured after SFT
 
-- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT run on one side of every base run, an ordering with exact permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
-- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT run on one side of every base run, an ordering with exact permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
 
 ##### Checks
 
@@ -843,7 +854,8 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - Raw-text CPT cost few-shot passage reading: grounded_acc went from 0.843 for the base to 0.778
      for `cpt-8b-replay10`, 1.8x the 3.7-point noise. Eroded instruction behaviour is a known cost
      of continued pre-training.
-   - SFT took both arms to 0.91-0.94, so the cost didn't carry into the chain.
+   - SFT took both arms to 0.90-0.94 (one run, sft-from-base-seed1, at 0.898, level with
+     Instruct), so the cost didn't carry into the chain.
 6. **CPT's contribution survives SFT.**
    - **The rule:** it passes the pre-registered rule.
    - **Consistency:** it holds in all four pairings of a CPT-start run with a base-start run, and
@@ -934,19 +946,20 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - **sft-from-base-seed1's merge** passed the amended gate at its line: exactly 11 added flips of 11
      allowed, with log-prob error 0.98x and val loss within 0.02%.
 
-**Scored against its pre-registered targets:** one miss, by a few items.
+**Scored against its pre-registered targets:** every B7 target passes. Two rows below aren't B7
+targets and are marked as such.
 
-| target (B7, fixed before training) | result | verdict |
+| target (B7, fixed before training, unless marked) | result | verdict |
 |---|---|---|
 | CPT's advantage survives SFT (unseen `gold_lp` beyond the floor) | +0.46 nats, all four pairings positive | pass; the SD multiple rests on one seed pair per arm |
 | beat Instruct on identifiers | 0.203 vs 0.031 | pass |
 | beat Instruct on vocab | 0.833 vs 0.786 | pass, narrowly (1.5x the noise) |
 | match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation |
-| guards: no half below its start; MMLU and GSM8K within noise | all four runs | pass |
+| guards: no half below its start by more than the noise; MMLU and GSM8K within noise + 1 point | all four runs (the base arm's unseen half is 0.110 / 0.097 against its start's 0.116, inside the noise) | pass |
 | abstain: > 80% on unanswerable, < 5% false refusals | 94.7%; 0% | pass |
 | diversity within 10% of Instruct | distinct-4 −4.7%, entropy −8.0% | pass, length-confounded |
-| stops before the cap; latency | 100%; 159 ms vs 1,753 ms | pass |
-| hallucination at or under Instruct | 4 of 76 vs 1 of 76 | miss, inside the run-to-run spread (the seed twin has 1 of 76) |
+| stops before the cap; latency (B5/B6 checks, not B7) | 100%; 159 ms vs 1,753 ms | pass |
+| hallucination against Instruct (not a target: B7 listed Instruct's 0.013 as a reference, and its abstain target is above) | 4 of 76 vs 1 of 76 | worse, inside the run-to-run spread (the seed twin has 1 of 76) |
 
 **What SFT did, and what it didn't.** SFT did its job, behaviour and the facts it was shown, and
 it did not erase CPT's knowledge. It did not generalise to unseen facts, which was never a
@@ -993,8 +1006,9 @@ target.
    - Per-record or per-format weighting, or a replay token cap, decided with the data, would have
      aimed the gradient at the facts.
 2. **Give both arms of the control a seed twin from the start.** "What CPT bought" was first read
-   against a noise floor from one arm, at 1.4 SD. The base arm's twin (0.5 GPU-h) put it at 3.6 SD;
-   it should have been in the plan, not added after the read.
+   against a noise floor from one arm, at 1.4 SD. The base arm's twin (0.5 GPU-h) put it at an
+   indicative 3.6 SD (one seed pair per arm). It should have been in the plan, not added after the
+   read.
 3. **Size a gate's sample for its threshold, and reference it to the exact function.**
    - A 99% agreement line on 295 positions is two flips from failing.
    - Comparing two bf16 models measures bf16's own near-tie noise.
@@ -1002,7 +1016,7 @@ target.
      from the start.
 4. **Pre-register sanity bands per format.** A mixture's token mean hides the formats that matter,
    and the step-1 band failed for that reason, not for a bug.
-5. **Find the minimum, don't bracket it.** All three runs overfit in epoch 2. An eval every ~15
+5. **Find the minimum, don't bracket it.** All four runs overfit in epoch 2. An eval every ~15
    steps on the recall formats would locate the best step, rather than choosing between two epoch
    ends.
 
@@ -1026,7 +1040,7 @@ passage in the prompt.
 - **The gap is the point.** With passages from the same documents in the prompt (the grounded
   task), the base model answers 84% correctly; closed-book, 12%. That gap is the knowledge the
   documents hold and the model doesn't, and these columns measure what training does to it.
-- **For scale:** Mistral Large 3 answers 28% of the same 325 questions closed-book (row
+- **For scale:** Mistral Large 3 answers 28% of the same 322 questions closed-book (row
   `mistral-large-3`, through the API, closed-book only): 45% of identifiers, 25% of values and 18%
   of terms. On SimpleQA, whose facts are far more common, frontier models score 30-40%.
 - **The scores are knowledge, not scoring:** a hand audit of 169 wrong answers found 2 scoring
@@ -1044,7 +1058,7 @@ passage in the prompt.
     seen, so the two halves (167 and 155 QA items) are a null check.
   - `false_abstain` is the share of grounded answers that use the abstain phrase although the
     passages hold the answer: the cost side of a low `halluc_rate`.
-  - `cpt-8b-full` and the Stage 0 `base-8b` have no QA scores on v2. Full's weights were deleted
+  - `cpt-8b-full` and the Stage 0 `base-8b` have no QA scores on v2 or v3. Full's weights were deleted
     before the task grew, and `base-8b-hf` supersedes the Stage 0 row.
 - **Gold-answer log-probability** (`gold_lp`, nats per answer, higher is better,
   `eval/gold_lp.py`) is the continuous companion to `qa_acc` on the same items. Instruct and the
@@ -1122,9 +1136,11 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 - **Attribution:** SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
   knowledge. It did not generalise to unseen facts, which was never a target; only more varied CPT
   exposure acts on those.
-- **CPT's contribution survives SFT:** unseen-half `gold_lp` is +0.46 nats over the SFT-only
-  control (arm means of two seeds each), 3.6 SD of run variance measured on both arms. Pass/fail
-  closed-book accuracy doesn't resolve it.
+- **CPT's contribution survives SFT:**
+  - unseen-half `gold_lp` is +0.46 nats over the SFT-only control (arm means of two seeds each);
+  - every CPT-arm run is above every base-arm run (1 in 6 by permutation);
+  - the 3.6 SD multiple is indicative, since each arm's run variance rests on one seed pair;
+  - pass/fail closed-book accuracy doesn't resolve it.
 - **Going forward:** `sft-from-cpt` (epoch 1) is the Stage 3 checkpoint; `train/configs/dpo.yaml`
   starts from it.
 

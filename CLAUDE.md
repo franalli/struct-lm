@@ -258,7 +258,7 @@ make sft-data                               # all steps below, in order
 M=.venv/bin/modal
 # data on the volume after any SFT data change (the run refuses files that don't match SHA256SUMS)
 for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
-$M volume put --force struct-lm data/dpo/prompts.jsonl data/dpo/prompts.jsonl   # the eos sample job
+$M volume put --force struct-lm data/dpo/prompts.jsonl data/dpo/prompts.jsonl   # the eos and dpo_probe sample jobs
 # smoke: no-op control, 1 step on 32 records, merge, merge check, vLLM template prompt ids
 $M run train/modal_train.py --config train/configs/sft.yaml --run-name smoke-sft --smoke --chat \
   --steps noop,train,merge,mergecheck,sample --sample-jobs template
@@ -272,6 +272,10 @@ $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name 
   --overrides "training.seed=1 training.data_seed=1"
 $M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-77 --chat \
   --steps merge,mergecheck,ppl,eval,latency,sample      # checkpoint-N: the epoch B4 picked
+# or one unattended chain: --merge-from b4 applies B4 to the run's own loss curve after training
+# (results/runs/<run>/b4.json, written before the merge)
+$M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name <run> \
+  --merge-from b4 --chat --steps train,merge,mergecheck,ppl,eval,latency,sample
 $M run train/modal_train.py::digest --run-name sft-from-cpt   # CPU: checkpoint sha256, after the evals too
 $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8B-Instruct-2512-BF16 \
   --run-name instruct-8b --chat --sample-jobs diversity --config-format auto
@@ -280,6 +284,29 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
   --ppl-dir results/ppl --model /vol/checkpoints/sft-from-cpt
 .venv/bin/python eval/diversity.py score sft-from-cpt     # -> results/diversity/<run>.json
 ```
+
+### Stage 4: pre-pairing probe (rules fixed 2026-10-06, before sampling)
+
+```bash
+# 20 prompts of data/dpo/prompts.jsonl (the first, in file order) x 4 samples at T 0.7
+$M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/sft-from-cpt \
+  --run-name sft-from-cpt --chat --sample-jobs dpo_probe
+$M volume get --force struct-lm results/runs/sft-from-cpt/samples results/runs/sft-from-cpt/
+.venv/bin/python eval/diversity.py collapse sft-from-cpt   # stop rule: > 1/4 of non-abstain prompts collapsed
+set -a; . ./.env; set +a                                    # the A5 judge, paced at 30 a minute
+.venv/bin/python data/scripts/dpo_probe.py sft-from-cpt    # pairable fraction per format (sets the budget)
+```
+
+- **Stop rule:** a prompt collapses when all 6 pairwise token overlaps are above 0.9. Abstain is
+  out of the share and closed-book in it, both on their own lines. On a stop, temperature 1.0 and
+  the system-prompt variants before any pair is built.
+- **Pairable fraction:** at least one chosen and one rejected of 4.
+  - **Scorers:** the verifier for closed-book (`sft_judge.same_fact`) and abstain (cites or runs
+    past 12 words = answered); the A5 judge margin >= 2 for grounded and definition (a hard-rule
+    failure scores the floor, failed calls are left out).
+  - **It sets the budget:** below half on a non-abstain format, that format gets 8 samples.
+- **Reads the gitignored `data/sft/work/judged.jsonl`** (the builder's records, for gold and
+  passages). Its judge prompts go to the SFT builder's cache, so `relabel` strips every chunk id.
 
 - `train/sft.py` trains on pre-tokenised records (`train/sft_data.py`: mistral-common, the eval's
   `--chat` rendering, `completion_mask`); `tests/test_template.py` is the gate on those tensors.
@@ -358,8 +385,11 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
     `eval_chunk_ids.txt`, and never reuses an eval question. Enforced by `data/scripts/sft_guard.py`
     (the SFT builder's only reader of `eval/tasks/`, never imported by a step that calls the LLM),
     which also keeps out every chunk on or next to an unseen eval chunk's page, and checked by
-    `tests/test_sft_data.py` and `contamination.py --only sft`. DPO/GRPO data and chat template work
-    are deferred until the user asks.
+    `tests/test_sft_data.py` and `contamination.py --only sft`. The chat template work is done
+    (Stage 3: `train/sft_data.py`, `tests/test_template.py`). Stage 4's prompt pool
+    (`data/dpo/prompts.jsonl`) and its pre-pairing probe are authorised (2026-10-06). DPO pair
+    labelling waits for the preference judge's benchmark, and GRPO data for the Stage 5 task-set
+    plan.
 11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
     reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
     GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
