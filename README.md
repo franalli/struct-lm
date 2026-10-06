@@ -605,6 +605,11 @@ and it needs repetition or augmentation to stick.
    cite_valid points it "cost" are probably not a real cost:
    - they measure a base model's citation formatting, which SFT overwrites completely;
    - one seed alone moved grounded accuracy by 4.6 points.
+
+   _Re-read after Stage 3:_ the grounded cost was real and the citation one formatting.
+   - **Grounded:** replay10's grounded_acc (0.843 → 0.778) is 1.8x the 3.7-point noise. Raw-text CPT
+     eroding few-shot instruction behaviour is a known cost, and this is a clean instance of it.
+   - **Both are repairable:** SFT took both arms to grounded 0.91-0.94 and cite_valid 0.98-1.00.
 6. **C: two GPUs reproduce one-GPU training step for step, at 2.23x the tokens/s.** Per-step loss
    is within 0.04% (median), and both runs see the same batches. Per GPU that is 6,610 against
    5,939 tokens/s (+11%).
@@ -797,7 +802,7 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 <!-- stage3-tables:end -->
 
 **What holds.**
-1. **At 2,436 records, the recall formats overfit in the second epoch, in all three runs.**
+1. **At 2,436 records, the recall formats overfit in the second epoch, in all four runs.**
    - Closed-book and definition val loss bottomed at the end of epoch 1 and rose through epoch 2,
      while train loss kept falling: the set was being memorised.
    - The pre-registered rule (amended before training to read those formats, not the mixture mean)
@@ -813,10 +818,18 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
    - Grounded accuracy matches Instruct (90.7% vs 89.8%).
 4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
-5. **CPT's contribution survives SFT.**
+5. **SFT repaired the passage reading that CPT eroded.**
+   - Raw-text CPT cost few-shot passage reading: grounded_acc went from 0.843 for the base to 0.778
+     for `cpt-8b-replay10`, 1.8x the 3.7-point noise. Eroded instruction behaviour is a known cost
+     of continued pre-training.
+   - SFT took both arms to 0.91-0.94, so the cost didn't carry into the chain.
+6. **CPT's contribution survives SFT.**
    - **The rule:** it passes the pre-registered rule.
    - **Consistency:** it holds in all four pairings of a CPT-start run with a base-start run, and
      on both halves.
+   - **The seed-matched pairs are the cleanest comparisons.** Each seed used the same data order and
+     LoRA init in both arms. At seed 0 the difference is +0.355; at seed 1 it is +0.573. The
+     difference of the arm means is +0.464.
    - **The per-item CI:** [+0.276, +0.660] nats per answer on the unseen half.
    - **The run-variance estimate rests on one seed pair per arm,** so the SD multiple is indicative.
      A third seed per arm is what would turn it into a test.
@@ -837,6 +850,23 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
      per arm, that ordering has an exact permutation probability of 1 in 6.
    - **Pass/fail:** unseen qa_acc is 13.2% against 10.3% between the arm means, inside the binomial
      noise: reported, not argued. The effect lives in the probabilities, as Stage 2's did.
+   - **Identifiers are the line that holds across stages.**
+     - Stage 2's CPT moved them most per answer. Per token (+0.127 nats) they were second to terms
+       (+0.147, a wide interval on 38 items); per answer they lead because they are the longest
+       answers.
+     - After SFT, the CPT arm leads the base arm on qa_ident by +8.6 points (0.219 vs 0.133). That
+       is on 64 items, with a standard error of about 5 points per run.
+   - **The design is blocked by seed, and the seed shows.**
+     - Seed 1 beats seed 0 in both arms: on seen `gold_lp` (−5.25 vs −5.41 base, −4.87 vs −5.12
+       CPT), on unseen `gold_lp` (−6.74 vs −6.78, −6.17 vs −6.43), on qa_ident, and on final train
+       loss (0.36 vs 0.43 in both arms).
+     - Hallucinations follow the same line: 5 and 4 at seed 0, 1 and 1 at seed 1.
+     - In a one-epoch run, data order is a hyperparameter, and the "seed gap" here is LoRA init
+       plus data order, inseparable. This is observed, on two blocks; nothing more is claimed.
+   - **What can't be computed here: how much of CPT's own gain survives SFT.** CPT's `gold_lp`
+     (−6.16 unseen) is scored in base format and the SFT rows' in chat format, so the two columns
+     can't be subtracted. The comparison that has a number is the one above: SFT from CPT against
+     SFT from the base, both in chat format.
 
 **What is weaker than a summary would make it.**
 1. **The gain over Instruct on closed-book facts is retention, not capability.** The seen half's
@@ -851,8 +881,13 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    | identifiers, instruct-8b | 2/30 | 0/34 |
    | identifiers, sft-from-cpt | 10/30 | 3/34 (its CPT start: 3/34) |
 
+   - **Terms are 38 items, so read them as counts.** Correct answers are 2 for instruct-8b, base and
+     CPT, 0 and 2 for sft-from-base s0/s1, 1 and 4 for sft-from-cpt s0/s1, and 7 for Large 3. As a
+     rate (0.000-0.105) the column invites a reading it can't support: one item is 2.6 points.
+
    - **Seen half:** a client wants the model to know their documents, and SFT delivers that here,
-     about 2.5x Instruct.
+     about 2.5x Instruct. At 28.1% it matches Mistral Large 3's 27.5% on the same items. These are
+     facts that were in the training set, and Large 3 never saw them.
    - **Unseen half:** 13.5% against Instruct's 8.4% sits inside the noise floor. Every unseen
      identifier it gets right, its CPT start already had.
 2. **Replay carried the gradient.**
@@ -911,7 +946,8 @@ saved generations. The earlier tables are frozen:
   the 130-item set.
 
 Stage 2 rows are base models, scored without `--chat`; Instruct and the SFT rows are chat models,
-scored with it.
+scored with it. `qa_term` covers 38 items (2.6 points each), so read it as counts (Stage 3's
+section gives them).
 
 **Reading the closed-book numbers.** The `qa_*` and `gold_lp` columns ask for facts from specific
 pages of the manuals (a value, a document or article number, a term) with no retrieval and no
@@ -1056,6 +1092,9 @@ tokens max; generated by `train/report.py` from `results/bench/`).
 - **The SFT rows' lower throughput is short answers, not slower decoding.** At 8 and 32 concurrent
   requests, tokens/s counts output tokens. With ~23 tokens per answer, prefill and scheduling take
   a larger share of each request, so the SFT rows produce fewer output tokens per second.
+  - **One cell isn't explained by that:** `sft-from-cpt` at 8 concurrent requests (297 tok/s,
+    against 509-563 for its siblings at the same mean length). Each cell is a single 64-request
+    sample, so read this one as such until it is rerun.
 - _Stage 6 adds the AWQ checkpoint of the SFT'd model: its quality delta against bf16 and its
   latency at 1 and 32 concurrent requests._
 
@@ -1068,6 +1107,10 @@ tokens max; generated by `train/report.py` from `results/bench/`).
   gradient and the closed-book and definition records, the ones the seen half measures, 9%.
   Normalising per record or per format, or capping replay's share, would aim the gradient at the
   domain facts. It wasn't changed for Stage 3, whose set and loss were frozen before training.
+- **Padding-free batches with FlashAttention-2.** SFT trained at about 1.8k tokens/s against
+  Stage 2's 5.9k. That is the cost of no packing: each micro-batch is padded to its longest record,
+  and SDPA computes on the padding. `padding_free` with FA2 (a flash-attn build in the image)
+  recovers it. It belongs with the per-format loss weighting, since both change the batch.
 
 **From Stage 2:**
 - **Split Stage 3's eval into seen and unseen halves.** Report `domain_qa` and `vocab` in two

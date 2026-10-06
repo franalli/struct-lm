@@ -2998,3 +2998,51 @@ convention; the other two criteria (0.98x, 0.02%) say there is no defect. One RE
   - **Not acted on.** It is a 4-prompt stand-in, and it bears directly on the open Stage 4 item:
     the preference judge's benchmark (the audit's labelled records, three judge prompts) comes
     before any pair is labelled.
+
+## 2026-10-06: Six additions to the Stage 3 read (user review); one earlier claim withdrawn
+**1. Blocked by seed.**
+- **The design:** each seed used the same data order and LoRA init in both arms. The seed-matched
+  differences (unseen `gold_lp`) are the cleanest pairs: +0.355 at seed 0, +0.573 at seed 1. They
+  sit in the README's first line next to the arm means (+0.464).
+- **Observed:** seed 1 beats seed 0 in both arms:
+  - seen `gold_lp`: −5.25 vs −5.41 base, −4.87 vs −5.12 CPT;
+  - unseen `gold_lp`: −6.74 vs −6.78, −6.17 vs −6.43;
+  - qa_ident;
+  - final train loss: 0.36 vs 0.43 in both arms;
+  - hallucination counts: 5 and 4 at seed 0, 1 and 1 at seed 1.
+- **Implication:** in a one-epoch run data order is a hyperparameter, and the "seed gap" is init
+  plus order, inseparable here. Observed on two blocks, nothing more.
+
+**2. CPT eroded passage reading; SFT repaired it.**
+- grounded_acc went from 0.843 (base) to 0.778 (`cpt-8b-replay10`), 1.8x the 3.7-point noise:
+  raw-text CPT eroding few-shot instruction behaviour, a known cost.
+- After SFT it is 0.91-0.94 in both arms.
+- The README's Stage 2 findings now carry this re-read. It qualifies item 5's "probably not a real
+  cost": the grounded cost was real; the citation one was formatting.
+
+**3. Identifiers are the consistent line across stages.**
+- **After SFT:** the CPT arm leads the base arm on qa_ident by +8.6 points (0.219 vs 0.133), on 64
+  items with SE about 5 points per run.
+- **In Stage 2, stated accurately from the 2026-10-04 entry:** identifiers moved most per answer
+  (because they are the longest answers). Per token they were second, +0.127 [+0.074, +0.187],
+  behind terms, +0.147 [+0.048, +0.255] on 38 items.
+
+**4. qa_term is 38 items and is shown as counts:** instruct-8b 2, base 2, CPT 2, sft-from-base 0 /
+2, sft-from-cpt 1 / 4, Large 3 7.
+
+**5. The format split caps what can be claimed.**
+- CPT's own `gold_lp` is base format and the SFT rows' chat format, so "how much of CPT's gain
+  survives SFT" has no number here. The README says so.
+- **Withdrawn:** the "+0.67 before SFT, +0.36 after, about half still visible" line in the
+  2026-10-06 Stage 3 read entry above. It subtracted across formats.
+
+**6. Hygiene.**
+- **Throughput anomaly:** sft-from-cpt's 297 tok/s at 8 concurrent requests (siblings 509-563 at the
+  same mean length) isn't explained by answer length. It is footnoted as a single 64-request sample;
+  a rerun is a ~20-minute H100 job, if wanted.
+- **Training throughput:** 1.8k tokens/s against Stage 2's 5.9k is the cost of no packing (batches
+  padded to their longest record, SDPA on the padding). `padding_free` with FlashAttention-2 goes in
+  next steps with the per-format loss weighting.
+
+**Kept:** "matches Large 3 on the seen half" (28.1% vs 27.5%), with its label: facts that were in
+the training set, which Large 3 never saw.
