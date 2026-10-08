@@ -1,0 +1,306 @@
+{
+  "run": "sft-from-cpt",
+  "rule": "pairable = >= 1 chosen and >= 1 rejected of 4 (verifier: closed_book, abstain; rules + listwise judge margin >= 2.0: grounded, definition); doesn't gate; < 0.5 on a non-abstain format -> 8 samples per prompt for it; abstain 8 regardless",
+  "variants": {
+    "grounded": null,
+    "definition": null
+  },
+  "by_format": {
+    "abstain": {
+      "prompts": 2,
+      "scored": 2,
+      "pairable": 0,
+      "pairable_fraction": 0.0
+    },
+    "closed_book": {
+      "prompts": 8,
+      "scored": 8,
+      "pairable": 4,
+      "pairable_fraction": 0.5
+    },
+    "definition": {
+      "prompts": 7,
+      "scored": 7,
+      "pairable": 0,
+      "pairable_fraction": 0.0
+    },
+    "grounded": {
+      "prompts": 3,
+      "scored": 3,
+      "pairable": 0,
+      "pairable_fraction": 0.0
+    }
+  },
+  "samples_per_prompt_8": [
+    "abstain",
+    "definition",
+    "grounded"
+  ],
+  "scorers": {
+    "rules": 10,
+    "verifier": 10
+  },
+  "per_prompt": [
+    {
+      "id": "usace-em-1110-2-1100-app-a:p69:c0:t0:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "nist-gcr-22-917-51:p136:c0:q4:grounded:1",
+      "format": "grounded",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fhwa-sbdh-ex2b:p54:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "pairable": true
+    },
+    {
+      "id": "fhwa-hif19067:p34:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pairable": false
+    },
+    {
+      "id": "fhwa-hif23003:p240:c0:q0:closed_book:2",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pairable": false
+    },
+    {
+      "id": "fema-p-2006:p49:c0:q4:grounded:1",
+      "format": "grounded",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "usace-em-1110-2-1100-app-a:p14:c0:f7:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fema-p-1050-1:p411:c0:q1:abstain:1",
+      "format": "abstain",
+      "scorer": "verifier",
+      "chosen": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "pairable": false
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p454:c1:q0:closed_book:1",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        true,
+        false,
+        true,
+        false
+      ],
+      "pairable": true
+    },
+    {
+      "id": "fema-nehrp-examples-v1:p38:c1:t0:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "nist-gcr-22-917-50:p227:c0:q0:abstain:1",
+      "format": "abstain",
+      "scorer": "verifier",
+      "chosen": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "pairable": false
+    },
+    {
+      "id": "usace-em-1110-2-1003:p382:c1:t0:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "nasa-std-5019a:p85:c0:f7:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fema-p-58-2:p69:c0:t0:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fhwa-sbdh-v19:p34:c0:f10:definition:1",
+      "format": "definition",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fema-p-1024-ra2:p16:c0:f0:closed_book:2",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pairable": false
+    },
+    {
+      "id": "fema-p-232:p111:c0:q0:closed_book:2",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "pairable": true
+    },
+    {
+      "id": "usace-em-1110-2-2902a:p346:c0:q4:grounded:1",
+      "format": "grounded",
+      "scorer": "rules",
+      "effective": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "failed_samples": 0,
+      "margin": 0.0,
+      "pairable": false
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1055:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pairable": false
+    },
+    {
+      "id": "usace-em-1110-2-2400:p33:c0:f3:closed_book:1",
+      "format": "closed_book",
+      "scorer": "verifier",
+      "chosen": [
+        false,
+        true,
+        true,
+        true
+      ],
+      "pairable": true
+    }
+  ],
+  "failed_judge_samples": 0
+}

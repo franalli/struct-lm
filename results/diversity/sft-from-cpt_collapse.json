@@ -1,0 +1,217 @@
+{
+  "run": "sft-from-cpt",
+  "rule": "collapsed = every pairwise token overlap > 0.9; stop if the collapsed share of non-abstain prompts > 0.25",
+  "non_abstain": {
+    "prompts": 18,
+    "collapsed": 0,
+    "collapsed_share": 0.0,
+    "mean_distinct_4": 0.7469,
+    "prompts_without_4grams": 2,
+    "mean_len": 24.7
+  },
+  "all": {
+    "prompts": 20,
+    "collapsed": 2,
+    "collapsed_share": 0.1,
+    "mean_distinct_4": 0.6917,
+    "prompts_without_4grams": 2,
+    "mean_len": 22.8
+  },
+  "by_format": {
+    "abstain": {
+      "prompts": 2,
+      "collapsed": 2,
+      "collapsed_share": 1.0,
+      "mean_distinct_4": 0.25,
+      "prompts_without_4grams": 0,
+      "mean_len": 6.0
+    },
+    "closed_book": {
+      "prompts": 8,
+      "collapsed": 0,
+      "collapsed_share": 0.0,
+      "mean_distinct_4": 0.7992,
+      "prompts_without_4grams": 2,
+      "mean_len": 5.1
+    },
+    "definition": {
+      "prompts": 7,
+      "collapsed": 0,
+      "collapsed_share": 0.0,
+      "mean_distinct_4": 0.8272,
+      "prompts_without_4grams": 0,
+      "mean_len": 22.1
+    },
+    "grounded": {
+      "prompts": 3,
+      "collapsed": 0,
+      "collapsed_share": 0.0,
+      "mean_distinct_4": 0.4552,
+      "prompts_without_4grams": 0,
+      "mean_len": 82.9
+    }
+  },
+  "per_prompt": [
+    {
+      "id": "usace-em-1110-2-1100-app-a:p69:c0:t0:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.2273,
+      "collapsed": false,
+      "distinct_4": 0.9571,
+      "mean_len": 20.5
+    },
+    {
+      "id": "nist-gcr-22-917-51:p136:c0:q4:grounded:1",
+      "format": "grounded",
+      "min_pair_overlap": 0.3828,
+      "collapsed": false,
+      "distinct_4": 0.5879,
+      "mean_len": 102.5
+    },
+    {
+      "id": "fhwa-sbdh-ex2b:p54:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "min_pair_overlap": 0.5,
+      "collapsed": false,
+      "distinct_4": 0.75,
+      "mean_len": 4.0
+    },
+    {
+      "id": "fhwa-hif19067:p34:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "min_pair_overlap": 0.0,
+      "collapsed": false,
+      "distinct_4": 1.0,
+      "mean_len": 4.0
+    },
+    {
+      "id": "fhwa-hif23003:p240:c0:q0:closed_book:2",
+      "format": "closed_book",
+      "min_pair_overlap": 0.0,
+      "collapsed": false,
+      "distinct_4": 1.0,
+      "mean_len": 4.5
+    },
+    {
+      "id": "fema-p-2006:p49:c0:q4:grounded:1",
+      "format": "grounded",
+      "min_pair_overlap": 0.4697,
+      "collapsed": false,
+      "distinct_4": 0.4481,
+      "mean_len": 56.0
+    },
+    {
+      "id": "usace-em-1110-2-1100-app-a:p14:c0:f7:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.381,
+      "collapsed": false,
+      "distinct_4": 0.8116,
+      "mean_len": 20.2
+    },
+    {
+      "id": "fema-p-1050-1:p411:c0:q1:abstain:1",
+      "format": "abstain",
+      "min_pair_overlap": 1.0,
+      "collapsed": true,
+      "distinct_4": 0.25,
+      "mean_len": 6.0
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p454:c1:q0:closed_book:1",
+      "format": "closed_book",
+      "min_pair_overlap": 0.3333,
+      "collapsed": false,
+      "distinct_4": null,
+      "mean_len": 3.0
+    },
+    {
+      "id": "fema-nehrp-examples-v1:p38:c1:t0:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.3548,
+      "collapsed": false,
+      "distinct_4": 0.8842,
+      "mean_len": 26.8
+    },
+    {
+      "id": "nist-gcr-22-917-50:p227:c0:q0:abstain:1",
+      "format": "abstain",
+      "min_pair_overlap": 1.0,
+      "collapsed": true,
+      "distinct_4": 0.25,
+      "mean_len": 6.0
+    },
+    {
+      "id": "usace-em-1110-2-1003:p382:c1:t0:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.2632,
+      "collapsed": false,
+      "distinct_4": 0.9844,
+      "mean_len": 19.0
+    },
+    {
+      "id": "nasa-std-5019a:p85:c0:f7:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.3448,
+      "collapsed": false,
+      "distinct_4": 0.8554,
+      "mean_len": 23.8
+    },
+    {
+      "id": "fema-p-58-2:p69:c0:t0:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.5217,
+      "collapsed": false,
+      "distinct_4": 0.5882,
+      "mean_len": 20.0
+    },
+    {
+      "id": "fhwa-sbdh-v19:p34:c0:f10:definition:1",
+      "format": "definition",
+      "min_pair_overlap": 0.3214,
+      "collapsed": false,
+      "distinct_4": 0.7093,
+      "mean_len": 24.5
+    },
+    {
+      "id": "fema-p-1024-ra2:p16:c0:f0:closed_book:2",
+      "format": "closed_book",
+      "min_pair_overlap": 0.6,
+      "collapsed": false,
+      "distinct_4": 0.5714,
+      "mean_len": 4.8
+    },
+    {
+      "id": "fema-p-232:p111:c0:q0:closed_book:2",
+      "format": "closed_book",
+      "min_pair_overlap": 0.0,
+      "collapsed": false,
+      "distinct_4": null,
+      "mean_len": 3.0
+    },
+    {
+      "id": "usace-em-1110-2-2902a:p346:c0:q4:grounded:1",
+      "format": "grounded",
+      "min_pair_overlap": 0.4148,
+      "collapsed": false,
+      "distinct_4": 0.3295,
+      "mean_len": 90.2
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1055:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "min_pair_overlap": 0.0,
+      "collapsed": false,
+      "distinct_4": 1.0,
+      "mean_len": 4.8
+    },
+    {
+      "id": "usace-em-1110-2-2400:p33:c0:f3:closed_book:1",
+      "format": "closed_book",
+      "min_pair_overlap": 0.4615,
+      "collapsed": false,
+      "distinct_4": 0.4737,
+      "mean_len": 12.5
+    }
+  ],
+  "stop": false
+}

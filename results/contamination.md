@@ -157,3 +157,28 @@ sft_val (80 records, question + completion) vs train: 34 share any 13-gram, 0 ha
 | MMLU (test) | 14042 | 7 | 0 | 0 |
 | GSM8K (test) | 1319 | 0 | 0 | 0 |
 | HellaSwag (val) | 10042 | 0 | 0 | 0 |
+
+## 7. DPO prompt pool and pairs (Stage 4) vs the eval and the benchmarks
+
+`data/dpo/prompts.jsonl` (2,506 prompts) plus the chosen and rejected text of 506 pairs as the reference. Eval chunk ids outside the seen half: 0; prompts copying an eval question (rule 1): 0; definitions of a blocked term: 0. Positive control (20 unseen domain_qa + 20 MMLU planted): 40 of 40 found at >= 80% (13-gram), 40 at >= 50% (8-gram).
+
+Eval items, 13-gram:
+
+| items | n | any n-gram | >= 50% | >= 80% |
+|---|---|---|---|---|
+| domain_qa seen: questions | 167 | 83 | 23 | 2 |
+| domain_qa seen: answers | 167 | 1 | 1 | 1 |
+| vocab seen: definitions | 101 | 0 | 0 | 0 |
+| domain_qa unseen: questions | 155 | 49 | 9 | 0 |
+| domain_qa unseen: answers | 155 | 4 | 4 | 4 |
+| vocab unseen: definitions | 109 | 0 | 0 | 0 |
+| grounded: questions | 108 | 4 | 3 | 0 |
+| adversarial: questions | 76 | 1 | 0 | 0 |
+
+Benchmarks, 13-gram and Tulu 3's 8-gram (an item counts at >= 50% of its tokens):
+
+| benchmark | items | 13: any | 13: >= 50% | 8: any | 8: >= 50% |
+|---|---|---|---|---|---|
+| MMLU (test) | 14042 | 3 | 0 | 188 | 1 |
+| GSM8K (test) | 1319 | 0 | 0 | 10 | 0 |
+| HellaSwag (val) | 10042 | 0 | 0 | 11 | 0 |

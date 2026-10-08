@@ -521,6 +521,120 @@ def sft_report(s: dict) -> list[str]:
     return out
 
 
+# ---- Stage 4: the DPO prompt pool (and, once built, its pairs) ----
+
+
+def dpo_checks(tok: Tok, bench: dict[str, list[str]]) -> dict:
+    """Section 7. The reference is every pool prompt (data/dpo/prompts.jsonl), plus each pair's
+    chosen and rejected text once data/dpo/{train,val}.jsonl exist. Rule 1 and the unseen-term
+    block on each prompt's own question or term (sft_guard), the eval sets at 13 tokens, the
+    benchmarks at 13 tokens and at Tulu 3's 8 tokens / 50% coverage, and a positive control at both
+    lengths."""
+    global N
+    sys.path.insert(0, str(ROOT / "data/scripts"))
+    from sft_guard import Guard
+
+    pool = jsonl(ROOT / "data/dpo/prompts.jsonl")
+    pairs = [r for f in ("train", "val") if (ROOT / f"data/dpo/{f}.jsonl").exists()
+             for r in jsonl(ROOT / f"data/dpo/{f}.jsonl")]  # fmt: skip
+    seen = set((TASKS / "sft_seen_chunks.txt").read_text().split())
+    eval_ids = set((TASKS / "eval_chunk_ids.txt").read_text().split())
+    work = {}
+    for line in (SFT / "work/judged.jsonl").open():
+        e = json.loads(line)
+        work[e["eid"]] = e
+    guard = Guard()
+    rule1, blocked = [], []
+    for r in pool:
+        e = work[r["id"]]
+        if r["format"] == "definition":
+            if hit := guard.term_block(e["term"]):
+                blocked.append([r["id"], hit])
+        elif hit := guard.rule1(e["question"]):
+            rule1.append([r["id"], hit])
+    texts = [r["prompt"][0]["content"] for r in pool]
+    texts += [r[k][0]["content"] for r in pairs for k in ("chosen", "rejected")]
+    res: dict = {
+        "prompts": len(pool),
+        "pairs": len(pairs),
+        "leaked_chunks": sorted({c for r in pool for c in r["source_chunks"]} & (eval_ids - seen)),
+        "rule1": rule1,
+        "term_block": blocked,
+    }
+    qa, vocab = jsonl(TASKS / "domain_qa.jsonl"), jsonl(TASKS / "vocab.jsonl")
+    grounded, adversarial = jsonl(TASKS / "grounded.jsonl"), jsonl(TASKS / "adversarial.jsonl")
+    half = lambda i: "seen" if i["source_chunk"] in seen else "unseen"
+    sets = {}
+    for h in ("seen", "unseen"):
+        sets[f"domain_qa {h}: questions"] = [i["question"] for i in qa if half(i) == h]
+        sets[f"domain_qa {h}: answers"] = [i["answer"] for i in qa if half(i) == h]
+        sets[f"vocab {h}: definitions"] = [i["definition"] for i in vocab if half(i) == h]
+    sets["grounded: questions"] = [i["question"] for i in grounded]
+    sets["adversarial: questions"] = [i["question"] for i in adversarial]
+    planted = [f"{i['question']}\n{i['answer']}" for i in qa if half(i) == "unseen"][:20]
+    planted += bench["MMLU (test)"][:20]
+    keep = N
+    try:
+        for n in (13, 8):
+            N = n
+            idx = Index(
+                [tok.grams(tok.encode(t)) for t in texts], [str(k) for k in range(len(texts))]
+            )
+            if n == 13:
+                res["eval"] = {k: items_vs(tok, v, {"dpo": idx}) for k, v in sets.items()}
+            res[f"benchmarks_{n}"] = {k: items_vs(tok, v, {"dpo": idx}) for k, v in bench.items()}
+            ctl = Index(
+                [tok.grams(tok.encode(t)) for t in texts + planted],
+                [str(k) for k in range(len(texts) + len(planted))],
+            )
+            m = items_vs(tok, planted, {"dpo": ctl})
+            res[f"control_{n}"] = {"planted": len(planted), "found_ge80": m["dpo"]["ge80"],
+                                   "found_ge50": m["dpo"]["ge50"]}  # fmt: skip
+    finally:
+        N = keep
+    return res
+
+
+def dpo_report(d: dict) -> list[str]:
+    row = lambda name, m: [name, m["items"], m["dpo"]["any"], m["dpo"]["ge50"], m["dpo"]["ge80"]]
+    head = ["items", "n", "any n-gram", ">= 50%", ">= 80%"]
+    return [
+        "",
+        "## 7. DPO prompt pool and pairs (Stage 4) vs the eval and the benchmarks",
+        "",
+        (
+            f"`data/dpo/prompts.jsonl` ({d['prompts']:,} prompts) plus the chosen and rejected text"
+            f" of {d['pairs']:,} pairs as the reference. Eval chunk ids outside the seen half:"
+            f" {len(d['leaked_chunks'])}; prompts copying an eval question (rule 1):"
+            f" {len(d['rule1'])}; definitions of a blocked term: {len(d['term_block'])}. Positive"
+            f" control (20 unseen domain_qa + 20 MMLU planted): {d['control_13']['found_ge80']} of"
+            f" {d['control_13']['planted']} found at >= 80% (13-gram),"
+            f" {d['control_8']['found_ge50']} at >= 50% (8-gram)."
+        ),
+        "",
+        "Eval items, 13-gram:",
+        "",
+        table(head, [row(k, m) for k, m in d["eval"].items()]),
+        "",
+        "Benchmarks, 13-gram and Tulu 3's 8-gram (an item counts at >= 50% of its tokens):",
+        "",
+        table(
+            ["benchmark", "items", "13: any", "13: >= 50%", "8: any", "8: >= 50%"],
+            [
+                [
+                    k,
+                    m["items"],
+                    m["dpo"]["any"],
+                    m["dpo"]["ge50"],
+                    d["benchmarks_8"][k]["dpo"]["any"],
+                    d["benchmarks_8"][k]["dpo"]["ge50"],
+                ]
+                for k, m in d["benchmarks_13"].items()
+            ],
+        ),
+    ]
+
+
 # ---- report ----
 
 
@@ -777,6 +891,8 @@ def report(res: dict, flag: float) -> str:
         )
     if "sft" in res:
         out += sft_report(res["sft"])
+    if "dpo" in res:
+        out += dpo_report(res["dpo"])
     return "\n".join(out) + "\n"
 
 
@@ -800,17 +916,18 @@ def main() -> None:
     ap.add_argument("--out", default="results/contamination")
     ap.add_argument(
         "--only",
-        choices=["sft"],
-        help="add section 6 to the existing --out .json and rewrite the .md",
+        choices=["sft", "dpo"],
+        help="add section 6 (sft) or 7 (dpo) to the existing --out .json and rewrite the .md",
     )
     args = ap.parse_args()
     N = args.n
     tok = Tok()
     out = ROOT / args.out
-    if args.only == "sft":
+    if args.only:
         res = json.loads(out.with_suffix(".json").read_text())
-        print("SFT set vs eval, val and benchmarks")
-        res["sft"] = sft_checks(tok, benchmarks())
+        print(f"{args.only} data vs eval and benchmarks")
+        check = sft_checks if args.only == "sft" else dpo_checks
+        res[args.only] = check(tok, benchmarks())
         out.with_suffix(".json").write_text(json.dumps(res, indent=1) + "\n")
         out.with_suffix(".md").write_text(report(res, args.flag))
         print(f"-> {out.with_suffix('.md')}, {out.with_suffix('.json')}")
@@ -966,8 +1083,10 @@ def main() -> None:
 
     res["qa"] = qa_checks(tok)
     prev = out.with_suffix(".json")
-    if prev.exists() and "sft" in (old := json.loads(prev.read_text())):
-        res["sft"] = old["sft"]  # section 6 is refreshed by --only sft
+    old = json.loads(prev.read_text()) if prev.exists() else {}
+    for k in ("sft", "dpo"):  # sections 6 and 7 are refreshed by --only sft / --only dpo
+        if k in old:
+            res[k] = old[k]
 
     out.with_suffix(".json").write_text(json.dumps(res, indent=1) + "\n")
     out.with_suffix(".md").write_text(report(res, args.flag))

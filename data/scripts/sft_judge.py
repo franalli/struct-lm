@@ -454,6 +454,11 @@ Return JSON, the reasoning first:
         model=TEACHER,
         temperature=0.0,
     )
+    return grade(out, items)
+
+
+def grade(out: dict, items: list[tuple]) -> dict:
+    """One answer's verdict from the judge's JSON for it: hard rules, principle score, pitfalls."""
     hard = {i[0]: bool(out.get("hard", {}).get(i[0], False)) for i in items if i[1] == "Hard Rule"}
     princ = {}
     for i in items:
@@ -484,6 +489,100 @@ Return JSON, the reasoning first:
         "reasoning": str(out.get("reasoning", ""))[:600],
         "titles": {i[0]: i[4] for i in items},
     }
+
+
+# ---- Stage 4: every sample of one prompt in one call (data/scripts/dpo_*.py) ----
+VARIANTS = ("a5", "quote", "page")  # the judge benchmark's three prompts (dpo_judge_bench.py)
+_PAGES = None
+
+
+def page_text(chunk_id: str) -> str:
+    """The whole page a chunk sits on (its doc's chunks on that page, in reading order)."""
+    global _PAGES
+    if _PAGES is None:
+        from sft_common import load_chunks
+
+        _, by_doc = load_chunks()
+        _PAGES = {}
+        for chunks in by_doc.values():
+            for c in chunks:
+                page = c["chunk_id"].rsplit(":", 1)[0]
+                _PAGES.setdefault(page, []).append(c["text"])
+    return "\n".join(_PAGES[chunk_id.rsplit(":", 1)[0]])
+
+
+def shown_page(e: dict) -> str:
+    """shown(), with each passage widened to its full page (no chunk ids: labels only)."""
+    if e["passages"]:
+        return "\n\n".join(f"[{p['label']}]\n{page_text(p['chunk_id'])}" for p in e["passages"])
+    return f"Document: {e['title']}\nPage:\n{page_text(e['chunk_id'])}"
+
+
+def judge_list(e: dict, answers: list[str], variant: str = "a5") -> list[dict] | None:
+    """Every answer to one prompt graded in one call (UltraFeedback-style): each gets its own
+    reasoning and its own hard-rule / principle / pitfall verdicts, scored as judge() scores one
+    (grade()). The caller fixes the order (a hash shuffle) and logs each answer's position.
+    variant "quote" asks for the source sentence each answer rests on before its verdict; "page"
+    shows the full page instead of the chunk. Returns None when the call failed or the reply
+    doesn't hold exactly one grade per answer (never cached; a rerun retries it)."""
+    assert variant in VARIANTS and answers
+    text, items = rubric_text(e)
+    n = len(answers)
+    listed = "\n\n".join(f"[Answer {k}]\n{a}" for k, a in enumerate(answers, 1))
+    quote = (
+        '"quote": "the source sentence(s) the answer rests on, copied exactly, or none",\n  '
+        if variant == "quote"
+        else ""
+    )
+
+    def valid(out: dict) -> bool:
+        g = out.get("grades")
+        return (
+            isinstance(g, list)
+            and len(g) == n
+            and all(isinstance(x, dict) for x in g)
+            and sorted(x.get("answer") for x in g if isinstance(x.get("answer"), int))
+            == list(range(1, n + 1))
+        )
+
+    out = llm_json(
+        f"""You are grading {n} answers to the same question, for a model that answers questions
+about US federal structural engineering documents. Grade strictly against the rubric. Grade every
+answer on its own: decide each rule for each answer separately; the other answers are not a
+reference, and their order means nothing.{" Before each verdict, quote the source sentence(s) the answer rests on." if variant == "quote" else ""}
+
+Source the answers must rest on:
+{shown_page(e) if variant == "page" else shown(e)}
+
+Question:
+{asked(e)}
+
+Answers to grade:
+{listed}
+
+Rubric:
+{text}
+
+Return JSON with one grade per answer, in answer order, each with its reasoning first:
+{{"grades": [
+ {{"answer": 1,
+  {quote}"reasoning": "two to four sentences",
+  "hard": {{"H1": true or false, ...}},
+  "principles": {{"P1": 1-5, ...}},
+  "optional": {{"O1": true or false}},
+  "pitfalls": {{"X1": true if present, ...}}}},
+ ...]}}""",
+        step=f"dpo_judge_list:{variant}",
+        model=TEACHER,
+        temperature=0.0,
+        valid=valid,
+    )
+    if not out:
+        return None
+    by_answer = {x["answer"]: x for x in out["grades"]}
+    return [
+        {**grade(by_answer[k], items), "quote": by_answer[k].get("quote")} for k in range(1, n + 1)
+    ]
 
 
 def verify(e: dict) -> dict:

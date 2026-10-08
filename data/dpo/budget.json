@@ -1,0 +1,11 @@
+{
+  "temperature": 0.7,
+  "top_p": null,
+  "n": {
+    "closed_book": 4,
+    "definition": 8,
+    "grounded": 8,
+    "abstain": 8
+  },
+  "from": "results/diversity/sft-from-cpt_pairable.json"
+}

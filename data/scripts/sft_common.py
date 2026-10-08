@@ -234,12 +234,18 @@ def _load_cache() -> dict[str, dict]:
 
 
 def llm_json(
-    prompt: str, step: str, model: str = TEACHER, temperature: float = 0.2, retries: int = 6
+    prompt: str,
+    step: str,
+    model: str = TEACHER,
+    temperature: float = 0.2,
+    retries: int = 6,
+    valid=None,
 ) -> dict:
     """One call in JSON mode through the disk cache (data/sft/.cache/llm_cache.jsonl, gitignored).
     Keyed on (model, temperature, prompt); each record also keeps the step and the prompt, so the
     prompts the generator saw can be audited (tests/test_sft_data.py). Returns {} when every retry
-    failed; failures are never cached, so a rerun retries them."""
+    failed; failures are never cached, so a rerun retries them. `valid(out) -> bool`, if given,
+    rejects a well-formed but wrong-shaped reply as a failure (retried, never cached)."""
     global _client, FAILED_CALLS
     cache = _load_cache()
     key = hashlib.sha256(json.dumps([model, temperature, prompt]).encode()).hexdigest()
@@ -265,6 +271,8 @@ def llm_json(
             out = json.loads(content)
             if not isinstance(out, dict) or not out:
                 raise TypeError(f"expected a JSON object, got {content[:100]!r}")
+            if valid is not None and not valid(out):
+                raise ValueError(f"reply failed validation: {content[:100]!r}")
             PACER.result(throttled=False)
             break
         except Exception as e:  # noqa: BLE001  any failure (rate limit, network, bad JSON) is retried

@@ -200,7 +200,10 @@ def generate(
 GOLD_FIELDS = ("gold_lp", "gold_tokens", "gold_lp_tokens", "gold_lp_end")
 
 
-def make_llm(model: str, tp: int, max_model_len: int, tokenizer_mode: str, config_format: str):
+def make_llm(
+    model: str, tp: int, max_model_len: int, tokenizer_mode: str, config_format: str, **engine
+):
+    """engine: extra vLLM engine arguments (eval/sample.py's pool-sized jobs only)."""
     from vllm import LLM
 
     return LLM(
@@ -219,6 +222,7 @@ def make_llm(model: str, tp: int, max_model_len: int, tokenizer_mode: str, confi
         max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
         gpu_memory_utilization=0.9,
         seed=0,
+        **engine,
     )
 
 

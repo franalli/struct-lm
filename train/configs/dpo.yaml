@@ -1,37 +1,74 @@
+# Stage 4 DPO: LoRA on the frozen on-policy pair set (data/dpo/, hash in notes/decisions.md), one
+# epoch from the Stage 3 checkpoint. Rules and reasons: notes/decisions.md (Stage 4
+# pre-registration). Relative paths resolve against the repo root locally and /vol on Modal.
+#   dpo          this file as is
+#   dpo-seed1    --overrides "training.seed=1 training.data_seed=1"
+#   dpo-rpo      --overrides "training.loss_type=[sigmoid,sft] training.loss_weights=[1.0,1.0]"
+#   dpo-lnorm    --overrides "dpo.length_norm=true training.beta=5.0"   (Tulu 3's 8B beta: check §5)
+stage: dpo  # modal_train.py dispatches on it (train/dpo.py)
+
 model:
-  init_from: checkpoints/sft-from-cpt  # Stage 3 final: epoch 1, sha256 db8ddabf (notes/decisions.md)
+  # stage3-final: sft-from-cpt epoch 1 (checkpoint-77), merged, sha256 db8ddabf. With LoRA and
+  # ref_model=None the reference is this checkpoint with the adapter disabled (rule 11)
+  init_from: checkpoints/sft-from-cpt
   dtype: bfloat16
+  attn_implementation: sdpa
 
 lora:
-  r: 16
-  lora_alpha: 32
-  lora_dropout: 0.05
-  target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
+  r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05  # inert: disable_dropout zeroes every nn.Dropout, LoRA's included
+  bias: none
   # text layers only; bare names / all-linear would also hit the vision tower
+  target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
 
 data:
+  dir: data/dpo  # SHA256SUMS: the run refuses any other files
   train: data/dpo/train.jsonl
-  validation: data/dpo/val.jsonl
+  val: data/dpo/val.jsonl  # dpo_val: loss curve and the checkpoint rule, not a metric
+
+run:
+  results_dir: results
+
+dpo:  # train/dpo.py's own keys (not DPOConfig's)
+  length_norm: false  # true: log-probs divided by completion length (Tulu 3's length-normalised DPO)
 
 training:
-  output_dir: checkpoints/dpo
+  output_dir: checkpoints/_train/dpo
+  run_name: dpo
   num_train_epochs: 1
-  per_device_train_batch_size: 4
-  gradient_accumulation_steps: 8
-  learning_rate: 5.0e-6          # DPO wants ~10-50x lower LR than SFT
-  lr_scheduler_type: cosine
+  per_device_train_batch_size: 2  # pairs: 4 sequences per forward (chosen + rejected)
+  gradient_accumulation_steps: 8  # 16 pairs per optimizer step
+  per_device_eval_batch_size: 2
+  precompute_ref_batch_size: 2
+  learning_rate: 1.0e-5
+  lr_scheduler_type: linear  # to 0
   warmup_steps: 0.1  # transformers 5: a float in [0, 1) is a ratio of total steps
-  beta: 0.1                      # KL strength to the reference; lower = drift further
-  loss_type: sigmoid
-  max_length: 4096
-  # no max_prompt_length: TRL 0.29 removed it (DPO bounds prompt + completion with max_length,
-  # GRPO the completion with max_completion_length); keep prompts short in the data
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  beta: 0.1
+  loss_type: sigmoid  # DPOConfig turns a string into [sigmoid]; RPO is [sigmoid, sft]
+  # no truncation: prompt + longer completion <= 4,096 is enforced when pairs are built, and
+  # dpo.py refuses a longer record
+  max_length: null
+  precompute_ref_log_probs: true  # one no-grad pass of the adapter-disabled model, before step 1
+  disable_dropout: true
   bf16: true
   tf32: true  # fp32 matmuls on TF32 tensor cores (decisions.md, numeric precision)
   gradient_checkpointing: true
-  logging_steps: 10
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  logging_steps: 1
   eval_strategy: steps
-  eval_steps: 100
-  report_to: wandb
-  run_name: dpo
-  seed: 42
+  eval_steps: 10  # plus at every save and the last step (dpo.py), where the checkpoint rule reads
+  save_strategy: steps
+  save_steps: 10  # 31 steps on the frozen set: saves at 10, 20, 30 and the last step (with optimizer state:
+  # epoch 2 can resume); the checkpoint rule's midpoint save is step 20 (2026-10-08 freeze)
+  save_only_model: false
+  save_total_limit: null
+  report_to: none  # the curve is results/runs/<run>/train_log.jsonl
+  seed: 0
+  data_seed: 0

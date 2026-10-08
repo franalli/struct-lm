@@ -1,4 +1,5 @@
-"""Stages 2-3 on Modal: CPT or SFT training, merge, perplexity and the eval harness, chained remotely.
+"""Stages 2-4 on Modal: CPT, SFT or DPO training, merge, perplexity and the eval harness, chained
+remotely.
 
   M=.venv/bin/modal   # always from the repo root (the images copy train/ and eval/ from there)
   $M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-cpt --smoke --steps train,merge,ppl
@@ -16,11 +17,20 @@ Stage 3 (SFT, a config with `stage: sft`, train/sft.py; reasons in notes/decisio
   $M run --detach train/modal_train.py --run-name sft-from-cpt --merge-from checkpoint-154 --chat \
       --steps merge,mergecheck,ppl,eval,latency,sample
 
+Stage 4 (DPO, a config with `stage: dpo`, train/dpo.py; rules in notes/decisions.md, Stage 4):
+  $M run train/modal_train.py --config train/configs/dpo.yaml --run-name smoke-dpo --smoke --chat \
+      --steps noop,train,merge,mergecheck
+  $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name dpo --chat \
+      --merge-from rule --steps noop,train,merge,mergecheck,ppl,eval,latency,sample
+  (--merge-from rule: the pre-registered checkpoint rule on the run's own dpo_val curve, written to
+  results/runs/<run>/b4.json before the merge; the merge gate runs on data/dpo/val.jsonl; the
+  sample step adds the dpo_judge job, the win-rate prompts.)
+
 Steps, in order: noop (merge_check.py noop: an untrained adapter on the run's start checkpoint,
-merged, must equal it; CPU, alongside the rest) -> train (cpt.py or sft.py by the config's stage;
-2 GPUs: accelerate + configs/fsdp2.yaml, CPT only) -> merge (merge.py into /vol/checkpoints/<run>;
---merge-from picks an epoch's checkpoint-N instead of the final adapter) -> mergecheck (B5's gate:
-the evals don't start if it fails) -> ppl, eval, latency and sample in parallel (eval/perplexity.py;
+merged, must equal it; CPU, alongside the rest) -> train (cpt.py, sft.py or dpo.py by the config's
+stage; 2 GPUs: accelerate + configs/fsdp2.yaml, CPT only) -> merge (merge.py into
+/vol/checkpoints/<run>; --merge-from picks a checkpoint-N instead of the final adapter) ->
+mergecheck (B5's gate, on sft_val or a DPO run's dpo_val: the evals don't start if it fails) -> ppl, eval, latency and sample in parallel (eval/perplexity.py;
 eval/modal_app.py's lm_eval and kpi_eval --generate-only; latency only when asked for, since it
 measures the serving setup more than the weights; sample: eval/sample.py's --sample-jobs), each in
 its own container. Without --model, the checkpoint evaluated is /vol/checkpoints/<run>. The KPI
@@ -37,11 +47,13 @@ Volume writes are committed on every trainer save and eval and at the end, so a 
 same run resumes from the newest checkpoint.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import modal
+import yaml
 
 # eval/modal_app.py: locally next to train/, in the containers under /root/eval
 for _d in (Path(__file__).resolve().parents[1] / "eval", Path("/root/eval")):
@@ -90,6 +102,19 @@ COMMON = {
 # eval = lm-eval + KPI generation; latency is its own step: it depends on the architecture and the
 # serving setup, not on these weights, so it is measured per deployed checkpoint, not per ablation
 STEPS = ("noop", "train", "merge", "mergecheck", "ppl", "eval", "latency", "sample")
+SFT_VAL = (
+    "data/sft/sft_val.jsonl"  # the merge gate's val set, DPO runs included (2026-10-08 freeze)
+)
+DPO_NAME = re.compile(r"(^|[/_-])dpo([/_-]|$)")  # run_eval.needs_chat's convention
+
+
+def is_dpo(config: str, run_name: str) -> bool:
+    """A DPO run: its config says `stage: dpo` (read from /root/<config> in a container, the repo
+    locally), or, for a merge or eval without a config, its run name has a dpo token."""
+    if config:
+        path = Path(f"/root/{config}") if Path(f"/root/{config}").exists() else Path(config)
+        return yaml.safe_load(path.read_text()).get("stage") == "dpo"
+    return bool(DPO_NAME.search(run_name))
 
 
 def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> list[str]:
@@ -107,8 +132,8 @@ def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> l
 
 @app.function(**COMMON, gpu="H100", timeout=6 * 3600)
 def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
-    """cpt.py or sft.py (the config's `stage`) in-process on one H100, committing the volume on
-    every save and eval."""
+    """cpt.py, sft.py or dpo.py (the config's `stage`) in-process on one H100, committing the
+    volume on every save and eval."""
     import os
 
     os.chdir("/vol")
@@ -119,6 +144,8 @@ def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict
     cfg = parse_config(cpt_args(config, run_name, overrides, smoke))
     if cfg.get("stage") == "sft":
         import sft as stage
+    elif cfg.get("stage") == "dpo":
+        import dpo as stage
     else:
         import cpt as stage
 
@@ -232,9 +259,10 @@ def noop_control(config: str, run_name: str, overrides: list[str], smoke: bool) 
 
 
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
-def merge_check(run_name: str, adapter: str = "") -> None:
-    """merge_check.py check: start + adapter (unmerged) against /vol/checkpoints/<run> on sft_val
-    and 3 probe records; writes /vol/results/runs/<run>/merge_check.json and raises on failure."""
+def merge_check(run_name: str, adapter: str = "", val: str = SFT_VAL) -> None:
+    """merge_check.py check: start + adapter (unmerged) against /vol/checkpoints/<run> on `val`
+    (sft_val; a DPO run's dpo_val pairs) and 3 probe records; writes
+    /vol/results/runs/<run>/merge_check.json and raises on failure."""
     vol.reload()
     src = Path(f"/vol/checkpoints/_train/{run_name}") / adapter
     cmd = [
@@ -246,7 +274,7 @@ def merge_check(run_name: str, adapter: str = "") -> None:
         "--merged",
         f"/vol/checkpoints/{run_name}",
         "--val",
-        "data/sft/sft_val.jsonl",
+        val,
         "--out",
         f"/vol/results/runs/{run_name}/merge_check.json",
     ]
@@ -272,10 +300,10 @@ def digest(run_name: str) -> dict:
 
 
 @app.function(**COMMON, gpu="H100", timeout=2 * 3600)
-def merge_diagnose(run_name: str, adapter: str = "") -> None:
+def merge_diagnose(run_name: str, adapter: str = "", val: str = SFT_VAL) -> None:
     """merge_check.py diagnose after a failed merge check: argmax flips and log-prob error of the
-    merged and the unmerged bf16 model against an fp32 reference, over every sft_val completion
-    position. /vol/results/runs/<run>/merge_diagnose.json.
+    merged and the unmerged bf16 model against an fp32 reference, over every completion position
+    of `val` (sft_val; --val data/dpo/val.jsonl for a DPO run). .../runs/<run>/merge_diagnose.json.
       modal run train/modal_train.py::merge_diagnose --run-name sft-from-cpt --adapter checkpoint-77"""
     vol.reload()
     cmd = [
@@ -287,7 +315,7 @@ def merge_diagnose(run_name: str, adapter: str = "") -> None:
         "--merged",
         f"/vol/checkpoints/{run_name}",
         "--val",
-        "data/sft/sft_val.jsonl",
+        val,
         "--out",
         f"/vol/results/runs/{run_name}/merge_diagnose.json",
     ]
@@ -336,6 +364,36 @@ def b4_checkpoint(run_name: str) -> str:
     return ckpt
 
 
+def dpo_checkpoint(run_name: str) -> str:
+    """Stage 4's checkpoint rule (dpo.checkpoint_rule, pre-registered) applied to the run's own
+    train_summary.json for an unattended chain: the final step unless dpo_val loss at the end is
+    above its value at step 50 (runs under 100 steps: the save nearest the midpoint). Written to
+    /vol/results/runs/<run>/b4.json before the merge; returns "" (the final adapter) or
+    checkpoint-N."""
+    import json
+
+    sys.path.insert(0, "/root/train")
+    from dpo import checkpoint_rule
+
+    vol.reload()
+    src = Path(f"/vol/checkpoints/_train/{run_name}")
+    decision = {
+        "run": run_name,
+        **checkpoint_rule(json.loads((src / "train_summary.json").read_text())),
+    }
+    ckpt = decision["checkpoint"]
+    if not (src / ckpt / "adapter_config.json").exists():
+        raise RuntimeError(
+            f"{run_name}: the rule picked {ckpt or 'the final adapter'}, which has none"
+        )
+    out = Path(f"/vol/results/runs/{run_name}/b4.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(decision, indent=2) + "\n")
+    vol.commit()
+    print(f"checkpoint rule: {decision}")
+    return ckpt
+
+
 def wait_for_weights(ckpt: Path, timeout_s: int = 900) -> None:
     """A checkpoint written by another app (a merge launched separately) shows up only once that
     app's volume commit lands; eval containers started before then find no weights. Reload until
@@ -375,10 +433,15 @@ def pipeline(
         print(fn.remote(config, run_name, overrides, smoke))
     if merge_from == "b4":  # the pre-registered rule picks the epoch, before anything is merged
         merge_from = b4_checkpoint(run_name)
+    elif merge_from == "rule":  # Stage 4's: final step or step 50, from the dpo_val curve
+        merge_from = dpo_checkpoint(run_name)
     if "merge" in steps:
         model = merge.remote(run_name, "" if "train" in steps else model, merge_from)
     if "mergecheck" in steps:
-        merge_check.remote(run_name, merge_from)  # raises on failure: nothing below runs
+        # raises on failure: nothing below runs
+        # sft_val for DPO runs too: dpo_val is 22 pairs, 665 positions (0 flips allowed at 0.1%), the
+        # underpowered-gate failure of 2026-10-06; sft_val is the calibrated 11,351 (2026-10-08 freeze)
+        merge_check.remote(run_name, merge_from, SFT_VAL)
     model = model or f"/vol/checkpoints/{run_name}"
     if model.startswith("/vol/") and set(steps) & {"ppl", "eval", "latency", "sample"}:
         wait_for_weights(Path(model))
@@ -416,8 +479,10 @@ def main(
     overrides: str = "",
     smoke: bool = False,
     chat: bool = False,  # KPI eval and sampling in the chat template: every SFT/DPO/GRPO checkpoint
-    merge_from: str = "",  # checkpoint-77: merge that epoch's adapter; "b4": apply B4 after training
-    sample_jobs: str = "eos,diversity",  # eval/sample.py jobs for the sample step
+    # checkpoint-77: merge that adapter; "b4": apply B4 after training (SFT); "rule": Stage 4's rule
+    merge_from: str = "",
+    # eval/sample.py jobs for the sample step; default eos,diversity (DPO runs: + dpo_judge)
+    sample_jobs: str = "",
 ) -> None:
     """Checks the arguments locally, before any container starts, then starts pipeline."""
     todo = [s.strip() for s in steps.split(",") if s.strip()]
@@ -438,15 +503,21 @@ def main(
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
     from run_eval import needs_chat
 
-    chat_ckpt = needs_chat(model, run_name) or "sft" in Path(config).stem
+    dpo = is_dpo(config, run_name)
+    chat_ckpt = needs_chat(model, run_name) or "sft" in Path(config).stem or dpo
     if set(todo) & {"eval", "sample"} and chat_ckpt and not chat:
         raise SystemExit(f"{run_name} is a chat checkpoint: its KPI eval and samples need --chat")
     if chat and not chat_ckpt:
         raise SystemExit(f"--chat on {run_name or model}, which isn't a chat checkpoint (rule 2)")
-    if gpus == 2 and "sft" in Path(config).stem:
-        raise SystemExit("SFT runs on one GPU (train/sft.py has no FSDP path)")
+    if gpus == 2 and ("sft" in Path(config).stem or dpo):
+        raise SystemExit("SFT and DPO run on one GPU (sft.py and dpo.py have no FSDP path)")
     if merge_from and not {"merge", "mergecheck"} & set(todo):
         raise SystemExit("--merge-from names the adapter for the merge and mergecheck steps")
+    if merge_from == "rule" and not dpo:
+        raise SystemExit("--merge-from rule is Stage 4's checkpoint rule: DPO runs only")
+    if merge_from == "b4" and dpo:
+        raise SystemExit("--merge-from b4 is Stage 3's epoch rule; DPO runs use --merge-from rule")
+    sample_jobs = sample_jobs or ("eos,diversity,dpo_judge" if dpo else "eos,diversity")
     pipeline.remote(
         config,
         run_name,

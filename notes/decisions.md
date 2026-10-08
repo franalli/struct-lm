@@ -3149,3 +3149,324 @@ so the rule stays pre-registered:**
 - **CLAUDE.md:** the probe commands, `--merge-from b4`, and rule 10 updated. Chat-template work is
   done, the Stage 4 pool and probe are authorised, DPO labelling waits for the judge benchmark, and
   GRPO data waits for the Stage 5 plan.
+
+## 2026-10-08: Stage 4 pre-registration: pool, judge benchmark, scoring, pairs, training and read rules (user decisions, fixed before any sampling)
+**Context:** Stage 4 is DPO on on-policy samples. Policy and reference are sft-from-cpt epoch 1
+(`/vol/checkpoints/sft-from-cpt`, sha `db8ddabf`; "stage3-final"). The student writes every chosen
+and rejected answer. Rules and Mistral Large 3 label them; Claude Code writes the prompts, rubric,
+tests and scaffolding only (rule 13). Everything below is fixed before the probe samples.
+
+**Pool** (`data/scripts/dpo_prompts.py`, sha256 `a44cb6b3…`, 2,506 prompts):
+- **Replay prompts are out:** no Tülu prompts in DPO.
+- **The definitions the Stage 3 cap cut are in.**
+  - There are 566, not ~470: the cap ran on 866 after the 101 targeted seen-term definitions were
+    added.
+  - **Dropped:** 3 whose term a train definition already defines (creep, scour, SFRS) and 1 whose
+    teacher answer equals an unseen-side eval item (W50 stone ~ qa-1105). 562 remain.
+  - They are appended after the train prompts, so the first 20 rows, the pre-registered probe
+    set, are unchanged (`prompts_meta.json` `probe_ids`).
+  - **Caveat:** their teacher answers were never read against the passage; the read found defects
+    in 7.7% of the 300 it covered. Those answers reach DPO only as the definition judge's
+    reference, never as text.
+- **By format:** closed-book 1,129, definition 820, grounded 374 (not ~500), abstain 183.
+- **`dpo_split`** (hash within format):
+  - 100 `judge`: the win-rate prompts;
+  - 125 `val`: dpo_val, the loss curve;
+  - 2,281 `train`.
+  - Both held-out splits stay out of training.
+
+**Sampling** (`eval/sample.py`, sft-from-cpt, `--chat`, seed 0):
+- **Probe:** as pre-registered on 2026-10-06.
+- **`dpo_bench`:** the benchmark's 166 prompts × 3 at T 0.7.
+- **`dpo_pool`:** every non-judge prompt at the probe's temperature, up to 512 tokens.
+  - A sample that doesn't end on `</s>` is dropped.
+  - **Budget:** a non-abstain format below half pairable gets 8 samples, otherwise 4.
+  - **Change from 2026-10-06: abstain also gets 8, regardless.** Its scorer is a rule, so this
+    costs no calls, and a hallucinated sample is the only source of an abstain pair.
+- **`dpo_judge`:** the 100 judge prompts, greedy.
+- The eos job now draws 4 prompts from each of the pool's 4 formats (16, was 20 with replay).
+
+**Scoring (no form judge on closed-book; one judge call per prompt):**
+- **Closed-book:** the verifier (`sft_judge.same_fact` on the answer line) is the whole signal
+  (ch. 11's verifiable-domain labelling).
+  - Chosen is a verifier-correct sample that also passes a form check: ends on `</s>`, no repeated
+    line, under 2× the median closed-book sample length.
+  - Rejected is a verifier-wrong sample.
+- **Abstain:** the SFT builder's rule (`sft_judge.verify`: cites a passage or runs past 12 words
+  = answered). On an unanswerable prompt, declining is chosen and answering rejected.
+- **Grounded and definition:**
+  1. Rules first (rule 8; `sft_judge.verify`): grounded citations valid, every sentence cited,
+     not a false abstain; definition one sentence, no passage reference. A failure scores the floor
+     (1.0) with no call.
+  2. The rest go in one call per prompt (`sft_judge.judge_list`, UltraFeedback-style), deduplicated
+     and in a fixed hash shuffle, with each sample's position logged. Each sample gets its own
+     reasoning, then the A5 hard rules and principle grades, scored as `sft_judge.judge` scores one
+     (weighted principle mean minus half of each pitfall's weight). A failed hard rule scores the
+     floor.
+  - A failed call leaves its samples unscored, never at the floor; rerun.
+  - **Both abstain directions:** a false abstain on an answerable grounded prompt scores the floor,
+    so answering over refusing is a pair too.
+
+**Judge benchmark, before pool scoring** (`data/scripts/dpo_judge_bench.py`, the 2026-10-05 rule):
+- **Labels:** the full-passage reads of the SFT builder's grounded and definition records, for the
+  content read. The A5 judge had passed every one of them.
+  - Defects with an answer-level category, up to 60 per format by hash (grounded 60, definition
+    23), and as many ok records.
+- **Each call:** the labelled teacher answer listed with the student's 3 `dpo_bench` samples of
+  the same prompt, so it is the scoring call as it runs on the pool.
+- **Variants:**
+  - `a5`: the rubric as is;
+  - `quote`: quote the supporting sentence, then the verdict;
+  - `page`: the full page instead of the chunk.
+- **Measures:** recall (a defect gets a failed hard rule or a score ≤ 3), ok-pass (all hard rules
+  and ≥ 4), AUROC, sibling gap, and mean score by position.
+- **Rule per format:** the variant with the highest recall among those with ok-pass ≥ 0.8. The
+  format passes at recall ≥ 0.5.
+  - A failed grounded format pairs on rule failures only; a failed definition format yields no
+    pairs.
+  - About 10 reasons per format are hand-checked against the read notes, verdicts only.
+
+**Verifier-agreement gate, after scoring** (`dpo_score.py gate`):
+- **Sample:** 200 closed-book and abstain samples judged listwise per prompt (~40-50 calls), with
+  at least 30 verifier-wrong samples.
+- **Comparison:** the judge's hard rule on the thing the verifier checks (`sft_judge.SHARED`:
+  closed-book H2 gold fact vs `same_fact`; abstain H2 exact sentence vs the exact-sentence rule).
+- **Pass:** agreement ≥ 0.90 overall, also reported per class.
+- Disagreeing samples are counted by kind and direction and kept out of pairing.
+- **Below the line:** fix the prompt and rescore from the cache. Nothing proceeds until it passes.
+
+**Pairs** (`data/scripts/dpo_pairs.py`):
+- **Scores:** a verifier-correct sample counts 5 and a wrong one 1.
+- **Choosing:**
+  - chosen = the highest score;
+  - rejected = a hash-drawn sample at least 2 points below;
+  - a second pair from the remaining samples if it clears the same margin; at most 2 per prompt.
+- **Caps:**
+  - closed-book ≤ 50% of pairs (hash drop);
+  - chosen ≤ 1.5× rejected in tokens, except grounded;
+  - prompt + longer completion ≤ 4,096 tokens, or the pair is dropped, never truncated.
+- **Shortfall:**
+  - under 1,000 pairs: margin 1 on judged kinds only, never on verifiable ones, recorded;
+  - still under 1,000 with 500 or more: train with the cap kept;
+  - below 500: stop and report.
+- **Record** (TRL conversational, explicit prompt):
+  - `prompt`, `chosen`, `rejected`, `format`, `kind`, `score_chosen`, `score_rejected`,
+    `label_source`, `prompt_hash`, `system_variant`;
+  - the vLLM ids `prompt_ids`, `chosen_ids`, `rejected_ids`, which the trainer reads (the exact
+    on-policy tokens);
+  - `format` carries the pasted schema's "kind", since `kind` is already the pool's
+    value/identifier/term.
+- **The tokenisation test** (`tests/test_dpo_data.py`) blocks launch.
+
+**Training** (`train/dpo.py`, `train/configs/dpo.yaml`): two runs from the same start, `dpo`
+(seed 0) and `dpo-seed1` (seed 1, data_seed 1).
+- **Setup:**
+  - TRL 0.29.1 `DPOTrainer`, sigmoid loss, β 0.1;
+  - LoRA r 64 / α 128 on the text layers' q/k/v/o/gate/up/down;
+  - lr 1e-5, linear, warmup 0.1;
+  - 2 pairs × 8 accumulation = 16 per step, 1 epoch;
+  - AdamW (0.9, 0.999), wd 0, clip 1.0, bf16, gradient checkpointing without reentrant;
+  - `disable_dropout`.
+- **Reference:** the start with adapters off (rule 11), precomputed.
+- **Two departures forced by TRL 0.29.1:**
+  - **Pre-tokenised ids:** a subclass passes the ids through `_prepare_dataset`. Its string path
+    appends EOS as text, and Mistral's backend refuses prompt+completion conversations.
+  - **Log-probs in fp32:** it computes per-token log-probs and their sum in bf16, which rounds a
+    sequence log-prob to 0.5-1 nat, more than the early policy/reference gap.
+- **Logging and eval:** every step is logged. dpo_val is evaluated every 10 steps. At every
+  25-step save, 10 fixed greedy generations are checked for repetition, length and language.
+- **Checkpoint rule** (`train/dpo.py checkpoint_rule`, written to `b4.json` before the merge):
+  - the final step, unless the dpo_val loss at the end is above its value at step 50, then
+    step 50;
+  - a run under 100 steps compares against the save nearest its midpoint (ties to the earlier
+    save) instead of step 50;
+  - a run with no save before its end keeps the final step.
+  - `DPOExtras` forces an eval at every save and at the last step, so both losses exist.
+- **Merge gate:** on the dpo_val chosen and rejected positions, against an fp32 reference.
+  - added flips ≤ 0.1% of positions (the line 11-of-11,351 was);
+  - |Δlp| ≤ 1.5×;
+  - val loss within 0.5%.
+
+**Read** (each line gets a sentence here before any rerun):
+1. **Win rate** against the SFT start on the 100 judge prompts: Large 3, temperature 0, both
+   orders, a tie counts 0.5, greedy decoding. DPO moved the policy only if the win rate is above
+   50% by more than max(seed gap, binomial SE ≈ 5 points). Otherwise it reads "DPO did not move
+   the policy".
+2. **Hallucination** on unanswerable ≤ 4 of 76; **false abstain** ≤ 1 of 108.
+3. **Citations and facts:** cite_supported ≥ 0.861. qa_acc not below SFT beyond noise. The seen
+   and unseen halves are reported, not argued.
+4. **Guards:** MMLU and GSM8K within noise; mean length within +30% of SFT.
+5. **Noise floor** per metric: max(seed gap, SE), stated with 1 df per arm.
+
+**At most one rerun, triggers fixed now:**
+- **Displacement:** `logps/chosen` fell over training and seen qa_acc dropped beyond noise. Rerun
+  `dpo` with RPO, which in TRL 0.29.1 is `loss_type: [sigmoid, sft]`, `loss_weights: [1.0, 1.0]`;
+  `rpo_alpha` is gone.
+- **Under-training:** the win rate is inside the floor and dpo_val accuracies were still rising at
+  the last eval. Continue `dpo` to epoch 2 from its saved state, with the checkpoint rule.
+  - **Open, decided before that rerun:** epoch 2's learning rate. Resuming with
+    `num_train_epochs: 2` rebuilds the linear schedule over both epochs, so the LR would jump back
+    to its mid-schedule value.
+- **Over-shooting:** generations degraded while the loss fell. lr 5e-6.
+- **None fired:** `dpo-lnorm`, length-normalised DPO (a subclass flag; TRL has no such loss). β 5
+  as Tülu 3 8B, checked against Tülu §5 before launch.
+
+**Names:**
+- `stage4-final` is the chosen run's merged checkpoint (`checkpoints/<run>`).
+- It is named here at close-out, and `grpo.yaml` `init_from` points at it. No symlinks on the
+  volume.
+
+## 2026-10-08: Judge benchmark failed on both formats; grounded judged anyway (post-hoc user decision, recorded before pool sampling)
+**Benchmark** (`results/dpo/judge_bench.json`, 166 labelled teacher answers × 3 listwise
+variants, 0 failed calls):
+
+| format | variant | recall | ok-pass | AUROC |
+|---|---|---|---|---|
+| grounded | a5 | **0.283** | 0.917 | 0.661 |
+| grounded | quote | 0.183 | 0.950 | 0.667 |
+| grounded | page | 0.217 | 0.917 | 0.666 |
+| definition | a5 | **0.087** | 0.870 | 0.535 |
+| definition | quote | 0.087 | 0.826 | 0.510 |
+| definition | page | 0.043 | 0.826 | 0.495 |
+
+- **Both formats fail the line (recall ≥ 0.5).** Grounded catches about a quarter of the framing
+  errors the full-passage read found; definition is at chance.
+- **Neither quoting nor the full page helped.** The misses are the audit's kind: dropped caveats,
+  filled-in passage gaps, generalised examples.
+- **In several misses the judge's own reasoning names the flaw and still scores 5.0.** For example,
+  "inaccurately expands PUD to 'Probable Ultimate Demand', which is not explicitly defined".
+- **Position effect:** the mean score falls with list position, by about 0.5 point from position 1
+  to 4 (grounded 3.95 → 3.45, definition 3.61 → 3.02). The order is a fixed shuffle, so this adds
+  noise rather than bias, but it is the size of a quarter of the margin.
+- **Teacher over student:** the student's samples score 0.77 (grounded) and 2.08 (definition)
+  points below Large 3's own teacher answers, defective ones included. That is self-preference or
+  a weaker student; this benchmark can't separate the two. DPO pairs are student against student,
+  so it doesn't choose between them.
+
+**Probe** (`results/diversity/sft-from-cpt_collapse.json`, `_pairable.json`):
+- **Collapse:** 0 of 18 non-abstain prompts, so no stop and T stays 0.7.
+- **Pairable under the registered rules:** closed-book 4/8; grounded 0/3 by rules alone;
+  definition 0/7; abstain 0/2.
+- **Budget** (`data/dpo/budget.json`): closed-book 4, definition 8, grounded 8, abstain 8.
+
+**Under the registered rule** grounded would pair on rule failures only, and definition not at all.
+- **Rule failures are rare:** 3% of the student's grounded samples, and none of its definitions,
+  in the benchmark samples.
+- **Expected total:** ~300 pairs after the closed-book cap, which is a stop under the shortfall
+  rule.
+
+**User decision (post-hoc, after seeing the benchmark, before any pool sample): DPO on verifiable
+preferences.** Lift the closed-book cap; the judge is out of pair-building entirely.
+- **Why not judge grounded anyway:**
+  - At ok-pass 0.92 and recall 0.28, with ~10% defect prevalence, a judge "fail" is a true defect
+    only about a quarter of the time. The rejected side of those pairs would be mostly good
+    answers: label noise near a coin flip, which DPO would learn.
+  - The gate did its job.
+- **Why not stop at ~300 pairs, or pause for a judge rework:**
+  - A rework is a day, of the three left.
+  - Stopping ends the stage with no training.
+- **Why lifting the cap is honest:**
+  - The cap was a mix-balance rule, not a validity rule. Every remaining label is a verifier or a
+    rule.
+  - Lifting it is a post-hoc amendment of the mix, recorded as such.
+  - The stage becomes "DPO on verifiable preferences": the RLHF Book ch. 11 verifiable-domain case
+    and Tülu 3's IF-constraint construction.
+
+**Conditions:**
+1. **No judge in pair-building**, grounded included.
+   - **Grounded pairs come from rules only:**
+     - `cite_valid`: every citation is a provided passage;
+     - **cites the gold passage:** the answer cites the passage the question was built from
+       (the record's `gold_label`), where the verifier knows it;
+     - **no false abstain** on an answerable prompt.
+   - **Definitions get no pairs,** stated plainly.
+   - **The verifier-agreement gate is not run.** It only screened samples for a judge that now
+     labels nothing.
+2. **The read is amended before launch.**
+   - **The Large-judged win rate is reported only.** A judge that misses 72% of grounded defects
+     per sample isn't a trustworthy pairwise judge either, and the DPO paper's GPT-4 validation
+     doesn't transfer to this rubric.
+   - **The primary lines are verifier metrics:**
+     - hallucination on unanswerable (≤ 4 of 76);
+     - false abstain (≤ 1 of 108);
+     - `cite_valid`;
+     - seen and unseen qa_acc and `gold_lp`, each against SFT beyond max(seed gap, SE).
+   - **The guards are unchanged:** MMLU and GSM8K within noise, mean length within +30% of SFT.
+   - `cite_supported` and `grounded_acc` (judge-scored) are reported, not read.
+3. **The judge failure is a finding, not a footnote.** The README carries:
+   - the benchmark numbers (0.28 / 0.09, AUROC 0.66, ok-pass 0.92);
+   - the listwise rubric prompt;
+   - the per-claim support check as the next step;
+   - whether the KPI eval's `grounded_acc` / `cite_supported` use the same judge prompt (a
+     leniency caveat on those rows if they do).
+4. **Both counts are reported:** the as-registered count (~300, with the cap) next to the amended
+   one (expected ~800-900, without it). The set sits under smol's 1,000 floor.
+   - The margin-1 fallback has nothing to act on, since no pair is judged.
+   - The shortfall rule stands: ≥ 500 trains, below 500 stops.
+
+**What this DPO can teach:**
+- correct facts over incorrect on SFT-seen prompts;
+- abstaining over hallucinating;
+- valid citations that point at the gold passage over invalid ones.
+
+Seen qa_acc and the abstain metrics are where movement is expected; nothing on definitions, nothing
+on unseen facts. It is also the reward signal Stage 5 would use on closed-book tasks, so DPO vs GRPO
+becomes a same-reward, two-algorithm comparison if GRPO runs.
+
+**Runs:** the seed twin still runs.
+- If the evals land overnight, the guide's rule for launching GRPO is met for tomorrow morning.
+- If the task set isn't built, GRPO is the cut, in the order the guide gives.
+
+## 2026-10-08: Stage 4 DPO set frozen: 506 pairs, dataset hash a899f7d2 (verifiable preferences, as amended)
+**Samples** (`dpo_pool`, sft-from-cpt, T 0.7, seed 0; `results/runs/sft-from-cpt/samples/`):
+- 14,912 samples on 2,406 prompts, and all of them end on `</s>`.
+  - closed-book: 4,336 at 4 per prompt;
+  - definition: 6,296 at 8 (unpaired);
+  - grounded: 2,872 at 8;
+  - abstain: 1,408 at 8.
+- `dpo_judge`: 100 greedy answers, the SFT start's side of the win rate.
+
+**Scores** (`results/dpo/score_log.json`; verifier and rules only, no judge call):
+- **Closed-book:** 1,492 of 4,336 samples correct (34%); 409 of 1,084 prompts mixed. 125
+  correct samples fail the form check.
+- **Grounded rule failures:** cites the gold passage 66, `cite_valid` 8, false abstain 3. 28 of
+  359 prompts are mixed (40 under the registered rules, where every-sentence-cited failed 56).
+- **Abstain:** 28 of 1,408 samples answered an unanswerable prompt (2.0%); 5 of 176 prompts
+  mixed.
+
+**Pairs** (`data/dpo/pairs_meta.json`):
+
+| | closed-book | grounded | abstain | total |
+|---|---|---|---|---|
+| as registered (cap, registered rules) | 57 | 51 | 6 | **114** |
+| amended (no cap, cite_valid / gold passage / false abstain) | 458 | 42 | 6 | **506** |
+
+- **Split:** train 484 (closed-book 439, grounded 39, abstain 6), val 22 (19 / 3 / 0).
+- **Drops:** 21 for the length ratio. The cap would have dropped 401 closed-book pairs.
+- **Length ratio, median chosen / rejected tokens:** closed-book 1.00, grounded 1.24, abstain
+  0.15 (the decline sentence against a hallucinated answer).
+- **Labels:** every one is a verifier or a rule.
+- **Size:** 506 clears the registered shortfall floor (500) by 6 and sits under smol's 1,000.
+- **Dataset hash:** sha256 of `data/dpo/SHA256SUMS`, `a899f7d2757c5952e35c3e6b816cdea982bf4f0d9982e707b81a6c285c66b4ad`.
+- **Contamination** (`eval/contamination.py --only dpo`, prompts plus every chosen and rejected
+  text):
+  - 0 rule-1 hits, 0 blocked terms, 0 leaked eval chunks;
+  - positive control 40 of 40 at 13 and at 8 tokens;
+  - the overlaps that remain are the document designations section 6 already lists
+    ("EM 1110-2-2904", "AASHTO LRFD Article ...");
+  - 1 MMLU item at 8-gram ≥ 50%.
+- **Tests:** `tests/test_dpo_data.py` passes, the step-7 tokenisation test included. The full suite
+  is 65 passed, 4 skipped.
+
+**Two settings changed at freeze, forced by the set's size, before any training:**
+- **Merge gate on `sft_val`, not `dpo_val`.**
+  - dpo_val is 22 pairs, 665 completion positions, so the 0.1% line allows 0 added flips. That
+    is the underpowered gate that failed spuriously on 2026-10-06 (295 positions).
+  - sft_val is the calibrated 11,351 positions every SFT merge passed. The gate measures merge
+    fidelity, not fit, so any frozen text serves.
+- **`save_steps` 10, not 25.**
+  - 484 pairs at 16 per step is 31 steps, under 100, so the checkpoint rule compares the end
+    against the save nearest the midpoint (15.5): step 20.
+  - With saves every 25 steps the only candidate would have been step 25.
+- **Noisy val curve:** dpo_val's 22 pairs make its accuracy noisy (SE about 0.1). The
+  under-training trigger reads that curve, so it is read with that caveat.

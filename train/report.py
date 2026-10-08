@@ -28,6 +28,13 @@ unseen gold_lp and qa_acc for the starts, the SFT runs and the instruct bar); th
 each run's start next to the noise, max(seed gap, SE); B7's first line, the paired bootstrap of
 unseen gold_lp, sft-from-cpt - sft-from-base; and the merge checks, no-op controls, </s> and
 diversity results. They go into the README's <!-- stage3-tables --> block.
+
+Stage 4 (runs whose train_summary.json says stage "dpo"; notes/decisions.md, Stage 4
+pre-registration): the run table with the final dpo_val loss, reward accuracy and margin and the
+checkpoint the rule picked (results/runs/<run>/b4.json); dpo.png (DPO loss, reward margin, reward
+accuracy, train and dpo_val, and the chosen / rejected sequence log-probs); the win rate against
+sft-from-cpt when eval/winrate.py has written it; and the merge checks, no-op control and
+diversity. They go into the README's <!-- stage4-tables --> block.
 """
 
 import argparse
@@ -64,7 +71,16 @@ SFT_COLORS = {
     "sft-from-base-seed1": "#eb6834",
     "sft-from-cpt-lr2e-4": "#1baf7a",
 }
-TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1", "sft-from-base-seed1"}  # another seed of a config
+DPO_COLORS = {
+    "dpo": "#2a78d6",
+    "dpo-seed1": "#2a78d6",
+    "dpo-rpo": "#eb6834",
+    "dpo-lnorm": "#1baf7a",
+    "dpo-lr5e-6": "#eda100",
+}
+DPO_START = "sft-from-cpt"  # stage3-final: every DPO run's start and reference
+# another seed of a config
+TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1", "sft-from-base-seed1", "dpo-seed1"}
 PPL_METRICS = [
     ("ppl_train", "train slice\n(seen once by CPT)"),
     ("ppl_domain_val", "domain val\n(held-out documents)"),
@@ -678,9 +694,10 @@ def sft_table(runs: dict, usd: float) -> str:
     return "\n".join(lines)
 
 
-def val_curve(log: list[dict]) -> list[tuple[int, float]]:
-    """(step, token-mean sft_val loss) at each evaluation, the last value if a step repeats."""
-    return sorted({r["step"]: r["val_loss"] for r in log if "val_loss" in r}.items())
+def val_curve(log: list[dict], key: str = "val_loss") -> list[tuple[int, float]]:
+    """(step, value of `key`) at each evaluation, the last value if a step repeats: SFT's
+    token-mean sft_val loss by default, TRL's eval_* metrics for DPO."""
+    return sorted({r["step"]: r[key] for r in log if key in r}.items())
 
 
 def plot_sft_loss(runs: dict, out: Path) -> None:
@@ -931,10 +948,24 @@ def b7_first_line() -> str:
     return "\n".join(out)
 
 
-def checks_table() -> str:
-    """Merge checks (B5), no-op controls, </s> on sampled answers and diversity, per run."""
+STAGE3_STARTS = ("cpt-8b-replay10", "base-8b-hf")
+SFT_GATE = (
+    "over all 11,351 sft_val completion positions against an fp32 reference, the argmax flips the "
+    "merge adds over the unmerged bf16 model's own"
+)
+
+
+def checks_table(
+    names=SFT_COLORS,
+    starts: tuple[str, ...] = STAGE3_STARTS,
+    gate: str = SFT_GATE,
+    diversity: tuple[str, ...] = ("instruct-8b",),
+) -> str:
+    """Merge checks (B5), no-op controls of the stage's starts, </s> on sampled answers and
+    diversity, per run (Stage 3's by default; stage4_md passes its own)."""
     out = []
     noop = sorted(Path("results/noop").glob("*.json")) if Path("results/noop").exists() else []
+    noop = [f for f in noop if f.stem in starts]
     if noop:
         out.append("No-op control (an untrained adapter, merged, against its start):\n")
         out.append("| start | tensors | differ | max abs diff | passed |\n|---|---|---|---|---|")
@@ -945,7 +976,7 @@ def checks_table() -> str:
                 f"{'yes' if r['passed'] else 'NO'} |"
             )
     rows = []
-    for name in SFT_COLORS:
+    for name in names:
         f = RUNS / name / "merge_check.json"
         if f.exists():
             r = json.loads(f.read_text())
@@ -961,8 +992,7 @@ def checks_table() -> str:
             )
     if rows:
         out.append(
-            "\nMerge gate (B5, amended): over all 11,351 sft_val completion positions against an "
-            "fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own, "
+            f"\nMerge gate (B5, amended): {gate}, "
             "and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss "
             "within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are "
             "reported, not gated; sha256 of the merged checkpoint's file list:\n"
@@ -973,7 +1003,7 @@ def checks_table() -> str:
         )
         out += rows
     rows = []
-    for name in ["instruct-8b", *SFT_COLORS]:
+    for name in [*diversity, *names]:
         f = Path("results/diversity") / f"{name}.json"
         if not f.exists():
             continue
@@ -1141,6 +1171,165 @@ def stage3_md(runs: dict, usd: float) -> str:
     return md
 
 
+def rule_pick(name: str) -> str:
+    """The checkpoint Stage 4's rule picked, from results/runs/<run>/b4.json (written by the
+    pipeline before the merge)."""
+    f = RUNS / name / "b4.json"
+    if not f.exists():
+        return ""
+    r = json.loads(f.read_text())
+    if r.get("ref_step") is None:
+        return f"final (step {r['steps']}; no earlier save)"
+    vs = f"{r['eval_loss_end']:.4f} vs {r['eval_loss_ref']:.4f} at {r['ref_step']}"
+    return f"step {r['picked_step']}" + (" (final)" if not r["checkpoint"] else "") + f": {vs}"
+
+
+def dpo_table(runs: dict, usd: float) -> str:
+    head = [
+        "run",
+        "start",
+        "pairs",
+        "steps",
+        "tokens/s",
+        "wall (h)",
+        "GPU-h",
+        "$",
+        "peak GB",
+        "final train loss",
+        "dpo_val loss",
+        "dpo_val reward accuracy",
+        "dpo_val margin",
+        "rule picks",
+    ]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for name, (s, _) in runs.items():
+        e = s.get("final_eval") or {}
+
+        def f(key: str, fmt: str = ".3f", e=e) -> str:
+            return format(e[key], fmt) if key in e else ""
+
+        cells = [
+            name,
+            Path(s["base"]).name,
+            s["pairs"],
+            s["steps"],
+            f"{s['tokens_per_s']:,.0f}" if s.get("tokens_per_s") else "",
+            f"{s['wall_s'] / 3600:.2f}",
+            f"{s['gpu_hours']:.2f}",
+            f"{s['gpu_hours'] * usd:.2f}",
+            f"{s['peak_mem_gb']:.0f}" if s.get("peak_mem_gb") else "",
+            f"{s['final_train_loss']:.3f}" if s.get("final_train_loss") else "",
+            f("eval_loss"),
+            f("eval_rewards/accuracies"),
+            f("eval_rewards/margins"),
+            rule_pick(name),
+        ]
+        lines.append("| " + " | ".join(str(c) for c in cells) + " |")
+    return "\n".join(lines)
+
+
+def winrate_table(names) -> str:
+    """Win rate against the start on the dpo_judge prompts, when eval/winrate.py has written
+    results/winrate/<run>_vs_sft-from-cpt.json. TODO(stage 4): fix the columns to winrate.py's
+    output once it exists; until then whichever of these keys it has."""
+    keys = ("win_rate", "wins", "ties", "losses", "n", "position_consistency")
+    rows = []
+    for name in names:
+        f = Path("results/winrate") / f"{name}_vs_{DPO_START}.json"
+        if f.exists():
+            r = json.loads(f.read_text())
+            rows.append([name, *(r.get(k, "") for k in keys)])
+    if not rows:
+        return ""
+    lines = ["| run | " + " | ".join(keys) + " |", "|" + "---|" * (len(keys) + 1)]
+    lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
+def plot_dpo(runs: dict, out: Path) -> None:
+    """Four panels: DPO loss, reward margin and reward accuracy (train as a moving average, dpo_val
+    as points), and the chosen / rejected sequence log-probs (train)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8.4), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    panels = [
+        (axes[0, 0], "loss", "eval_loss", "DPO loss (0.693 = no preference)", "loss"),
+        (axes[0, 1], "rewards/margins", "eval_rewards/margins", "Reward margin", "beta x nats"),
+        (axes[1, 0], "rewards/accuracies", "eval_rewards/accuracies", "Reward accuracy", "share"),
+    ]
+    last_step = max(curve(log)[0][-1] for _, log in runs.values())
+    for ax, key, ekey, title, ylabel in panels:
+        labels = []
+        for name, (_, log) in runs.items():
+            color, ls = DPO_COLORS.get(name, INK_2), "--" if name in TWIN else "-"
+            pts = val_curve(log, key)
+            if pts:
+                x, y = np.array([p[0] for p in pts]), smooth(np.array([p[1] for p in pts]))
+                ax.plot(x, y, color=color, lw=2, ls=ls, solid_capstyle="round")
+                labels.append((name, x[-1], y[-1], False))
+            if ev := val_curve(log, ekey):
+                ex, ey = zip(*ev)
+                ax.plot(ex, ey, marker="o", ls="none", ms=6, color=color, mec=SURFACE, mew=1.5)
+        style(ax, title, "", ylabel)
+        ax.set_xlim(0, last_step * 1.3)
+        end_labels(ax, labels)
+    ax = axes[1, 1]
+    labels = []
+    for name, (s, log) in runs.items():
+        if s.get("length_norm"):  # per-token means: another scale
+            continue
+        color = DPO_COLORS.get(name, INK_2)
+        for key, ls, tag in (("logps/chosen", "-", "chosen"), ("logps/rejected", ":", "rejected")):
+            if pts := val_curve(log, key):
+                x, y = np.array([p[0] for p in pts]), smooth(np.array([p[1] for p in pts]))
+                ax.plot(x, y, color=color, lw=2, ls=ls)
+                labels.append((f"{name} {tag}", x[-1], y[-1], False))
+    style(ax, "Sequence log-prob (chosen solid, rejected dotted)", "optimizer step", "nats")
+    ax.set_xlim(0, last_step * 1.3)
+    end_labels(ax, labels)
+    for a in axes[1]:
+        a.set_xlabel("optimizer step", color=INK_2)
+    fig.suptitle(
+        f"Stage 4 DPO: train ({SMOOTH}-step moving average, lines) and dpo_val (points)",
+        color=INK,
+        fontsize=11,
+        x=0.01,
+        ha="left",
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    print(f"-> {out}")
+
+
+def stage4_md(runs: dict, usd: float) -> str:
+    md = "## Training runs\n\n" + dpo_table(runs, usd)
+    md += (
+        "\n\nThe checkpoint rule (pre-registered): the final step unless the dpo_val loss at the "
+        "end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). "
+        f"dpo_val values at the last evaluation. $ at {usd} per GPU-hour (assumed).\n"
+    )
+    if wr := winrate_table(runs):
+        md += f"\n## Win rate against {DPO_START}\n\n" + wr + "\n"
+    # TODO(stage 4): the KPI change against sft-from-cpt next to max(seed gap, SE), as
+    # sft_delta_table does for Stage 3, once the dpo rows are scored.
+    checks = checks_table(
+        names=list(runs),
+        starts=(DPO_START,),
+        gate="over every dpo_val completion position (chosen and rejected) against an fp32 "
+        "reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most "
+        "0.1% of positions)",
+        diversity=(DPO_START,),
+    )
+    if checks:
+        md += "\n## Checks\n\n" + checks + "\n"
+    return md
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
@@ -1151,9 +1340,11 @@ def main() -> None:
     every = {d.name: r for d in sorted(RUNS.iterdir()) if d.is_dir() and (r := load(d))}
     if not every:
         raise SystemExit(f"no train_summary.json + train_log.jsonl under {RUNS}")
-    runs = {k: v for k, v in every.items() if v[0].get("stage") != "sft"}
+    runs = {k: v for k, v in every.items() if v[0].get("stage") not in ("sft", "dpo")}
     sft = {k: v for k, v in every.items() if v[0].get("stage") == "sft"}
     sft_runs = {r: sft[r] for r in [*[r for r in SFT_COLORS if r in sft], *sorted(sft)]}
+    dpo = {k: v for k, v in every.items() if v[0].get("stage") == "dpo"}
+    dpo_runs = {r: dpo[r] for r in [*[r for r in DPO_COLORS if r in dpo], *sorted(dpo)]}
     order = [*[r for r in COLORS if r in runs], *[r for r in runs if r not in COLORS]]
     runs = {r: runs[r] for r in order}
     md = "## Training runs\n\n" + table(runs, args.usd_per_gpu_hour)
@@ -1181,15 +1372,21 @@ def main() -> None:
             "none.\n"
         )
     md3 = stage3_md(sft_runs, args.usd_per_gpu_hour) if sft_runs else ""
+    md4 = stage4_md(dpo_runs, args.usd_per_gpu_hour) if dpo_runs else ""
     Path("results/train_runs.md").write_text(
-        "# Stage 2: CPT\n\n" + md + ("\n# Stage 3: SFT\n\n" + md3 if md3 else "")
+        "# Stage 2: CPT\n\n"
+        + md
+        + ("\n# Stage 3: SFT\n\n" + md3 if md3 else "")
+        + ("\n# Stage 4: DPO\n\n" + md4 if md4 else "")
     )
-    print(md + md3)
+    print(md + md3 + md4)
     if args.readme:
         # the README nests these under "#### Stage N": their own headings go two levels down
         update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
         if md3:
             update_readme(Path(args.readme), "stage3-tables", re.sub(r"(?m)^## ", "##### ", md3))
+        if md4:
+            update_readme(Path(args.readme), "stage4-tables", re.sub(r"(?m)^## ", "##### ", md4))
         update_readme(Path(args.readme), "results-table", results_table())
         update_readme(Path(args.readme), "serving-table", serving_table())
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
@@ -1199,6 +1396,8 @@ def main() -> None:
     if sft_runs:
         plot_sft_loss(sft_runs, Path("results/curves/sft.png"))
         plot_sft_kpi(Path("results/curves/sft_kpi.png"))
+    if dpo_runs:
+        plot_dpo(dpo_runs, Path("results/curves/dpo.png"))
 
 
 if __name__ == "__main__":

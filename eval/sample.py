@@ -11,6 +11,14 @@ checks that need more than the greedy KPI outputs. One engine load serves every 
   dpo_probe  the first 20 prompts of the Stage 4 pool x 4 samples at temperature 0.7, up to 1,024
              tokens: whether samples collapse to one answer before DPO pairs are built
              (eval/diversity.py collapse; stop rule in notes/decisions.md, 2026-10-06)
+  dpo_bench  the judge benchmark's prompts (data/dpo/bench_prompts.jsonl, from
+             data/scripts/dpo_judge_bench.py prep) x 3 samples at temperature 0.7, up to 512 tokens:
+             the student answers each labelled teacher answer is judged next to
+  dpo_pool   the Stage 4 pool minus its judge split, the samples DPO pairs are built from:
+             data/dpo/budget.json sets the temperature (top_p 0.95 only at 1.0) and the samples per
+             prompt by format; up to 512 tokens; written per format as each finishes
+  dpo_judge  the pool's 100 judge-split prompts, greedy, up to 1,024 tokens: the win-rate answers
+             (eval/winrate.py), from the SFT start and from each DPO run
 
   python eval/sample.py --model /vol/checkpoints/sft-from-cpt --run-name sft-from-cpt --chat \
       --jobs eos,diversity
@@ -36,7 +44,12 @@ JOBS = {
     "eos": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 4, "temperature": 0.8, "max_tokens": 1024, "per_format": 4},
     "diversity": {"prompts": HERE / "diversity_prompts.jsonl", "n": 1, "temperature": 0.7, "max_tokens": 1024},
     "dpo_probe": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 4, "temperature": 0.7, "max_tokens": 1024, "first": 20},
+    "dpo_bench": {"prompts": pathlib.Path("data/dpo/bench_prompts.jsonl"), "n": 3, "temperature": 0.7, "max_tokens": 512},
+    "dpo_pool": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "budget": pathlib.Path("data/dpo/budget.json"), "max_tokens": 512, "exclude_split": "judge"},
+    "dpo_judge": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 1, "temperature": 0.0, "max_tokens": 1024, "only_split": "judge"},
 }  # fmt: skip
+# the pool-sized jobs: vLLM's batch width and prefix cache (n samples share one prompt) set explicitly
+POOL_ENGINE = {"max_num_seqs": 256, "enable_prefix_caching": True}
 
 
 def h(key: str) -> str:
@@ -49,7 +62,13 @@ def prompts_for(job: str) -> list[dict]:
     rows = [json.loads(line) for line in spec["prompts"].read_text().splitlines()]
     out = []
     for r in rows:
+        if "only_split" in spec and r.get("dpo_split") != spec["only_split"]:
+            continue
+        if "exclude_split" in spec and r.get("dpo_split") == spec["exclude_split"]:
+            continue
         p = r["prompt"]
+        if not isinstance(p, str) and len(p) != 1:  # system-prompt variants: not supported yet
+            raise SystemExit(f"{r['id']}: {len(p)} prompt messages; sample.py sends one user turn")
         text = p if isinstance(p, str) else p[0]["content"]
         out.append({"id": r["id"], "format": r.get("format"), "prompt": text})
     if "first" in spec:  # the head of the file, in its fixed order
@@ -81,41 +100,71 @@ def main() -> None:
         ap.error(f"unknown jobs {sorted(unknown)}")
     from vllm import SamplingParams
 
-    llm = make_llm(args.model, 1, args.max_model_len, args.tokenizer_mode, args.config_format)
+    pool_sized = {"dpo_pool", "dpo_bench", "dpo_judge"} & set(jobs)
+    llm = make_llm(
+        args.model,
+        1,
+        args.max_model_len,
+        args.tokenizer_mode,
+        args.config_format,
+        **(POOL_ENGINE if pool_sized else {}),
+    )
     out_dir = pathlib.Path(args.results_dir) / "runs" / args.run_name / "samples"
     out_dir.mkdir(parents=True, exist_ok=True)
     for job in jobs:
         spec, items = JOBS[job], prompts_for(job)
-        params = SamplingParams(
-            n=spec["n"], temperature=spec["temperature"], max_tokens=spec["max_tokens"], seed=0
-        )
-        if args.chat:
-            outs = llm.chat([[{"role": "user", "content": it["prompt"]}] for it in items], params)
-        else:
-            outs = llm.generate([it["prompt"] for it in items], params)
-        rows = []
-        for it, o in zip(items, outs):
-            samples = [
-                {
-                    "text": c.text,
-                    "token_ids": list(c.token_ids),
-                    "n_tokens": len(c.token_ids),
-                    "finish_reason": c.finish_reason,
-                }
-                for c in o.outputs
+        if "budget" in spec:  # per format: its own n, and a file per format as each finishes
+            budget = json.loads(spec["budget"].read_text())
+            groups = [
+                (f, [it for it in items if it["format"] == f], budget["n"][f])
+                for f in sorted({it["format"] for it in items})
             ]
-            rows.append(
-                {
-                    "id": it["id"],
-                    "format": it["format"],
-                    "prompt_token_ids": list(o.prompt_token_ids),
-                    "samples": samples,
-                }
+            temperature, top_p = budget["temperature"], budget.get("top_p") or 1.0
+        else:
+            groups = [(None, items, spec["n"])]
+            temperature, top_p = spec["temperature"], 1.0
+        rows = []
+        for fmt, group, n in groups:
+            params = SamplingParams(
+                n=n, temperature=temperature, top_p=top_p, max_tokens=spec["max_tokens"], seed=0
             )
+            part = generate(llm, group, params, args.chat)
+            if fmt is not None:
+                write_jsonl(out_dir / f"{job}.{fmt}.jsonl", part)
+            rows += part
         write_jsonl(out_dir / f"{job}.jsonl", rows)
         flat = [s for r in rows for s in r["samples"]]
         stopped = sum(s["finish_reason"] == "stop" for s in flat)
-        print(f"{job}: {len(rows)} prompts x {spec['n']}, stopped on </s> {stopped}/{len(flat)}")
+        print(
+            f"{job}: {len(rows)} prompts, {len(flat)} samples, stopped on </s> {stopped}/{len(flat)}"
+        )
+
+
+def generate(llm, items: list[dict], params, chat: bool) -> list[dict]:
+    if chat:
+        outs = llm.chat([[{"role": "user", "content": it["prompt"]}] for it in items], params)
+    else:
+        outs = llm.generate([it["prompt"] for it in items], params)
+    rows = []
+    for it, o in zip(items, outs):
+        samples = [
+            {
+                "text": c.text,
+                "token_ids": list(c.token_ids),
+                "n_tokens": len(c.token_ids),
+                "finish_reason": c.finish_reason,
+            }
+            for c in o.outputs
+        ]
+        rows.append(
+            {
+                "id": it["id"],
+                "format": it["format"],
+                "prompt_token_ids": list(o.prompt_token_ids),
+                "samples": samples,
+            }
+        )
+    return rows
 
 
 if __name__ == "__main__":

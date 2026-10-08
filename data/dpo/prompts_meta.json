@@ -1,14 +1,93 @@
 {
-  "source": "data/sft/train.jsonl",
+  "sources": {
+    "sft_train": "data/sft/train.jsonl",
+    "definition_cap": "data/sft/sft_rejected.jsonl"
+  },
   "sft_dataset_hash": "70f47740bd973dc47f43d74c826b1bca3a82bb3e50379fe3ccc44179566ab4b6",
-  "prompts": 2419,
-  "duplicates_dropped": 17,
+  "prompts": 2506,
+  "by_source": {
+    "sft_train": 1944,
+    "definition_cap": 562
+  },
+  "dropped_from_sft_train": {
+    "replay": 475,
+    "duplicate_prompt": 17
+  },
+  "dropped_from_definition_cap": {
+    "term_in_train": 3,
+    "rule2_unseen": 1
+  },
+  "excluded_definitions": [
+    {
+      "eid": "fhwa-hif15016:p46:c0:f6:definition:1",
+      "term": "creep",
+      "why": "term_in_train"
+    },
+    {
+      "eid": "usace-em-1110-2-1100-app-a:p69:c0:f7:definition:1",
+      "term": "scour",
+      "why": "term_in_train"
+    },
+    {
+      "eid": "usace-em-1110-2-1601:p29:c0:f9:definition:1",
+      "term": "W50 stone",
+      "why": "rule2_unseen:qa-1105"
+    },
+    {
+      "eid": "fema-p-1050-1:p486:c0:f6:definition:1",
+      "term": "seismic force-resisting system (SFRS)",
+      "why": "term_in_train"
+    }
+  ],
   "by_format": {
     "closed_book": 1129,
-    "replay": 475,
+    "definition": 820,
     "grounded": 374,
-    "definition": 258,
     "abstain": 183
   },
-  "sha256": "1810718dfb35a3ffa40ce9ba2a13203ced0a6f3759bb3cdc97b1eb7e0bad12d1"
+  "by_format_split": {
+    "closed_book": {
+      "train": 1028,
+      "val": 56,
+      "judge": 45
+    },
+    "definition": {
+      "train": 746,
+      "val": 41,
+      "judge": 33
+    },
+    "grounded": {
+      "train": 340,
+      "val": 19,
+      "judge": 15
+    },
+    "abstain": {
+      "train": 167,
+      "val": 9,
+      "judge": 7
+    }
+  },
+  "probe_ids": [
+    "usace-em-1110-2-1100-app-a:p69:c0:t0:definition:1",
+    "nist-gcr-22-917-51:p136:c0:q4:grounded:1",
+    "fhwa-sbdh-ex2b:p54:c0:f2:closed_book:1",
+    "fhwa-hif19067:p34:c0:f1:closed_book:2",
+    "fhwa-hif23003:p240:c0:q0:closed_book:2",
+    "fema-p-2006:p49:c0:q4:grounded:1",
+    "usace-em-1110-2-1100-app-a:p14:c0:f7:definition:1",
+    "fema-p-1050-1:p411:c0:q1:abstain:1",
+    "fema-nehrp-2000-commentary:p454:c1:q0:closed_book:1",
+    "fema-nehrp-examples-v1:p38:c1:t0:definition:1",
+    "nist-gcr-22-917-50:p227:c0:q0:abstain:1",
+    "usace-em-1110-2-1003:p382:c1:t0:definition:1",
+    "nasa-std-5019a:p85:c0:f7:definition:1",
+    "fema-p-58-2:p69:c0:t0:definition:1",
+    "fhwa-sbdh-v19:p34:c0:f10:definition:1",
+    "fema-p-1024-ra2:p16:c0:f0:closed_book:2",
+    "fema-p-232:p111:c0:q0:closed_book:2",
+    "usace-em-1110-2-2902a:p346:c0:q4:grounded:1",
+    "fhwa-nhi-15-047:p1055:c0:f2:closed_book:2",
+    "usace-em-1110-2-2400:p33:c0:f3:closed_book:1"
+  ],
+  "sha256": "a44cb6b3c0d4ff9894f2d284e330acd8c4ea134c0e93787efebf398aedb9e699"
 }

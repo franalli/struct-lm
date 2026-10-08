@@ -62,3 +62,6 @@ eval/.cache/
 # records every count; train.jsonl, sft_val.jsonl, sft_rejected.jsonl and review.md are committed)
 data/sft/.cache/
 data/sft/work/
+
+# Stage 4 scoring scratch (every pool sample with its scores; rebuilt by data/scripts/dpo_score.py)
+data/dpo/work/

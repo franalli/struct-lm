@@ -221,3 +221,29 @@ comparison or an explanation), even if hedged or next to a statement that the in
 provided. Also score 0 if the answer is empty or consists only of citations.
 
 Return JSON: {{"score": 0 or 1, "reason": "one sentence"}}"""
+
+
+def pairwise_rubric(prompt: str, reference: str, answer_1: str, answer_2: str) -> str:
+    """Stage 4's win rate (eval/winrate.py): which of two anonymous answers to the same prompt is
+    better. Kept on the binary contract: score 1 means answer 1. Asked in both orders by the
+    caller, so position bias shows as a split (scored a tie). Reported only: this judge missed
+    72% of known grounded defects in the Stage 4 benchmark (notes/decisions.md, 2026-10-08)."""
+    return f"""You are comparing two answers to the same request. Be strict.
+
+Request (exactly as the model saw it):
+{prompt}
+
+Reference (what a correct answer must agree with): {reference}
+
+Answer 1:
+{answer_1}
+
+Answer 2:
+{answer_2}
+
+Decide which answer is better, in this order of importance:
+1. Correct and faithful to the reference and to any passages in the request; adds nothing they don't say.
+2. Does what the request asks: its format, its citations, or declining when the request says to.
+3. Concise.
+
+Return JSON: {{"score": 1 if Answer 1 is better, 0 if Answer 2 is better, "reason": "one sentence"}}"""

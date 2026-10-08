@@ -11,48 +11,37 @@ before sampling; notes/decisions.md):
   closed_book   verifier: the answer line states the record's gold fact (sft_judge.same_fact)
   abstain       verifier, as the SFT builder's (sft_judge.verify): a sample answered if it cites a
                 passage or runs past 12 words; otherwise it declined (chosen), whatever its wording
-  grounded,     the A5 judge (sft_judge.judge: Mistral Large 3, the format's ch. 12 rubric, the
-  definition    gold fact as a hard rule) scores each sample; a sample failing a hard rule counts
-                at the floor (1.0), as the judge's own keep rule requires both. Pairable if max -
-                min >= 2. A failed judge call is left out, never scored; a prompt with fewer than
+  grounded,     rules first, then the A5 rubric with all of a prompt's samples in one call
+  definition    (dpo_common.judge_samples; user decision 2026-10-08), in the prompt variant the
+                judge benchmark chose for the format (results/dpo/judge_bench.json); a sample
+                failing a rule or a judge hard rule counts at the floor (1.0). Pairable if max -
+                min >= 2. A format that failed the benchmark is scored by its rules alone (5 pass,
+                1 fail). A failed judge call is left out, never scored; a prompt with fewer than
                 2 scored samples is not counted
   replay        no scorer yet: counted, not scored
 Pairable fraction doesn't gate: below half on a non-abstain format, that format is sampled 8 per
-prompt instead of raising temperature further. The judge is the SFT builder's, not benchmarked for
-preference labels (the retrospective's rule: Stage 4's judge gets its benchmark before any pair is
-labelled), so this is a sampling-budget estimate, not labels. Samples are model output and are
+prompt instead of raising temperature further; abstain is sampled 8 regardless (2026-10-08). Writes
+the sampling budget to data/dpo/budget.json for eval/sample.py's dpo_pool job. Samples are model output and are
 only scored here; nothing is written into training data.
 """
 
 import json
-import re
 import sys
 from collections import Counter
-from pathlib import Path
 
+from dpo_common import FLOOR, MARGIN, REPO, judge_samples, records, relabel
 from sft_common import pmap, read_jsonl, report_failures, set_rpm
-from sft_judge import judge, same_fact
+from sft_judge import same_fact
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+sys.path.insert(0, str(REPO / "eval"))
 from scorers import answer_line, citations
 
-REPO = Path(__file__).resolve().parents[2]
-WORK = REPO / "data/sft/work/judged.jsonl"
-MARGIN = 2.0
-CHUNK_ID = re.compile(r"[\w.-]+:p\d+:c\d+\b")  # tests/test_sft_data.py's pattern
-FLOOR = 1.0
+BENCH = REPO / "results/dpo/judge_bench.json"
+BUDGET = REPO / "data/dpo/budget.json"
+TEMPERATURE = 0.7  # the probe's; a stop (collapse) moves it to 1.0 with top_p 0.95, by hand
 
 
-def relabel(text: str, passages: list[dict]) -> str:
-    """The model cites chunk ids (the prompt shows them); the judge and verifier read [P1]-[P4].
-    Every chunk id goes: one of the record's passages becomes its label, any other id (a made-up
-    one, the prompt's [doc:p12:c0] example) becomes "unknown", so no chunk id reaches a judge
-    prompt or the SFT builder's call cache (test_generator_prompts_clean)."""
-    label = {p["chunk_id"]: p["label"] for p in passages}
-    return CHUNK_ID.sub(lambda m: label.get(m[0], "unknown"), text)
-
-
-def verdicts(row: dict, rec: dict) -> dict:
+def verdicts(row: dict, rec: dict, variants: dict) -> dict:
     """Chosen / rejected per sample by the format's scorer, and whether the prompt is pairable."""
     texts = [s["text"].strip() for s in row["samples"]]
     fmt = row["format"]
@@ -63,19 +52,24 @@ def verdicts(row: dict, rec: dict) -> dict:
         ok = [not (citations(t) or len(t.split()) > 12) for t in texts]
         return {"scorer": "verifier", "chosen": ok, "pairable": any(ok) and not all(ok)}
     if fmt in ("grounded", "definition"):
-        items = [{**rec, "answer": relabel(t, rec.get("passages") or [])} for t in texts]
-        assert not any(CHUNK_ID.search(i["answer"]) for i in items)
-        judged = pmap(judge, items)
-        scored = [j for j in judged if not j["failed_call"]]
-        eff = [j["score"] if all(j["hard"].values()) else FLOOR for j in scored]
+        texts = [relabel(t, rec.get("passages") or []) for t in texts]
+        variant = variants.get(fmt)
+        if variant is None:  # failed the benchmark: rules only
+            from dpo_common import rule_fails
+
+            eff = [FLOOR if rule_fails(rec, t) else 5.0 for t in texts]
+            scored, failed, scorer = eff, 0, "rules"
+        else:
+            got = judge_samples(rec, texts, variant, f"probe:{row['id']}")
+            scored = [g["eff"] for g in got if g["eff"] is not None]
+            failed, scorer = sum(g["eff"] is None for g in got), f"judge:{variant}"
+            eff = scored
         return {
-            "scorer": "judge",
-            "scores": [j["score"] for j in scored],
-            "hard_pass": [all(j["hard"].values()) for j in scored],
+            "scorer": scorer,
             "effective": eff,
-            "failed_calls": len(judged) - len(scored),
-            "margin": round(max(eff) - min(eff), 2) if len(eff) >= 2 else None,
-            "pairable": max(eff) - min(eff) >= MARGIN if len(eff) >= 2 else None,
+            "failed_samples": failed,
+            "margin": round(max(scored) - min(scored), 2) if len(scored) >= 2 else None,
+            "pairable": max(scored) - min(scored) >= MARGIN if len(scored) >= 2 else None,
         }
     return {"scorer": None, "pairable": None}
 
@@ -85,17 +79,17 @@ def main() -> None:
         raise SystemExit(__doc__)
     run = sys.argv[1]
     set_rpm(30)
+    bench = json.loads(BENCH.read_text())  # the benchmark comes first (2026-10-08)
+    variants = {f: v["variant"] if v["passed"] else None for f, v in bench["chosen"].items()}
     rows = read_jsonl(REPO / f"results/runs/{run}/samples/dpo_probe.jsonl")
-    work = {}
-    ids = {r["id"] for r in rows}
-    for line in WORK.open():
-        rec = json.loads(line)
-        if rec["eid"] in ids:
-            work[rec["eid"]] = rec
-    per = []
-    for r in rows:
-        v = verdicts(r, work[r["id"]]) if r["id"] in work else {"scorer": None, "pairable": None}
-        per.append({"id": r["id"], "format": r["format"], **v})
+    work = records({r["id"] for r in rows})
+
+    def one(r: dict) -> dict:
+        if r["id"] not in work:
+            return {"id": r["id"], "format": r["format"], "scorer": None, "pairable": None}
+        return {"id": r["id"], "format": r["format"], **verdicts(r, work[r["id"]], variants)}
+
+    per = pmap(one, rows)
     by_format = {}
     for f in sorted({x["format"] for x in per}):
         sel = [x for x in per if x["format"] == f and x["pairable"] is not None]
@@ -111,21 +105,35 @@ def main() -> None:
     budget = {
         f: 8
         for f, v in by_format.items()
-        if f != "abstain" and v["pairable_fraction"] is not None and v["pairable_fraction"] < 0.5
+        if f == "abstain" or (v["pairable_fraction"] is not None and v["pairable_fraction"] < 0.5)
     }
     res = {
         "run": run,
         "rule": "pairable = >= 1 chosen and >= 1 rejected of 4 (verifier: closed_book, abstain; "
-        f"judge margin >= {MARGIN}: grounded, definition); doesn't gate; < 0.5 on a non-abstain "
-        "format -> 8 samples per prompt for it",
+        f"rules + listwise judge margin >= {MARGIN}: grounded, definition); doesn't gate; < 0.5 on "
+        "a non-abstain format -> 8 samples per prompt for it; abstain 8 regardless",
+        "variants": variants,
         "by_format": by_format,
         "samples_per_prompt_8": sorted(budget),
         "scorers": dict(Counter(x["scorer"] for x in per)),
         "per_prompt": per,
     }
-    res["failed_judge_calls"] = sum(x.get("failed_calls", 0) for x in per)
+    res["failed_judge_samples"] = sum(x.get("failed_samples", 0) for x in per)
     out = REPO / "results/diversity" / f"{run}_pairable.json"
     out.write_text(json.dumps(res, indent=2) + "\n")
+    formats = ("closed_book", "definition", "grounded", "abstain")
+    BUDGET.write_text(
+        json.dumps(
+            {
+                "temperature": TEMPERATURE,
+                "top_p": None,
+                "n": {f: 8 if f in budget else 4 for f in formats},
+                "from": str(out.relative_to(REPO)),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     report_failures()
     print(json.dumps({k: v for k, v in res.items() if k != "per_prompt"}, indent=2))
 

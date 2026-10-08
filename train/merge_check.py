@@ -6,14 +6,15 @@
            python train/merge_check.py noop --start checkpoints/cpt-8b-replay10 \
                --config train/configs/sft.yaml --work scratch/noop-cpt --out results/runs/noop/x.json
   check  (GPU) B5's merge gate for a trained adapter (amended 2026-10-06, before any downstream
-         eval; notes/decisions.md). Over every sft_val completion position (11,351), three models
-         loaded one at a time are compared at each position (argmax, top-1/top-2 margin, the
-         target's log-prob):
+         eval; notes/decisions.md). Over every --val completion position (sft_val: 11,351; for a
+         DPO run, data/dpo/val.jsonl's pairs, chosen and rejected each a sequence of their
+         sampled ids), three models loaded one at a time are compared at each position (argmax,
+         top-1/top-2 margin, the target's log-prob):
            ref       the start in fp32 + the fp32 adapter, unmerged (the exact function)
            unmerged  the start in bf16 + the fp32 adapter: the noise floor of bf16 inference
            merged    the merged bf16 checkpoint under test
          Pass: the merge adds at most 0.1% of positions in argmax flips against ref over what
-         unmerged already has (11 of 11,351); its mean |delta log-prob| against ref is at most 1.5x
+         unmerged already has (11 of 11,351 on sft_val); its mean |delta log-prob| against ref is at most 1.5x
          unmerged's; and its val loss (token-mean NLL) is within 0.5% of unmerged's. Reported, not
          gated: merged-vs-unmerged agreement (two bf16 approximations: it measures bf16's own
          near-tie noise as much as the merge), the 3-probe logit ratios, and the sha256 of every
@@ -44,6 +45,37 @@ from safetensors import safe_open
 
 LOSS_TOL, ADDED_FLIPS_MAX, LP_RATIO_MAX, RATIO_FLAG = 0.005, 0.001, 1.5, 0.05
 PROBES = ("closed_book", "grounded", "replay")  # the 3 val records the logits are compared on
+N_PROBES = 3
+
+
+def val_records(path: str, start: str) -> list[dict]:
+    """{input_ids, completion_mask, format} per val sequence. SFT records are encoded through
+    mistral-common (sft_data.encode); DPO pair records (with chosen_ids) give two sequences each,
+    prompt + chosen and prompt + rejected, from their sampled ids as the trainer sees them."""
+    from sft_data import encode, load
+
+    recs = load(path)
+    if not recs or "chosen_ids" not in recs[0]:
+        return [{**encode(r, start), "format": r["format"]} for r in recs]
+    out = []
+    for r in recs:
+        for side in ("chosen_ids", "rejected_ids"):
+            out.append(
+                {
+                    "input_ids": r["prompt_ids"] + r[side],
+                    "completion_mask": [0] * len(r["prompt_ids"]) + [1] * len(r[side]),
+                    "format": r["format"],
+                }
+            )
+    return out
+
+
+def probe_formats(val: list[dict]) -> list[str]:
+    """PROBES' formats that the val set has (all three on sft_val), then its other formats in
+    name order, up to 3 (DPO val has no replay)."""
+    present = {r["format"] for r in val}
+    first = [f for f in PROBES if f in present]
+    return (first + sorted(present - set(first)))[:N_PROBES]
 
 
 def tensors(d: Path) -> dict[str, Path]:
@@ -161,16 +193,15 @@ def gate(diag: dict) -> dict:
 
 
 def measure(args) -> tuple[dict, dict]:
-    """Position stats of ref / unmerged / merged over all of sft_val, and the 3 probes' logits
+    """Position stats of ref / unmerged / merged over all of --val, and the 3 probes' logits
     (unmerged, the start without the adapter, merged), one model on the GPU at a time."""
     import gc
 
     from peft import PeftConfig, PeftModel
-    from sft_data import encode, load
 
     start = PeftConfig.from_pretrained(args.adapter).base_model_name_or_path
-    val = [{**encode(r, start), "format": r["format"]} for r in load(args.val)]
-    probes = [next(r for r in val if r["format"] == f) for f in PROBES]
+    val = val_records(args.val, start)
+    probes = [next(r for r in val if r["format"] == f) for f in probe_formats(val)]
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     logits: dict[str, list] = {}
 

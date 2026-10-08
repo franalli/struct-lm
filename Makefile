@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data sft-data train eval serve all
+.PHONY: data sft-data dpo-data dpo-pairs train eval serve all
 
 # --- data -------------------------------------------------------------------
 # Stage 1 corpus: data/sources.csv -> data/processed/{docs_raw,docs,train,val,replay,general_val}.jsonl
@@ -21,6 +21,19 @@ SFT_STEPS = sft_pool sft_questions sft_filter sft_answers sft_judge sft_replay s
 sft-data:
 	for s in $(SFT_STEPS); do $(PY) data/scripts/$$s.py || exit 1; done
 	$(PY) eval/contamination.py --only sft
+
+# --- DPO data (Stage 4) -----------------------------------------------------
+# Prompt pool + judge-benchmark prompts (Mac), then GPU sampling and API scoring in between
+# (commands: CLAUDE.md, Stage 4), then pairs. Mistral API for the judge (.env loaded).
+dpo-data:
+	$(PY) data/scripts/dpo_prompts.py
+	$(PY) data/scripts/dpo_judge_bench.py prep
+	$(PY) eval/contamination.py --only dpo
+dpo-pairs:
+	$(PY) data/scripts/dpo_score.py
+	$(PY) data/scripts/dpo_pairs.py
+	$(PY) eval/contamination.py --only dpo
+	$(PY) -m pytest tests/test_dpo_data.py -q
 
 # --- train ------------------------------------------------------------------
 # Stage 2 runs on Modal (commands and ablations: CLAUDE.md, Stage 2); this starts the main run.

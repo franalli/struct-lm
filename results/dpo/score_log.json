@@ -1,0 +1,62 @@
+{
+  "closed_book_median_tokens": 6.0,
+  "rule_sets": {
+    "registered": [
+      "citations",
+      "answered",
+      "every_sentence_cited"
+    ],
+    "amended": [
+      "citations",
+      "cites_gold",
+      "answered"
+    ]
+  },
+  "by_format": {
+    "closed_book": {
+      "prompts": 1084,
+      "samples": 4336,
+      "dropped_no_eos": 0,
+      "score_histogram": {
+        "1.0": 2844,
+        "5.0": 1492
+      },
+      "mixed_prompts": 409,
+      "form_fail_among_correct": 125
+    },
+    "definition": {
+      "prompts": 787,
+      "samples": 6296,
+      "dropped_no_eos": 0,
+      "score_histogram": {},
+      "mixed_prompts": 0
+    },
+    "grounded": {
+      "prompts": 359,
+      "samples": 2872,
+      "dropped_no_eos": 0,
+      "score_histogram": {
+        "5.0": 2805,
+        "1.0": 67
+      },
+      "mixed_prompts": 28,
+      "rule_fails": {
+        "every_sentence_cited": 56,
+        "cites_gold": 66,
+        "citations": 8,
+        "answered": 3
+      },
+      "mixed_prompts_registered_rules": 40
+    },
+    "abstain": {
+      "prompts": 176,
+      "samples": 1408,
+      "dropped_no_eos": 0,
+      "score_histogram": {
+        "5.0": 1380,
+        "1.0": 28
+      },
+      "mixed_prompts": 5
+    }
+  }
+}
