@@ -3470,3 +3470,76 @@ becomes a same-reward, two-algorithm comparison if GRPO runs.
   - With saves every 25 steps the only candidate would have been step 25.
 - **Noisy val curve:** dpo_val's 22 pairs make its accuracy noisy (SE about 0.1). The
   under-training trigger reads that curve, so it is read with that caveat.
+
+## 2026-10-08: dpo was preempted mid-training on Modal (recorded as observed)
+**What happened** (`results/dpo/launch_dpo.log`):
+- Modal preempted the `dpo` container during training and restarted the function with the same
+  input. The pipeline's own restarts launched training more than once.
+- **Attempt A** trained from scratch to step 31 (saves 10/20/30/31):
+  - train loss at the end 0.6537;
+  - dpo_val loss 0.66528.
+- **Attempt B** resumed from A's `checkpoint-10` while A was still running, in the same output
+  directory, and finished steps 11-31:
+  - train loss 0.6545;
+  - dpo_val loss 0.66538.
+- **Attempt C** resumed from `checkpoint-31` and finished at once. Its `train_summary.json`
+  (eval curve from the checkpoint's trainer state) is the one the checkpoint rule read: final
+  step kept, 0.6653 at step 31 against 0.6715 at step 20.
+
+**Reading:**
+- A and B are the same config, data order and restored RNG/optimizer state, and their end
+  points differ by 1e-4 in dpo_val loss.
+- Volume writes are whole files, so the merged adapter is one attempt's, the later commit's.
+- The seed twin (`dpo-seed1`) ran clean.
+- A clean rerun under a new name would remove the ambiguity; it isn't done unless the read needs
+  it.
+
+## 2026-10-08: Stage 4 read, as amended: hallucination down, an unseen gold-answer cost, the rest flat
+**Runs:** `dpo` and `dpo-seed1`, 31 steps each, 484 pairs.
+- **Checkpoint rule:** final step on both (dpo_val loss 0.6654 vs 0.6701 at step 20; 0.6684 vs
+  0.6738).
+- **Merge gate** (sft_val): passed with 4 and 1 added flips of 11; checkpoint sha256
+  `bf9a01c7…` and `24405b93…`.
+- **Training moved the policy only a little:**
+  - train loss 0.693 → 0.654 / 0.658;
+  - dpo_val reward accuracy 0.68 and margin 0.06, on 22 pairs;
+  - 58 and 60 of the 100 greedy win-rate answers are identical to the start's.
+
+**The pre-registered lines** (`results/train_runs.md`, Stage 4; noise = max(DPO seed gap,
+start's SE), 1 df):
+1. **Hallucination on unanswerable:** 1 and 2 of 76 against the start's 4, a change of −3.3 pt
+   against a noise of 2.6 pt. **It passes the ≤ 4 line and is beyond the noise, by about 2.5
+   items.** The start's own SFT seed twin sits at 1 of 76, so this is the line most exposed to
+   item count. Only 6 of the 484 pairs are abstain pairs.
+2. **False abstain:** 0 and 0 of 108. Passes.
+3. **`cite_valid`:** 1.000 on both, unchanged.
+4. **Seen and unseen facts:**
+   - qa_seen +1.8 pt (noise 3.5) and qa_unseen −0.3 pt (noise 2.7): **inside the noise.**
+   - seen `gold_lp` +0.02 nats, CI [−0.07, +0.11]: **inside.**
+   - **unseen `gold_lp` −0.21 nats, item CI [−0.34, −0.10], noise 0.19: beyond the noise, a
+     cost.** It is −0.12 on `dpo` and −0.31 on `dpo-seed1`. The drop is in the answer tokens, not
+     the end token (end token +0.08). The unseen accuracy doesn't move (−0.3 pt).
+5. **Guards:** MMLU −0.0 pt (noise 0.3), GSM8K −0.6 pt (noise 1.1), mean answer length −21% to
+   +3% of SFT (line +30%). **All pass.**
+
+**Reported, not read:**
+- **Win rate** against the start: 0.520 and 0.515 (SE 0.05), 79-82 ties.
+- **The pairwise judge's two orders agree on 43% and 53% of prompts,** about chance, which is
+  consistent with the benchmark's finding about this judge.
+- **Judge-scored KPI rows:** grounded_acc +0.5 pt, cite_supported +1.4 pt, vocab_recall
+  +1.0 pt, all inside the noise.
+
+**In one sentence:** DPO on 484 verifiable pairs for 31 steps cut hallucination on unanswerable
+prompts (4 → 1-2 of 76), left facts, citations and the guards inside the noise, and lowered the
+model's log-probability of unseen gold answers by about 0.2 nats without changing their accuracy.
+
+**Step 13 triggers, as written:**
+- **Displacement:** not fired. `rewards/chosen` stayed positive through training on both runs,
+  and seen qa_acc rose.
+- **Under-training:** not fired as written. The dpo_val accuracies were flat at the last eval
+  (0.68 on 22 pairs). The train loss (0.654) is far from the 0.40-0.55 the plan expected, and
+  the train margin was still rising at step 31.
+- **Over-shooting:** not fired. Generations at every save are English, non-repetitive and end on
+  `</s>`.
+- **None fired, so the registered rerun is `dpo-lnorm`** (length-normalised, β 5). The pasted
+  plan's time condition ("evals in by 15:00") wasn't met; the user decides.

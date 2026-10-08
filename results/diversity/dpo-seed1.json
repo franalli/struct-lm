@@ -1,0 +1,30 @@
+{
+  "run": "dpo-seed1",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.7797,
+    "entropy": 9.1358,
+    "mean_len": 171.5,
+    "stop_rate": 0.97
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.7643,
+    "entropy": 8.926,
+    "mean_len": 293.5,
+    "stop_rate": 0.94
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.8791,
+    "entropy": 8.2347,
+    "mean_len": 49.5,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 64,
+    "eos_stop_rate": 1.0,
+    "mean_len": 24.6,
+    "passed": true
+  }
+}

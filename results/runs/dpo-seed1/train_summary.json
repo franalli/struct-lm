@@ -1,0 +1,198 @@
+{
+  "stage": "dpo",
+  "run": "dpo-seed1",
+  "base": "checkpoints/sft-from-cpt",
+  "lora": true,
+  "gpus": 1,
+  "dataset_hash": "a899f7d2757c5952e35c3e6b816cdea982bf4f0d9982e707b81a6c285c66b4ad",
+  "pairs": 484,
+  "val_pairs": 22,
+  "by_format": {
+    "abstain": 6,
+    "closed_book": 439,
+    "grounded": 39
+  },
+  "tokens": 280192,
+  "pairs_per_step": 16,
+  "steps_per_epoch": 31,
+  "steps": 31,
+  "epochs": 1,
+  "beta": 0.1,
+  "loss_type": [
+    "sigmoid"
+  ],
+  "length_norm": false,
+  "tokens_per_s": 1867.0,
+  "train_runtime_s": 251.7,
+  "wall_s": 427.2,
+  "gpu_hours": 0.119,
+  "final_train_loss": 0.6584,
+  "final_eval": {
+    "step": 31,
+    "eval_loss": 0.6683945059776306,
+    "eval_runtime": 1.481,
+    "eval_samples_per_second": 14.855,
+    "eval_steps_per_second": 7.428,
+    "eval_entropy": 0.6723925579677928,
+    "eval_num_tokens": 280192.0,
+    "eval_logits/chosen": -2.186810633648647,
+    "eval_logits/rejected": -2.234208092272091,
+    "eval_mean_token_accuracy": 0.8493711352348328,
+    "eval_rewards/chosen": 0.005060924217104912,
+    "eval_rewards/rejected": -0.05006248867985877,
+    "eval_rewards/accuracies": 0.6818181818181818,
+    "eval_rewards/margins": 0.05512341213497249,
+    "eval_logps/chosen": -3.221657796339555,
+    "eval_logps/rejected": -5.4577341946688565
+  },
+  "eval_curve": [
+    {
+      "step": 10,
+      "eval_loss": 0.6865885853767395,
+      "eval_runtime": 1.6464,
+      "eval_samples_per_second": 13.363,
+      "eval_steps_per_second": 6.681,
+      "eval_entropy": 0.7568933245810595,
+      "eval_num_tokens": 90055.0,
+      "eval_logits/chosen": -2.2164674215858025,
+      "eval_logits/rejected": -2.2551782334750397,
+      "eval_mean_token_accuracy": 0.8548642234368757,
+      "eval_rewards/chosen": 0.005823226285759698,
+      "eval_rewards/rejected": -0.007783629677512429,
+      "eval_rewards/accuracies": 0.7272727272727273,
+      "eval_rewards/margins": 0.013606856196102772,
+      "eval_logps/chosen": -3.214034774086692,
+      "eval_logps/rejected": -5.034945574673739
+    },
+    {
+      "step": 20,
+      "eval_loss": 0.6738224625587463,
+      "eval_runtime": 1.4979,
+      "eval_samples_per_second": 14.687,
+      "eval_steps_per_second": 7.344,
+      "eval_entropy": 0.7059014751152559,
+      "eval_num_tokens": 176780.0,
+      "eval_logits/chosen": -2.198643788669541,
+      "eval_logits/rejected": -2.2475393633700356,
+      "eval_mean_token_accuracy": 0.8488168120384216,
+      "eval_rewards/chosen": 0.008287117393179373,
+      "eval_rewards/rejected": -0.0336686840958216,
+      "eval_rewards/accuracies": 0.7272727272727273,
+      "eval_rewards/margins": 0.04195580140433528,
+      "eval_logps/chosen": -3.189395861192183,
+      "eval_logps/rejected": -5.293796105818315
+    },
+    {
+      "step": 30,
+      "eval_loss": 0.6675542593002319,
+      "eval_runtime": 1.5652,
+      "eval_samples_per_second": 14.055,
+      "eval_steps_per_second": 7.028,
+      "eval_entropy": 0.6723325428637591,
+      "eval_num_tokens": 275784.0,
+      "eval_logits/chosen": -2.1871162472043495,
+      "eval_logits/rejected": -2.2355788774907452,
+      "eval_mean_token_accuracy": 0.8488168120384216,
+      "eval_rewards/chosen": 0.0060232417149977254,
+      "eval_rewards/rejected": -0.05156707408075983,
+      "eval_rewards/accuracies": 0.6818181818181818,
+      "eval_rewards/margins": 0.05759031427177516,
+      "eval_logps/chosen": -3.2120346156033603,
+      "eval_logps/rejected": -5.472779967568138
+    },
+    {
+      "step": 31,
+      "eval_loss": 0.6683945059776306,
+      "eval_runtime": 1.481,
+      "eval_samples_per_second": 14.855,
+      "eval_steps_per_second": 7.428,
+      "eval_entropy": 0.6723925579677928,
+      "eval_num_tokens": 280192.0,
+      "eval_logits/chosen": -2.186810633648647,
+      "eval_logits/rejected": -2.234208092272091,
+      "eval_mean_token_accuracy": 0.8493711352348328,
+      "eval_rewards/chosen": 0.005060924217104912,
+      "eval_rewards/rejected": -0.05006248867985877,
+      "eval_rewards/accuracies": 0.6818181818181818,
+      "eval_rewards/margins": 0.05512341213497249,
+      "eval_logps/chosen": -3.221657796339555,
+      "eval_logps/rejected": -5.4577341946688565
+    }
+  ],
+  "checkpoints": [
+    "checkpoint-10",
+    "checkpoint-20",
+    "checkpoint-30",
+    "checkpoint-31"
+  ],
+  "peak_mem_gb": 36.67,
+  "smoke": false,
+  "data": {
+    "data/dpo/train.jsonl": "546415ffd4b63210eb4d85014565d20493d58341e685bce21c07a0598510fb71",
+    "data/dpo/val.jsonl": "89cf64ee6a9f93c91e9b8e7c0af026c4eb059be4529f29c376c3631f4619fb4d"
+  },
+  "config": {
+    "stage": "dpo",
+    "model": {
+      "init_from": "checkpoints/sft-from-cpt",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa"
+    },
+    "lora": {
+      "r": 64,
+      "lora_alpha": 128,
+      "lora_dropout": 0.05,
+      "bias": "none",
+      "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
+    },
+    "data": {
+      "dir": "data/dpo",
+      "train": "data/dpo/train.jsonl",
+      "val": "data/dpo/val.jsonl"
+    },
+    "run": {
+      "results_dir": "results"
+    },
+    "dpo": {
+      "length_norm": false
+    },
+    "training": {
+      "output_dir": "checkpoints/_train/dpo-seed1",
+      "run_name": "dpo-seed1",
+      "num_train_epochs": 1,
+      "per_device_train_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "per_device_eval_batch_size": 2,
+      "precompute_ref_batch_size": 2,
+      "learning_rate": 1e-05,
+      "lr_scheduler_type": "linear",
+      "warmup_steps": 0.1,
+      "weight_decay": 0.0,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.999,
+      "adam_epsilon": 1e-08,
+      "max_grad_norm": 1.0,
+      "beta": 0.1,
+      "loss_type": "sigmoid",
+      "max_length": null,
+      "precompute_ref_log_probs": true,
+      "disable_dropout": true,
+      "bf16": true,
+      "tf32": true,
+      "gradient_checkpointing": true,
+      "gradient_checkpointing_kwargs": {
+        "use_reentrant": false
+      },
+      "logging_steps": 1,
+      "eval_strategy": "steps",
+      "eval_steps": 10,
+      "save_strategy": "steps",
+      "save_steps": 10,
+      "save_only_model": false,
+      "save_total_limit": null,
+      "report_to": "none",
+      "seed": 1,
+      "data_seed": 1
+    }
+  }
+}

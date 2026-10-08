@@ -145,7 +145,7 @@ sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ─�
 |-------|--------|-----------|--------|
 | CPT  | `train/cpt.py`  | `data/processed/{train,val}.jsonl` (+ `replay.jsonl` for the replay ablation) | next-token on domain text |
 | SFT  | `train/sft.py`  | `data/sft/{train,sft_val}.jsonl` `{"prompt": [...], "completion": [...]}` | completion-only loss |
-| DPO  | `train/dpo.py`  | `data/dpo/{train,val}.jsonl` `{"prompt","chosen","rejected"}` | preference pairs |
+| DPO  | `train/dpo.py`  | `data/dpo/{train,val}.jsonl` `{"prompt","chosen","rejected"}` + token ids | verifiable preference pairs (sigmoid DPO) |
 | GRPO | `train/grpo.py` | `data/grpo/train.jsonl` `{"prompt","answer"}` | verifiable reward functions |
 
 **Who wrote the training data.** The SFT questions and completions were written by Mistral Large 3
@@ -153,7 +153,8 @@ sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ─�
 the abstain records' fixed refusal sentence, and the 500 general replay records come from the Tülu 3
 SFT mixture without its Claude-written subsets. Claude, through Claude Code, built the tooling and
 reviewed the generated records against their source passages with keep/drop verdicts only: no
-training record contains text Claude wrote.
+training record contains text Claude wrote. The DPO pairs' chosen and rejected answers are
+sft-from-cpt's own samples, labelled by verifiers and rules (no judge, no Claude verdicts).
 
 Each stage trains a LoRA adapter; `train/merge.py` folds it into the weights, and the next
 stage's `model.init_from` points at the merged directory.
@@ -211,7 +212,7 @@ $M run --detach train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 
 ```
 
 SFT is wired (a config with `stage: sft`; `train/sft.py`, pre-tokenised by `train/sft_data.py`).
-DPO and GRPO (`dpo.py`, `grpo.py`) are not wired into the Modal app yet.
+DPO is wired (`stage: dpo`, `train/dpo.py`); GRPO (`grpo.py`) is not yet.
 
 ```bash
 # Stage 3: SFT (the set must match data/sft/SHA256SUMS on the volume), B4 and the merge gate run in
@@ -494,6 +495,8 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | cpt-8b-full | 6.732 | -2.15% | -0.0217 [-0.0357, -0.0104] | 8.248 | +1.19% | +0.0118 [+0.0091, +0.0143] | 4.815 | -22.15% |
 | cpt-8b-lr2x | 6.713 | -2.42% | -0.0245 [-0.0335, -0.0172] | 8.220 | +0.85% | +0.0085 [+0.0068, +0.0102] | 5.442 | -12.01% |
 | cpt-8b-seed1 | 6.718 | -2.35% | -0.0238 [-0.0307, -0.0180] | 8.165 | +0.17% | +0.0017 [+0.0002, +0.0030] | 5.687 | -8.05% |
+| dpo | 6.882 | +0.03% | +0.0003 [-0.0053, +0.0064] | 8.066 | -1.05% | -0.0105 [-0.0138, -0.0075] | 5.805 | -6.14% |
+| dpo-seed1 | 6.885 | +0.08% | +0.0008 [-0.0049, +0.0069] | 8.067 | -1.03% | -0.0104 [-0.0137, -0.0073] | 5.808 | -6.10% |
 | sft-from-base | 7.008 | +1.86% | +0.0184 [+0.0166, +0.0211] | 8.234 | +1.01% | +0.0100 [+0.0091, +0.0110] | 6.311 | +2.05% |
 | sft-from-base-seed1 | 7.010 | +1.89% | +0.0187 [+0.0169, +0.0214] | 8.251 | +1.22% | +0.0121 [+0.0110, +0.0133] | 6.316 | +2.13% |
 | sft-from-cpt | 6.872 | -0.11% | -0.0011 [-0.0071, +0.0051] | 8.061 | -1.11% | -0.0111 [-0.0144, -0.0081] | 5.800 | -6.23% |
@@ -1020,6 +1023,214 @@ target.
    steps on the recall formats would locate the best step, rather than choosing between two epoch
    ends.
 
+#### Stage 4: DPO on verifiable preferences
+
+Direct preference optimisation from the Stage 3 checkpoint (sft-from-cpt, epoch 1), on pairs the
+SFT model wrote itself: every chosen and every rejected answer is one of its own samples, and a
+verifier or a rule decides which is which. It was planned with a Mistral Large 3 judge labelling
+grounded and definition answers. The judge failed its pre-registered benchmark (below), so it
+labels nothing, and the stage became DPO on verifiable preferences (the RLHF Book's ch. 11 case;
+Tülu 3's IF-constraint pairs are built the same way). The plan, the benchmark rule and the
+amendment, made after the benchmark and before any pool sample, are in
+[`notes/decisions.md`](notes/decisions.md) (2026-10-08).
+
+**The prompts:** 2,506 (`data/dpo/prompts.jsonl`, sha256 `a44cb6b3`): the SFT set's domain prompts
+(no replay) and the 562 definitions the Stage 3 cap cut, never trained on. 100 are held out for
+the win rate and 125 for dpo_val.
+
+**The samples:** sft-from-cpt at T 0.7, 4 per closed-book prompt and 8 per grounded, definition
+and abstain prompt: 14,912, all ending on `</s>`. No collapse in the pre-registered probe (0 of 18
+non-abstain prompts).
+
+##### The judge failed its benchmark
+
+Before any pair was labelled, the judge was measured on 166 SFT-builder answers whose defects a
+full-passage read had found or cleared (the 2026-10-05 rule). The A5 judge had passed every one of
+them one at a time. Here each was judged as it would be in the pool: listed with three of the
+student's own answers to the same prompt, all graded in one call.
+
+| format | prompt variant | defects caught (recall) | clean answers passed | AUROC |
+|---|---|---|---|---|
+| grounded (60 defects, 60 clean) | rubric as is | **0.28** | 0.92 | 0.66 |
+| | quote the supporting sentence first | 0.18 | 0.95 | 0.67 |
+| | full page instead of the chunk | 0.22 | 0.92 | 0.67 |
+| definition (23 defects, 23 clean) | rubric as is | **0.09** | 0.87 | 0.54 |
+| | quote first | 0.09 | 0.83 | 0.51 |
+| | full page | 0.04 | 0.83 | 0.50 |
+
+- **The line was recall ≥ 0.5 at ok-pass ≥ 0.8.** Neither format passed, and no prompt variant
+  helped.
+- **What it misses is the audit's kind of defect:** a dropped caveat, a gap in an OCR'd passage
+  filled in, one example generalised into a rule. In several misses the judge's own reasoning
+  names the flaw and the score is still 5 ("inaccurately expands PUD to 'Probable Ultimate
+  Demand', which is not explicitly defined in the passage").
+- **Why a ~25% catch rate can't label pairs:** with ~10% defect prevalence, a judge "fail" at
+  this recall and ok-pass is a true defect only about a quarter of the time, so the rejected side
+  of judged pairs would be mostly good answers.
+- **Two biases measured on the way:**
+  - list position: the mean score falls about 0.5 point from the first answer to the fourth;
+  - teacher over student: the student's answers score 0.8 (grounded) and 2.1 (definition) points
+    below Large 3's own answers, defective ones included. That is self-preference or a weaker
+    student, and this benchmark can't tell which.
+- **The KPI eval's judge is a different prompt:** `grounded_acc` and `cite_supported` use the same
+  model (Large 3) with strict binary prompts that name the gold passage and list the parsed
+  citations (`eval/judge.py`). The Stage 0 hand-check found that prompt errs strict, but this
+  benchmark did not test it.
+- **Next step:** a per-claim support check (split the answer into claims, check each against its
+  cited passage), benchmarked on the same labels before it labels anything.
+
+The listwise prompt (`data/scripts/sft_judge.py`, `judge_list`), with the format's A5 rubric
+inserted and each grade scored as the SFT builder's judge scores one:
+
+```text
+You are grading {n} answers to the same question, for a model that answers questions
+about US federal structural engineering documents. Grade strictly against the rubric. Grade every
+answer on its own: decide each rule for each answer separately; the other answers are not a
+reference, and their order means nothing.
+
+Source the answers must rest on:
+{passages, labelled [P1]-[P4]}
+
+Question:
+{question}
+
+Answers to grade:
+[Answer 1]
+...
+
+Rubric:
+{hard rules, principles with weights, pitfalls}
+
+Return JSON with one grade per answer, in answer order, each with its reasoning first:
+{"grades": [{"answer": 1, "reasoning": "...", "hard": {...}, "principles": {...},
+  "optional": {...}, "pitfalls": {...}}, ...]}
+```
+
+##### The pairs
+
+Every label is a verifier or a rule (`data/scripts/dpo_score.py`, `dpo_pairs.py`):
+
+- **Closed-book:** the answer states the gold fact (the SFT builder's verifier); the chosen answer
+  also passes a form check.
+- **Abstain:** declining on an unanswerable prompt over answering it.
+- **Grounded:** a rule-passing answer over one that cites an id it wasn't given, doesn't cite the
+  passage the question came from, or refuses an answerable question.
+- **Definition:** no pairs, since no verifier knows a definition's quality.
+
+| | closed-book | grounded | abstain | total |
+|---|---|---|---|---|
+| as registered (closed-book capped at half) | 57 | 51 | 6 | **114** |
+| as trained (cap lifted, judge out) | 458 | 42 | 6 | **506** |
+
+- **Size:** 506 pairs (train 484, dpo_val 22), dataset hash `a899f7d2` (`data/dpo/SHA256SUMS`).
+  That is under smol's 1,000-pair floor for domain DPO; Tülu 3 used ~270k.
+- **The cap was a mix rule, not a validity rule.** Lifting it is a post-hoc amendment of the mix,
+  recorded as one, and it turns the stage into mostly fact preference on SFT-seen prompts.
+- **What this DPO can teach:** correct facts over incorrect ones on prompts SFT already showed,
+  abstaining over hallucinating (6 pairs: the student answered only 2% of unanswerable samples),
+  and citing the right passage. Nothing on definitions, nothing on unseen facts.
+- **The same reward Stage 5 would use:** on closed-book it is the reward GRPO would use, so DPO
+  against GRPO would compare two algorithms on one reward.
+- **Self-preference:** chosen and rejected share a generator, so self-preference can't bias which
+  answer is chosen.
+
+**The training run** (`train/configs/dpo.yaml`): TRL 0.29.1 `DPOTrainer`, sigmoid loss, β 0.1;
+LoRA r 64 / α 128 on the language model; LR 1e-5 linear, 10% warmup; 16 pairs per step, one
+epoch (31 steps); the reference is the SFT checkpoint with the adapter off, precomputed. Two
+changes to TRL:
+- **Pre-tokenised pairs:** the trainer gets vLLM's sampled token ids, the exact tokens the policy
+  produced.
+- **Log-probabilities in fp32:** TRL sums them in bf16, which rounds a sequence log-probability to
+  0.5-1 nat, more than the early policy/reference gap.
+
+Seeds 0 (`dpo`) and 1 (`dpo-seed1`).
+
+![Stage 4 DPO curves: loss, reward margin and reward accuracy (train as a moving average, dpo_val as points), and the chosen / rejected sequence log-probs](results/curves/dpo.png)
+
+**The read** (amended before launch; `results/train_runs.md` and the table below; noise is
+max(the DPO seed gap, the start's SE), one seed pair):
+
+- **Hallucination on unanswerable prompts fell from 4 of 76 to 1 and 2.** That passes the ≤ 4 line
+  and is beyond the noise (−3.3 pt against 2.6), but it is about 2.5 items. The start's own SFT
+  seed twin also sits at 1 of 76, and only 6 of the 484 pairs are abstain pairs.
+- **False abstain stayed at 0 of 108; `cite_valid` stayed at 1.000.**
+- **Facts: inside the noise.** qa_seen moved +1.8 pt (noise 3.5) and qa_unseen −0.3 pt. The
+  expected movement on SFT-seen facts didn't show at this size.
+- **A cost on unseen facts' likelihood.** The model's log-probability of the unseen gold answers
+  fell 0.21 nats (item CI [−0.34, −0.10], noise 0.19), in the answer tokens rather than the end
+  token, on both seeds (−0.12, −0.31), with unseen accuracy unchanged.
+- **Guards held:** MMLU −0.0 pt, GSM8K −0.6 pt, answer length −21% to +3% of SFT.
+- **The policy barely moved.** Train loss went from 0.693 to 0.654 in 31 steps and the dpo_val
+  margin is 0.06; 58-60 of the 100 greedy win-rate answers are identical to SFT's.
+- **The win rate is 0.52 and 0.515** (SE 0.05; reported, not read). The pairwise judge agreed with
+  itself across the two answer orders on only 43-53% of prompts.
+
+Of the pre-registered rerun triggers, none fired as written (displacement, under-training on the
+dpo_val accuracy curve, over-shooting). `dpo` was preempted on Modal mid-training and restarted
+(recorded in `notes/decisions.md`); the seed twin ran clean.
+
+<!-- stage4-tables:start -->
+##### Training runs
+
+| run | start | pairs | steps | tokens/s | wall (h) | GPU-h | $ | peak GB | final train loss | dpo_val loss | dpo_val reward accuracy | dpo_val margin | rule picks |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| dpo | sft-from-cpt | 484 | 31 |  | 0.04 | 0.04 | 0.18 | 29 | 0.654 | 0.665 | 0.682 | 0.062 | step 31 (final): 0.6654 vs 0.6701 at 20 |
+| dpo-seed1 | sft-from-cpt | 484 | 31 | 1,867 | 0.12 | 0.12 | 0.47 | 37 | 0.658 | 0.668 | 0.682 | 0.055 | step 31 (final): 0.6684 vs 0.6738 at 20 |
+
+The checkpoint rule (pre-registered): the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (assumed).
+
+##### The read: change against sft-from-cpt, next to the noise
+
+| metric | read | sft-from-cpt | dpo | dpo-seed1 | change (mean of 2) | noise | beyond noise |
+|---|---|---|---|---|---|---|---|
+| halluc_rate (lower is better) | primary | 0.053 | 0.013 | 0.026 | -3.3 pt | 2.6 pt | yes |
+| false_abstain (lower is better) | primary | 0.000 | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
+| cite_valid | primary | 1.000 | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
+| qa_seen | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no |
+| qa_unseen | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no |
+| seen gold-answer log-prob (nats) | primary | -5.120 | -5.003 | -5.196 | +0.021 [-0.072, +0.113] | 0.193 | no |
+| unseen gold-answer log-prob (nats) | primary | -6.426 | -6.544 | -6.731 | -0.212 [-0.335, -0.097] | 0.187 | yes |
+| MMLU | guard | 0.766 | 0.767 | 0.765 | -0.0 pt | 0.3 pt | no |
+| GSM8K | guard | 0.814 | 0.810 | 0.807 | -0.6 pt | 1.1 pt | no |
+| grounded_acc (judge) | reported | 0.907 | 0.917 | 0.907 | +0.5 pt | 2.8 pt | no |
+| cite_supported (judge) | reported | 0.861 | 0.870 | 0.880 | +1.4 pt | 3.3 pt | no |
+| vocab_recall (judge) | reported | 0.833 | 0.838 | 0.848 | +1.0 pt | 2.6 pt | no |
+
+Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must stay within the noise; judge-scored rows are reported, not read. Noise is max(the DPO seed gap, the start's SE), one seed pair (1 df).
+
+##### Win rate against sft-from-cpt (reported, not read)
+
+| run | win rate | SE | ties | identical greedy answers | n | position consistency |
+|---|---|---|---|---|---|---|
+| dpo | 0.520 | 0.050 | 82 | 58 | 100 | 0.43 |
+| dpo-seed1 | 0.515 | 0.050 | 79 | 60 | 100 | 0.53 |
+
+##### Checks
+
+No-op control (an untrained adapter, merged, against its start):
+
+| start | tensors | differ | max abs diff | passed |
+|---|---|---|---|---|
+| sft-from-cpt | 531 | 0 | 0.0 | yes |
+
+Merge gate (B5, amended): over every sft_val completion position (11,351; dpo_val's 665 are too few for the 0.1% line, 2026-10-08 freeze) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
+
+| run | flips added | \|dlp\| ratio | val loss diff | merged vs unmerged top-1 | probe error ratio | checkpoint sha256 | passed |
+|---|---|---|---|---|---|---|---|
+| dpo | 4 of 11 | 1.084 | 0.06% | 99.44% | 0.3635 | `bf9a01c704d3` | yes |
+| dpo-seed1 | 1 of 11 | 1.089 | 0.04% | 99.56% | 0.3944 | `24405b930436` | yes |
+
+Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):
+
+| run | distinct-4 | entropy (bits) | mean length | distinct-4 general | distinct-4 domain | stopped (T 0.7) | stopped (eos job) |
+|---|---|---|---|---|---|---|---|
+| sft-from-cpt | 0.7724 | 9.0197 | 163.4 | 0.7567 | 0.8646 | 0.98 | 98.8% of 80 |
+| dpo | 0.7963 | 9.2183 | 167.6 | 0.7846 | 0.8729 | 1.0 | 100.0% of 64 |
+| dpo-seed1 | 0.7797 | 9.1358 | 171.5 | 0.7643 | 0.8791 | 0.97 | 100.0% of 64 |
+| dpo | 0.7963 | 9.2183 | 167.6 | 0.7846 | 0.8729 | 1.0 | 100.0% of 64 |
+| dpo-seed1 | 0.7797 | 9.1358 | 171.5 | 0.7643 | 0.8791 | 0.97 | 100.0% of 64 |
+<!-- stage4-tables:end -->
+
 ### 4. Results
 
 Every scored checkpoint, from [`results/table.md`](results/table.md) (copied here by
@@ -1085,6 +1296,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-cpt-seed1 | -5.497 | -4.873 | -6.168 | 0.202 | 0.209 | 0.234 | 0.105 | 0.270 | 0.129 |
 | sft-from-cpt | -5.749 | -5.120 | -6.426 | 0.211 | 0.245 | 0.203 | 0.026 | 0.281 | 0.136 |
 | sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 |
+| dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 |
+| dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -1101,6 +1314,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-cpt-seed1 | 0.935 | 0.982 | 0.880 | 0.013 | 0.009 | 0.857 | 0.901 | 0.817 |
 | sft-from-cpt | 0.907 | 1.000 | 0.861 | 0.053 | 0.000 | 0.833 | 0.891 | 0.780 |
 | sft-from-base-seed1 | 0.898 | 0.991 | 0.880 | 0.013 | 0.009 | 0.829 | 0.911 | 0.752 |
+| dpo-seed1 | 0.907 | 1.000 | 0.880 | 0.026 | 0.000 | 0.848 | 0.891 | 0.807 |
+| dpo | 0.917 | 1.000 | 0.870 | 0.013 | 0.000 | 0.838 | 0.891 | 0.789 |
 
 **General benchmarks (5-shot, no chat template) and perplexity (lower is better)**
 
@@ -1117,6 +1332,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-cpt-seed1 | 0.770 | 0.727 | 0.710 | 0.861 | 0.814 | 0.792 | 0.799 | 5.79 | 6.87 | 8.07 | 6.27 |
 | sft-from-cpt | 0.766 | 0.730 | 0.701 | 0.859 | 0.812 | 0.814 | 0.794 | 5.80 | 6.87 | 8.06 | 6.29 |
 | sft-from-base-seed1 | 0.768 | 0.732 | 0.706 | 0.857 | 0.813 | 0.790 | 0.799 | 6.32 | 7.01 | 8.25 | 6.31 |
+| dpo-seed1 | 0.765 | 0.726 | 0.701 | 0.858 | 0.811 | 0.807 | 0.795 | 5.81 | 6.89 | 8.07 | 6.30 |
+| dpo | 0.767 | 0.729 | 0.703 | 0.859 | 0.814 | 0.810 | 0.796 | 5.80 | 6.88 | 8.07 | 6.30 |
 <!-- results-table:end -->
 
 **Stage 2 (CPT) earned little.**

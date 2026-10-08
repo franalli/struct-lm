@@ -1229,20 +1229,90 @@ def dpo_table(runs: dict, usd: float) -> str:
 
 
 def winrate_table(names) -> str:
-    """Win rate against the start on the dpo_judge prompts, when eval/winrate.py has written
-    results/winrate/<run>_vs_sft-from-cpt.json. TODO(stage 4): fix the columns to winrate.py's
-    output once it exists; until then whichever of these keys it has."""
-    keys = ("win_rate", "wins", "ties", "losses", "n", "position_consistency")
+    """Win rate against the start on the 100 dpo_judge prompts (eval/winrate.py: Large 3, both
+    orders, a split is a tie). Reported, not read (2026-10-08 amendment)."""
+    head = [
+        "run",
+        "win rate",
+        "SE",
+        "ties",
+        "identical greedy answers",
+        "n",
+        "position consistency",
+    ]
     rows = []
     for name in names:
         f = Path("results/winrate") / f"{name}_vs_{DPO_START}.json"
         if f.exists():
             r = json.loads(f.read_text())
-            rows.append([name, *(r.get(k, "") for k in keys)])
+            o = r["overall"]
+            rows.append([name, f"{o['win_rate']:.3f}", f"{o['se']:.3f}", o["ties"], o["identical"],
+                         o["n"], f"{r['position_consistency']:.2f}"])  # fmt: skip
     if not rows:
         return ""
-    lines = ["| run | " + " | ".join(keys) + " |", "|" + "---|" * (len(keys) + 1)]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
+DPO_PAIR = ("dpo", "dpo-seed1")
+DPO_ROWS = [  # the amended read (2026-10-08): primary verifier lines, then the guards
+    ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial", "primary"),
+    ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded", "primary"),
+    ("cite_valid", "cite_valid", "kpi", "grounded", "primary"),
+    ("qa_seen", "qa_seen", "kpi", "qa_seen", "primary"),
+    ("qa_unseen", "qa_unseen", "kpi", "qa_unseen", "primary"),
+    ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
+    ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen", "primary"),
+    ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none"), "guard"),
+    ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match"), "guard"),
+    ("grounded_acc (judge)", "grounded_acc", "kpi", "grounded", "reported"),
+    ("cite_supported (judge)", "cite_supported", "kpi", "grounded", "reported"),
+    ("vocab_recall (judge)", "vocab_recall", "kpi", "vocab", "reported"),
+]
+
+
+def dpo_delta_table() -> str:
+    """Each DPO run against the start, the mean change of the two seeds, and the noise:
+    max(the DPO seed gap, the start's SE: binomial on its items, lm-eval's stderr, or for gold_lp
+    the paired per-item SE of the twins). gold_lp also gets the item-bootstrap 95% CI of the
+    two-seed mean minus the start. Beyond the noise: |change| > noise (and, for gold_lp, the CI
+    excludes 0). One seed pair: the noise has 1 df."""
+    m = {}
+    for r in (DPO_START, *DPO_PAIR):
+        f = RUNS / r / "metrics.json"
+        if f.exists():
+            m[r] = json.loads(f.read_text())
+    if not all(r in m for r in (DPO_START, *DPO_PAIR)):
+        return ""
+    sizes = half_sizes()
+    head = ["metric", "read", DPO_START, *DPO_PAIR, "change (mean of 2)", "noise", "beyond noise"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra, role in DPO_ROWS:
+        vals = [m[r].get(key) for r in (DPO_START, *DPO_PAIR)]
+        if any(v is None for v in vals):
+            continue
+        start, a, b = vals
+        scale = 1 if kind == "lp" else 100
+        change = ((a + b) / 2 - start) * scale
+        if kind == "lp":
+            n = max(abs(a - b), paired_lp(DPO_PAIR[1], DPO_PAIR[0], extra).get("se", 0))
+            ci = bootstrap_diff(item_lp(DPO_START, extra), mean_lp(list(DPO_PAIR), extra))["ci"]
+            beyond = abs(change) > n and (ci[0] > 0 or ci[1] < 0)
+            note = f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]"
+            unit = "{:.3f}"
+        else:
+            if kind == "lm":
+                n = max(abs(a - b) * 100, lm_se(DPO_START, *extra))
+            else:
+                k = sizes.get(extra) or m[DPO_START]["n"].get(extra, 0)
+                n = max(abs(a - b) * 100, math.sqrt(start * (1 - start) / k) * 100 if k else 0)
+            beyond = abs(change) > n
+            note = f"{change:+.1f} pt"
+            unit = "{:.1f} pt"
+        cells = [label, role, *(f"{v:.3f}" for v in vals), note, unit.format(n),
+                 "yes" if beyond else "no"]  # fmt: skip
+        lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
@@ -1313,17 +1383,22 @@ def stage4_md(runs: dict, usd: float) -> str:
         "end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). "
         f"dpo_val values at the last evaluation. $ at {usd} per GPU-hour (assumed).\n"
     )
+    if dt := dpo_delta_table():
+        md += (
+            f"\n## The read: change against {DPO_START}, next to the noise\n\n" + dt + "\n\n"
+            "Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must "
+            "stay within the noise; judge-scored rows are reported, not read. Noise is max(the DPO "
+            "seed gap, the start's SE), one seed pair (1 df).\n"
+        )
     if wr := winrate_table(runs):
-        md += f"\n## Win rate against {DPO_START}\n\n" + wr + "\n"
-    # TODO(stage 4): the KPI change against sft-from-cpt next to max(seed gap, SE), as
-    # sft_delta_table does for Stage 3, once the dpo rows are scored.
+        md += f"\n## Win rate against {DPO_START} (reported, not read)\n\n" + wr + "\n"
     checks = checks_table(
         names=list(runs),
         starts=(DPO_START,),
-        gate="over every dpo_val completion position (chosen and rejected) against an fp32 "
-        "reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most "
-        "0.1% of positions)",
-        diversity=(DPO_START,),
+        gate="over every sft_val completion position (11,351; dpo_val's 665 are too few for the "
+        "0.1% line, 2026-10-08 freeze) against an fp32 reference, the argmax flips the merge adds "
+        "over the unmerged bf16 model's own (at most 0.1% of positions)",
+        diversity=(DPO_START, *runs),
     )
     if checks:
         md += "\n## Checks\n\n" + checks + "\n"

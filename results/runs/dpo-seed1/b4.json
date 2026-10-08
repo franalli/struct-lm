@@ -1,0 +1,11 @@
+{
+  "run": "dpo-seed1",
+  "rule": "final step unless dpo_val loss at the end > at step 50 (runs under 100 steps: the save nearest the midpoint)",
+  "steps": 31,
+  "ref_step": 20,
+  "eval_loss_ref": 0.6738224625587463,
+  "eval_loss_end": 0.6683945059776306,
+  "end_above_ref": false,
+  "picked_step": 31,
+  "checkpoint": ""
+}

@@ -1,0 +1,11 @@
+{
+  "run": "dpo",
+  "rule": "final step unless dpo_val loss at the end > at step 50 (runs under 100 steps: the save nearest the midpoint)",
+  "steps": 31,
+  "ref_step": 20,
+  "eval_loss_ref": 0.6701158285140991,
+  "eval_loss_end": 0.6653768420219421,
+  "end_above_ref": false,
+  "picked_step": 31,
+  "checkpoint": ""
+}

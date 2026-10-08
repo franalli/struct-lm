@@ -1,0 +1,141 @@
+{
+  "stage": "dpo",
+  "run": "smoke-dpo",
+  "base": "checkpoints/sft-from-cpt",
+  "lora": true,
+  "gpus": 1,
+  "dataset_hash": "a899f7d2757c5952e35c3e6b816cdea982bf4f0d9982e707b81a6c285c66b4ad",
+  "pairs": 32,
+  "val_pairs": 16,
+  "by_format": {
+    "abstain": 6,
+    "closed_book": 439,
+    "grounded": 39
+  },
+  "tokens": 34443,
+  "pairs_per_step": 16,
+  "steps_per_epoch": 2,
+  "steps": 1,
+  "epochs": 1,
+  "beta": 0.1,
+  "loss_type": [
+    "sigmoid"
+  ],
+  "length_norm": false,
+  "tokens_per_s": 2297.3,
+  "train_runtime_s": 18.3,
+  "wall_s": 170.6,
+  "gpu_hours": 0.047,
+  "final_train_loss": 0.6931,
+  "final_eval": {
+    "step": 1,
+    "eval_loss": 0.6939253807067871,
+    "eval_runtime": 0.5632,
+    "eval_samples_per_second": 28.41,
+    "eval_steps_per_second": 14.205,
+    "eval_entropy": 0.8364079184830189,
+    "eval_num_tokens": 30714.0,
+    "eval_logits/chosen": -2.0255081319219466,
+    "eval_logits/rejected": -2.0612207756119623,
+    "eval_mean_token_accuracy": 0.8510989025235176,
+    "eval_rewards/chosen": 2.4914625100791454e-06,
+    "eval_rewards/rejected": 0.0015324890264309943,
+    "eval_rewards/accuracies": 0.4375,
+    "eval_rewards/margins": -0.001529997869511135,
+    "eval_logps/chosen": -2.3564619421958923,
+    "eval_logps/rejected": -4.838588178157806
+  },
+  "eval_curve": [
+    {
+      "step": 1,
+      "eval_loss": 0.6939253807067871,
+      "eval_runtime": 0.5632,
+      "eval_samples_per_second": 28.41,
+      "eval_steps_per_second": 14.205,
+      "eval_entropy": 0.8364079184830189,
+      "eval_num_tokens": 30714.0,
+      "eval_logits/chosen": -2.0255081319219466,
+      "eval_logits/rejected": -2.0612207756119623,
+      "eval_mean_token_accuracy": 0.8510989025235176,
+      "eval_rewards/chosen": 2.4914625100791454e-06,
+      "eval_rewards/rejected": 0.0015324890264309943,
+      "eval_rewards/accuracies": 0.4375,
+      "eval_rewards/margins": -0.001529997869511135,
+      "eval_logps/chosen": -2.3564619421958923,
+      "eval_logps/rejected": -4.838588178157806
+    }
+  ],
+  "checkpoints": [],
+  "peak_mem_gb": 34.71,
+  "smoke": true,
+  "data": {
+    "data/dpo/train.jsonl": "546415ffd4b63210eb4d85014565d20493d58341e685bce21c07a0598510fb71",
+    "data/dpo/val.jsonl": "89cf64ee6a9f93c91e9b8e7c0af026c4eb059be4529f29c376c3631f4619fb4d"
+  },
+  "config": {
+    "stage": "dpo",
+    "model": {
+      "init_from": "checkpoints/sft-from-cpt",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa"
+    },
+    "lora": {
+      "r": 64,
+      "lora_alpha": 128,
+      "lora_dropout": 0.05,
+      "bias": "none",
+      "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
+    },
+    "data": {
+      "dir": "data/dpo",
+      "train": "data/dpo/train.jsonl",
+      "val": "data/dpo/val.jsonl"
+    },
+    "run": {
+      "results_dir": "results",
+      "smoke": true
+    },
+    "dpo": {
+      "length_norm": false
+    },
+    "training": {
+      "output_dir": "checkpoints/_train/smoke-dpo",
+      "run_name": "smoke-dpo",
+      "num_train_epochs": 1,
+      "per_device_train_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "per_device_eval_batch_size": 2,
+      "precompute_ref_batch_size": 2,
+      "learning_rate": 1e-05,
+      "lr_scheduler_type": "linear",
+      "warmup_steps": 0,
+      "weight_decay": 0.0,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.999,
+      "adam_epsilon": 1e-08,
+      "max_grad_norm": 1.0,
+      "beta": 0.1,
+      "loss_type": "sigmoid",
+      "max_length": null,
+      "precompute_ref_log_probs": true,
+      "disable_dropout": true,
+      "bf16": true,
+      "tf32": true,
+      "gradient_checkpointing": true,
+      "gradient_checkpointing_kwargs": {
+        "use_reentrant": false
+      },
+      "logging_steps": 1,
+      "eval_strategy": "steps",
+      "eval_steps": 1,
+      "save_strategy": "no",
+      "save_steps": 10,
+      "save_only_model": false,
+      "save_total_limit": null,
+      "report_to": "none",
+      "seed": 0,
+      "data_seed": 0,
+      "max_steps": 1
+    }
+  }
+}
