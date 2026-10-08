@@ -1,0 +1,35 @@
+{
+  "check": "merge_diagnose",
+  "start": "checkpoints/sft-from-cpt",
+  "adapter": "/vol/checkpoints/_train/dpo-2ep",
+  "merged": "/vol/checkpoints/dpo-2ep",
+  "positions": 11351,
+  "ref_margin_median": 5.8885,
+  "ref_margin_share_below_0.25": 0.0531,
+  "unmerged_bf16_vs_fp32_ref": {
+    "top1_agreement": 0.994009,
+    "flips": 68,
+    "median_ref_margin_at_flips": 0.0319,
+    "mean_abs_lp_diff": 0.009516,
+    "max_abs_lp_diff": 1.1105
+  },
+  "merged_bf16_vs_fp32_ref": {
+    "top1_agreement": 0.993569,
+    "flips": 73,
+    "median_ref_margin_at_flips": 0.0461,
+    "mean_abs_lp_diff": 0.013583,
+    "max_abs_lp_diff": 4.1811
+  },
+  "merged_vs_unmerged_bf16": {
+    "top1_agreement": 0.994626,
+    "flips": 61,
+    "median_ref_margin_at_flips": 0.0652,
+    "mean_abs_lp_diff": 0.012237,
+    "max_abs_lp_diff": 3.0707
+  },
+  "nll_fp32_ref": 0.570611,
+  "nll_unmerged_bf16": 0.569551,
+  "nll_merged_bf16": 0.566258,
+  "merge_adds_flips": 5,
+  "passed": true
+}

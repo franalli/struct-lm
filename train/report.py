@@ -1020,7 +1020,8 @@ def checks_table(
     if rows:
         out.append(
             "\nDiversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over "
-            "output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):\n"
+            "output tokens) and </s> on sampled answers (the eos job: 4 Stage 4 pool prompts per "
+            "format x 4 at T 0.8; 20 prompts while the pool held replay, 16 after, 2026-10-08):\n"
         )
         out.append(
             "| run | distinct-4 | entropy (bits) | mean length | distinct-4 general | "
@@ -1316,6 +1317,87 @@ def dpo_delta_table() -> str:
     return "\n".join(lines)
 
 
+DPO_MORE = "dpo-2ep"  # the "more training" ablation (2026-10-08, post hoc): two epochs, epoch 2
+
+
+def dpo_more_table() -> str:
+    """dpo-2ep against dpo (one epoch, same data, seed and recipe) on the read's rows, next to the
+    Stage 4 floor: max(the dpo / dpo-seed1 seed gap, dpo's SE; for gold_lp the twins' paired
+    per-item SE), with the item-bootstrap CI for gold_lp."""
+    m = {}
+    for r in (DPO_PAIR[0], DPO_PAIR[1], DPO_MORE):
+        f = RUNS / r / "metrics.json"
+        if f.exists():
+            m[r] = json.loads(f.read_text())
+    if not all(r in m for r in (*DPO_PAIR, DPO_MORE)):
+        return ""
+    sizes = half_sizes()
+    one, more = DPO_PAIR[0], DPO_MORE
+    head = [
+        "metric",
+        "read",
+        f"{one} (1 epoch)",
+        f"{more} (2 epochs)",
+        "change",
+        "floor",
+        "beyond floor",
+    ]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra, role in DPO_ROWS:
+        a, b, twin = m[one].get(key), m[more].get(key), m[DPO_PAIR[1]].get(key)
+        if a is None or b is None or twin is None:
+            continue
+        if kind == "lp":
+            floor = max(abs(a - twin), paired_lp(DPO_PAIR[1], one, extra).get("se", 0))
+            d = bootstrap_diff(item_lp(one, extra), item_lp(more, extra))
+            change, beyond = b - a, abs(b - a) > floor and (d["ci"][0] > 0 or d["ci"][1] < 0)
+            note, unit = f"{change:+.3f} [{d['ci'][0]:+.3f}, {d['ci'][1]:+.3f}]", "{:.3f}"
+        else:
+            if kind == "lm":
+                floor = max(abs(a - twin) * 100, lm_se(one, *extra))
+            else:
+                k = sizes.get(extra) or m[one]["n"].get(extra, 0)
+                floor = max(abs(a - twin) * 100, math.sqrt(a * (1 - a) / k) * 100 if k else 0)
+            change = (b - a) * 100
+            beyond = abs(change) > floor
+            note, unit = f"{change:+.1f} pt", "{:.1f} pt"
+        cells = [
+            label,
+            role,
+            f"{a:.3f}",
+            f"{b:.3f}",
+            note,
+            unit.format(floor),
+            "yes" if beyond else "no",
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def gate_flags(names) -> str:
+    """Runs whose merge check failed but whose fp32-referenced diagnosis passed, evaluated under
+    the 2026-10-09 rule (the row is flagged, not hidden)."""
+    out = []
+    for name in names:
+        chk, diag = RUNS / name / "merge_check.json", RUNS / name / "merge_diagnose.json"
+        if chk.exists() and diag.exists():
+            c, d = json.loads(chk.read_text()), json.loads(diag.read_text())
+            if not c.get("passed") and d.get("passed"):
+                ratio = (
+                    d["merged_bf16_vs_fp32_ref"]["mean_abs_lp_diff"]
+                    / d["unmerged_bf16_vs_fp32_ref"]["mean_abs_lp_diff"]
+                )
+                out.append(
+                    f"- **{name}: merge gate flagged.** Val-loss criterion "
+                    f"{c['val_loss_rel_diff']:.2%} against 0.5% (merged {c['val_loss_merged']:.4f}, "
+                    f"unmerged {c['val_loss_unmerged']:.4f} nats on sft_val). The merge-isolating "
+                    f"criteria pass in `merge_diagnose`: {d['merge_adds_flips']} added flips of 11, "
+                    f"|dlp| ratio {ratio:.2f} against 1.5. Evaluated under the rule fixed before the "
+                    "diagnosis (notes/decisions.md, 2026-10-09)."
+                )
+    return "\n".join(out)
+
+
 def plot_dpo(runs: dict, out: Path) -> None:
     """Four panels: DPO loss, reward margin and reward accuracy (train as a moving average, dpo_val
     as points), and the chosen / rejected sequence log-probs (train)."""
@@ -1390,6 +1472,13 @@ def stage4_md(runs: dict, usd: float) -> str:
             "stay within the noise; judge-scored rows are reported, not read. Noise is max(the DPO "
             "seed gap, the start's SE), one seed pair (1 df).\n"
         )
+    if mt := dpo_more_table():
+        md += (
+            f"\n## More training: {DPO_MORE} against {DPO_PAIR[0]} (ablation, not a candidate)\n\n"
+            + mt
+            + "\n\nSame data, seed and recipe; two epochs, epoch 2 evaluated. Floor: max(the "
+            f"{DPO_PAIR[0]} / {DPO_PAIR[1]} seed gap, {DPO_PAIR[0]}'s SE), one seed pair.\n"
+        )
     if wr := winrate_table(runs):
         md += f"\n## Win rate against {DPO_START} (reported, not read)\n\n" + wr + "\n"
     checks = checks_table(
@@ -1402,6 +1491,8 @@ def stage4_md(runs: dict, usd: float) -> str:
     )
     if checks:
         md += "\n## Checks\n\n" + checks + "\n"
+    if flags := gate_flags(runs):
+        md += "\n" + flags + "\n"
     return md
 
 

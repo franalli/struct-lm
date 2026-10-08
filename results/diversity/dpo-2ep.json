@@ -1,0 +1,30 @@
+{
+  "run": "dpo-2ep",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.7992,
+    "entropy": 9.2158,
+    "mean_len": 164.8,
+    "stop_rate": 0.99
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.8022,
+    "entropy": 9.0514,
+    "mean_len": 275.8,
+    "stop_rate": 0.98
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.7855,
+    "entropy": 7.9793,
+    "mean_len": 53.7,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 64,
+    "eos_stop_rate": 1.0,
+    "mean_len": 25.2,
+    "passed": true
+  }
+}

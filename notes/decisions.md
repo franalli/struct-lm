@@ -3574,3 +3574,101 @@ points at it, and close-out is tonight.
 
 **Pair counts:** as registered 114, as trained 506. The estimates were ~300 and ~800-900; the
 amendment's real effect is 114 → 506.
+
+## 2026-10-09: dpo-2ep failed the merge gate; not evaluated (recorded as observed)
+**Training** (62 steps, epoch-2 adapter):
+- train loss 0.382 (dpo: 0.654);
+- dpo_val loss 0.571 (0.665);
+- dpo_val margin 0.38 (0.06);
+- dpo_val accuracy flat at 0.68 on 22 pairs.
+
+The within-run checkpoint rule keeps epoch 2 (0.571 at the end against 0.647 at step 30).
+
+**Merge gate** (sft_val, 11,351 positions, against fp32):
+- added flips 5 of 11: passes;
+- |Δlp| ratio 1.43 against 1.5: passes (dpo 1.08, dpo-seed1 1.09);
+- **val loss: merged 0.5663 against unmerged 0.5696, 0.58%, against the 0.5% line. Fails.**
+
+The merged weights sit further from the fp32 reference than the adapter does: mean |Δlp| 0.0136
+against 0.0095, max 4.18 against 1.11 nats. A larger adapter delta means more bf16 rounding when
+it is folded in.
+- **This isn't an underpowered gate:** it ran on the full set, and both one-epoch runs passed with
+  wide margins.
+- **So, per the rule, the pipeline stopped at the gate** and `dpo-2ep` has no eval rows. Its
+  merged checkpoint is not to be served.
+- **What it says about more training:** two epochs move the DPO objective a long way (loss 0.65 →
+  0.38). At this LoRA rank, that much movement also brings the bf16 merge to its fidelity limit.
+
+## 2026-10-09: dpo-2ep merge diagnosis clears the merge-isolating criteria; evaluated with a flagged row (user decision)
+**User rule, fixed before the diagnosis:**
+- **If** the merge adds ≤ 11 flips and |Δlp| ≤ 1.5× against fp32: evaluate the merged checkpoint
+  as planned, with the row flagged.
+- **If either fails:** record and stop. The finding would then be that the longer-trained adapter
+  produced a delta the bf16 cast doesn't carry.
+
+**Diagnosis** (`results/runs/dpo-2ep/merge_diagnose.json`, all 11,351 sft_val positions, against
+fp32):
+
+| | flips vs fp32 | mean \|Δlp\| | max \|Δlp\| | NLL |
+|---|---|---|---|---|
+| unmerged bf16 | 68 | 0.00952 | 1.11 | 0.56955 |
+| merged bf16 | 73 | 0.01358 | 4.18 | 0.56626 |
+| fp32 reference | | | | 0.57061 |
+
+- **Both criteria pass:** the merge adds 5 flips (allowed 11), and the |Δlp| ratio is 1.43
+  (line 1.5).
+  - The flips sit at near-ties (median reference margin 0.046 against 5.89 overall).
+  - The merge's error has a longer tail than one epoch's: max 4.18 nats, against 0.55 for dpo
+    and 0.72 for dpo-seed1.
+- **Decision:** evaluate. The row is flagged "merge gate: val-loss criterion 0.58% vs 0.5%,
+  merge-isolating criteria pass".
+  - Eval-only chain on the existing merged checkpoint: `--steps ppl,eval,sample`, no latency.
+  - `stage4-final` stays `dpo`.
+
+**About the loss criterion, for the record:**
+- It already uses the sft_val NLL for DPO runs (the freeze moved it there). The 0.58% is merged
+  0.5663 against unmerged 0.5696, an absolute 0.0033 nats on the same yardstick as Stage 3.
+- What changed is the adapter: two epochs moved the fp32 sft_val NLL itself from 0.5604 (dpo) to
+  0.5706.
+- **Next step:** keep the loss criterion on sft_val NLL at every stage, CPT to GRPO, and state it
+  in nats next to the relative line. A sharper, more-moved policy makes a relative line read
+  differently.
+
+## 2026-10-09: dpo-2ep result: two epochs displace the chosen answers; seen accuracy and gold-answer likelihood fall
+**Within-run checkpoint rule:** there is no dpo_val eval at step 31. With
+`save_strategy: epoch`, the epoch-1 save didn't trigger the forced eval, so step 30 stands in:
+0.647 against 0.571 at step 62, so epoch 2 is kept (`results/runs/dpo-2ep/b4.json`).
+
+**Against `dpo`** (one epoch, same data, seed and recipe; floor = max(the dpo / dpo-seed1 gap,
+dpo's SE)):
+- **qa_seen 0.311 → 0.264 (−4.8 pt, floor 3.6): beyond the floor.** It is below the SFT start too
+  (0.281), though that is inside the start's SE.
+- **seen `gold_lp` −3.01 nats (CI [−3.52, −2.51]) and unseen −4.30 nats (CI [−5.00, −3.65]):
+  beyond the floor.**
+  - The drop is in the answer tokens (−3.74 nats), not the end token (+0.11); 80% of items move
+    down.
+  - The median falls from −4.81 to −8.42.
+- **Unchanged:** hallucination (1 of 76), false abstain (0), `cite_valid` (1.000), qa_unseen
+  (−0.7 pt), MMLU (+0.0), GSM8K (−0.4). Judge-scored rows are inside the noise.
+- **Win rate 0.520 (reported),** with 33 greedy answers identical to SFT's against 58 for `dpo`.
+
+**Mechanism, from the training log:**
+- `rewards/chosen` is positive through epoch 1 (about +0.02) and reaches −0.005 by step 62.
+- On dpo_val it turns negative from step 30 and reaches −0.229 at step 62, so the chosen
+  answers lost about 2.3 nats while the rejected lost about 6.1.
+- **The margin grows by pushing both down.** This is the displacement the step-13 trigger was
+  written for: chosen log-probs falling and seen qa_acc dropping beyond noise.
+- **The merge is not the cause:** its error is 0.014 nats per token on average, against a 3-4 nat
+  per-answer fall.
+
+**Reading:**
+- On this set, one epoch is the useful amount of sigmoid DPO, and a second one trades
+  gold-answer likelihood and seen accuracy for a larger preference margin.
+- **The checkpoint rule can't see it:** it reads dpo_val DPO loss, which keeps falling while the
+  chosen log-probs fall.
+- **For any longer preference training:**
+  - the registered remedy, RPO (`loss_type: [sigmoid, sft]`, the NLL on chosen);
+  - and a checkpoint rule or guard that reads `rewards/chosen` or gold-answer likelihood, not the
+    DPO loss alone.
+
+No rerun: dpo-2ep is an ablation, the scope was fixed, and `stage4-final` stays `dpo`.

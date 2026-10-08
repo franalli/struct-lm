@@ -1,0 +1,69 @@
+{
+  "check": "merge",
+  "gate": "amended 2026-10-06",
+  "added_flips": 5,
+  "added_flips_allowed": 11,
+  "lp_error_ratio": 1.4274,
+  "val_loss_unmerged": 0.569551,
+  "val_loss_merged": 0.566258,
+  "val_loss_rel_diff": 0.005782,
+  "merged_vs_unmerged_top1": 0.994626,
+  "rule": "added flips <= 11 of 11351, merged |dlp| <= 1.5x unmerged's (both against fp32), val loss within 0.5%",
+  "passed": false,
+  "measurement": {
+    "start": "checkpoints/sft-from-cpt",
+    "adapter": "/vol/checkpoints/_train/dpo-2ep",
+    "merged": "/vol/checkpoints/dpo-2ep",
+    "positions": 11351,
+    "ref_margin_median": 5.8885,
+    "ref_margin_share_below_0.25": 0.0531,
+    "unmerged_bf16_vs_fp32_ref": {
+      "top1_agreement": 0.994009,
+      "flips": 68,
+      "median_ref_margin_at_flips": 0.0319,
+      "mean_abs_lp_diff": 0.009516,
+      "max_abs_lp_diff": 1.1105
+    },
+    "merged_bf16_vs_fp32_ref": {
+      "top1_agreement": 0.993569,
+      "flips": 73,
+      "median_ref_margin_at_flips": 0.0461,
+      "mean_abs_lp_diff": 0.013583,
+      "max_abs_lp_diff": 4.1811
+    },
+    "merged_vs_unmerged_bf16": {
+      "top1_agreement": 0.994626,
+      "flips": 61,
+      "median_ref_margin_at_flips": 0.0652,
+      "mean_abs_lp_diff": 0.012237,
+      "max_abs_lp_diff": 3.0707
+    },
+    "nll_fp32_ref": 0.570611,
+    "nll_unmerged_bf16": 0.569551,
+    "nll_merged_bf16": 0.566258
+  },
+  "probes": {
+    "probe_positions": 295,
+    "max_abs_merge_error": 4.5391,
+    "max_abs_adapter_effect": 9.4062,
+    "mean_abs_merge_error": 0.03674,
+    "mean_abs_adapter_effect": 0.14965,
+    "ratio": 0.4826,
+    "ratio_mean": 0.2455,
+    "ratio_flag": true
+  },
+  "checkpoint_sha256": {
+    "checkpoint": "/vol/checkpoints/dpo-2ep",
+    "files": {
+      "config.json": "d9c045068c4bc9d4eb806c7a99692a89ca03854112816c6be6117cf0ad1cdda2",
+      "generation_config.json": "20b4a7795892537036d0f85dc0023fa7a23ac366876a03e3e51991ac7a3b5861",
+      "model.safetensors": "dd23bf6b85799cb52aa3f91a3583f273465234870dd6e5d9aead68c2d5cf4ffe",
+      "processor_config.json": "ece2373c2ae391bce18785a1810543bc6173a1f28b6767cffab2c35dbea5f002",
+      "special_tokens_map.json": "486a0ad6c426d698f63d5332a78923f0529789f6f0a32fbc86433cd7dcc14693",
+      "tekken.json": "e29d19ea32eb7e26e6c0572d57cb7f9eca0f4420e0e0fe6ae1cf3be94da1c0d6",
+      "tokenizer.json": "577575622324b2e099e2648be26bdeb5e5815ffe66d7004e9e3ddbf421db6bf1",
+      "tokenizer_config.json": "f3a437d1214f6b61c8eae19d1256b0ebbf567793f6dcc1f63f4a30b829f85235"
+    },
+    "sha256": "b7606d2350fdace8c05f0aeec7244d61bad9652ce734506195a5a0e3ba2d1ebb"
+  }
+}

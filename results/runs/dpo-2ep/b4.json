@@ -1,0 +1,15 @@
+{
+  "run": "dpo-2ep",
+  "rule": "within the run (2026-10-08): epoch 2 unless the dpo_val loss at step 62 is above its value at step 31",
+  "steps": 62,
+  "eval_loss_end": 0.5710769295692444,
+  "eval_loss_step31": null,
+  "eval_loss_step30": 0.6471443772315979,
+  "end_above_ref": false,
+  "picked": "epoch 2 (checkpoint-62)",
+  "note": "no dpo_val eval at step 31: with save_strategy=epoch the epoch-1 save didn't trigger DPOExtras' forced eval; step 30 (one step earlier) stands in. Computed after the run; the merge used the epoch-2 adapter, as the recipe fixed.",
+  "ref_step": 30,
+  "eval_loss_ref": 0.6471443772315979,
+  "picked_step": 62,
+  "checkpoint": ""
+}

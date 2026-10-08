@@ -124,7 +124,7 @@ tokens, and enterprise data readiness and governance.
 | Corpus | 20M tokens of cleaned public PDFs | billions of tokens: documents, code, databases, images; messy |
 | Continued pre-training | LoRA on one GPU, hours | full-parameter, multi-node, days to weeks, replay mix, annealing |
 | CPT data | documents concatenated and read once, 20M tokens | the same next-token objective with data engineering around it: rewrites of the facts that matter, per-source mixture and repetition, section-level boundaries |
-| Post-training | a few thousand SFT examples, ~1k DPO pairs, a small GRPO run | 10k–100k+ examples reviewed with domain experts, RL with distillation |
+| Post-training | a few thousand SFT examples, ~500 verifier-labelled DPO pairs, a small GRPO run | 10k–100k+ examples reviewed with domain experts, RL with distillation |
 | Evaluation | six-measurement harness plus regression suite | the same idea, built with domain experts, with audit lineage |
 | Infrastructure | rented GPUs (Modal), open-source stack | isolated environments, data residency, versioned datasets and runs |
 
@@ -220,6 +220,14 @@ DPO is wired (`stage: dpo`, `train/dpo.py`); GRPO (`grpo.py`) is not yet.
 for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
 $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt \
   --merge-from b4 --chat --steps train,merge,mergecheck,ppl,eval,latency,sample
+# Stage 4: DPO on verifiable preferences. Pairs from the SFT model's own samples (make dpo-data,
+# then the probe/benchmark/pool sampling jobs, then make dpo-pairs: CLAUDE.md, Stage 4); the set
+# must match data/dpo/SHA256SUMS on the volume; the checkpoint rule (--merge-from rule) and the
+# merge gate (on sft_val) run in the chain
+for f in train.jsonl val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/dpo/$f data/dpo/$f; done
+$M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name dpo \
+  --merge-from rule --chat --steps noop,train,merge,mergecheck,ppl,eval,latency,sample
+.venv/bin/python eval/winrate.py dpo sft-from-cpt   # reported only: the judge failed its benchmark
 ```
 
 ### Evaluate (repeat per stage, including the base and instruct baselines)
@@ -496,6 +504,7 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | cpt-8b-lr2x | 6.713 | -2.42% | -0.0245 [-0.0335, -0.0172] | 8.220 | +0.85% | +0.0085 [+0.0068, +0.0102] | 5.442 | -12.01% |
 | cpt-8b-seed1 | 6.718 | -2.35% | -0.0238 [-0.0307, -0.0180] | 8.165 | +0.17% | +0.0017 [+0.0002, +0.0030] | 5.687 | -8.05% |
 | dpo | 6.882 | +0.03% | +0.0003 [-0.0053, +0.0064] | 8.066 | -1.05% | -0.0105 [-0.0138, -0.0075] | 5.805 | -6.14% |
+| dpo-2ep | 6.971 | +1.32% | +0.0131 [+0.0085, +0.0188] | 8.109 | -0.52% | -0.0053 [-0.0085, -0.0022] | 5.894 | -4.70% |
 | dpo-seed1 | 6.885 | +0.08% | +0.0008 [-0.0049, +0.0069] | 8.067 | -1.03% | -0.0104 [-0.0137, -0.0073] | 5.808 | -6.10% |
 | sft-from-base | 7.008 | +1.86% | +0.0184 [+0.0166, +0.0211] | 8.234 | +1.01% | +0.0100 [+0.0091, +0.0110] | 6.311 | +2.05% |
 | sft-from-base-seed1 | 7.010 | +1.89% | +0.0187 [+0.0169, +0.0214] | 8.251 | +1.22% | +0.0121 [+0.0110, +0.0133] | 6.316 | +2.13% |
@@ -825,7 +834,7 @@ Merge gate (B5, amended): over all 11,351 sft_val completion positions against a
 | sft-from-cpt-seed1 | -8 of 11 | 0.978 | 0.02% | 99.54% | 0.0427 | `5f805f85ed59` | yes |
 | sft-from-base-seed1 | 11 of 11 | 0.984 | 0.02% | 99.53% | 0.0466 | `272cbcb28872` | yes |
 
-Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):
+Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (the eos job: 4 Stage 4 pool prompts per format x 4 at T 0.8; 20 prompts while the pool held replay, 16 after, 2026-10-08):
 
 | run | distinct-4 | entropy (bits) | mean length | distinct-4 general | distinct-4 domain | stopped (T 0.7) | stopped (eos job) |
 |---|---|---|---|---|---|---|---|
@@ -1145,6 +1154,11 @@ changes to TRL:
 
 Seeds 0 (`dpo`) and 1 (`dpo-seed1`).
 
+- **Checkpoint rule:** the final step unless the dpo_val loss at the end is above its value at the
+  save nearest the midpoint (step 20 at 31 steps). It kept the final step on both runs.
+- **Merge gate:** run on sft_val (11,351 positions), because dpo_val is 22 pairs and 665 positions,
+  too few for the 0.1% flip line. Both runs passed (4 and 1 added flips of 11).
+
 ![Stage 4 DPO curves: loss, reward margin and reward accuracy (train as a moving average, dpo_val as points), and the chosen / rejected sequence log-probs](results/curves/dpo.png)
 
 **The read** (amended before launch; `results/train_runs.md` and the table below; noise is
@@ -1165,14 +1179,45 @@ max(the DPO seed gap, the start's SE), one seed pair):
 - **The win rate is 0.52 and 0.515** (SE 0.05; reported, not read). The pairwise judge agreed with
   itself across the two answer orders on only 43-53% of prompts.
 
-Of the pre-registered rerun triggers, none fired as written (displacement, under-training on the
-dpo_val accuracy curve, over-shooting). `dpo` was preempted on Modal mid-training and restarted
-(recorded in `notes/decisions.md`); the seed twin ran clean.
+**The rerun triggers:**
+- **Displacement and over-shooting:** neither fired. `rewards/chosen` stayed positive, seen
+  qa_acc rose, and generations stayed clean.
+- **Under-training:** its first clause read the win rate, which the judge's failure demoted, so
+  "not fired as written" is a clause that can no longer be evaluated, not evidence against it.
 
-**More training (`dpo-2ep`, an ablation, not a candidate):** the same recipe for two epochs
-(62 steps, linear schedule over both, epoch-2 adapter evaluated), added post hoc because the loss
-ended at 0.654 with the margin still rising. <!-- dpo-2ep: filled when its evals land --> Results
-pending.
+`dpo` was preempted on Modal mid-training and restarted (recorded in `notes/decisions.md`); the
+seed twin ran clean.
+
+**More training (`dpo-2ep`, an ablation, not a candidate).** Added post hoc, motivated by the loss
+ending at 0.654 with the margin still rising.
+- **Recipe:** a fresh run from the SFT start, everything as `dpo` but two epochs: 62 steps, linear
+  schedule over both, saves at each epoch end, only the epoch-2 adapter evaluated.
+- **Training moved much further:** train loss 0.382 (against 0.654), dpo_val loss 0.571 (0.665),
+  dpo_val margin 0.38 (0.06). The within-run checkpoint rule keeps epoch 2.
+- **Flag: merge gate, val-loss criterion 0.58% against 0.5%; the merge-isolating criteria pass.**
+  - The merged checkpoint's sft_val NLL is 0.5663 against the unmerged adapter's 0.5696, 0.0033
+    nats apart.
+  - Against fp32, the merge adds 5 argmax flips (11 allowed), and its |Δlp| is 1.43× the
+    adapter's own (line 1.5). Those two are the criteria that isolate the merge.
+  - The merge error's tail is longer than one epoch's (max 4.18 nats against 0.55), consistent
+    with a bigger adapter delta cast to bf16.
+  - Evaluated per the rule fixed before the diagnosis (`notes/decisions.md`, 2026-10-09).
+
+- **Result: a second epoch displaces the chosen answers.** Against `dpo`:
+  - **qa_seen falls from 0.311 to 0.264** (−4.8 pt, floor 3.6), below the SFT start's 0.281.
+  - **gold-answer log-probability collapses:** seen −3.0 nats (CI [−3.5, −2.5]), unseen −4.3
+    (CI [−5.0, −3.7]), in the answer tokens, on 80% of items.
+  - **Unchanged:** hallucination, false abstain, `cite_valid`, qa_unseen, MMLU, GSM8K.
+- **Mechanism:** dpo_val `rewards/chosen` turns negative from step 30 and ends at −0.23, so the
+  chosen answers lost about 2.3 nats and the rejected about 6.1. The margin grows by pushing
+  both down.
+- **It fits the training pairs:** train reward accuracy reaches 0.95 while dpo_val stays at 0.68.
+- **The checkpoint rule kept epoch 2 anyway,** because it reads the DPO loss on dpo_val, which
+  keeps falling while the chosen answers lose probability. (No dpo_val eval landed at step 31;
+  step 30 stood in: 0.647 against 0.571.)
+- **Reading:** on this set one epoch is the useful amount of sigmoid DPO. Longer preference
+  training needs the RPO term (NLL on the chosen answer) and a guard on chosen or gold-answer
+  likelihood. `stage4-final` stays `dpo`.
 
 **Step 13 as registered:** no trigger fired, so the registered rerun was the length-normalised
 `dpo-lnorm`. It was skipped because its time condition was unmet; with verifier-labelled,
@@ -1187,6 +1232,7 @@ length-capped, one-line pairs it would also have answered nothing.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | dpo | sft-from-cpt | 484 | 31 |  | 0.04 | 0.04 | 0.18 | 29 | 0.654 | 0.665 | 0.682 | 0.062 | step 31 (final): 0.6654 vs 0.6701 at 20 |
 | dpo-seed1 | sft-from-cpt | 484 | 31 | 1,867 | 0.12 | 0.12 | 0.47 | 37 | 0.658 | 0.668 | 0.682 | 0.055 | step 31 (final): 0.6684 vs 0.6738 at 20 |
+| dpo-2ep | sft-from-cpt | 484 | 62 | 2,297 | 0.13 | 0.13 | 0.52 | 37 | 0.382 | 0.571 | 0.682 | 0.378 | step 62 (final): 0.5711 vs 0.6471 at 30 |
 
 The checkpoint rule (pre-registered): the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (assumed).
 
@@ -1209,12 +1255,32 @@ The checkpoint rule (pre-registered): the final step unless the dpo_val loss at 
 
 Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must stay within the noise; judge-scored rows are reported, not read. Noise is max(the DPO seed gap, the start's SE), one seed pair (1 df).
 
+##### More training: dpo-2ep against dpo (ablation, not a candidate)
+
+| metric | read | dpo (1 epoch) | dpo-2ep (2 epochs) | change | floor | beyond floor |
+|---|---|---|---|---|---|---|
+| halluc_rate (lower is better) | primary | 0.013 | 0.013 | +0.0 pt | 1.3 pt | no |
+| false_abstain (lower is better) | primary | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
+| cite_valid | primary | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
+| qa_seen | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
+| qa_unseen | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| seen gold-answer log-prob (nats) | primary | -5.003 | -8.012 | -3.010 [-3.522, -2.514] | 0.193 | yes |
+| unseen gold-answer log-prob (nats) | primary | -6.544 | -10.845 | -4.301 [-4.999, -3.653] | 0.187 | yes |
+| MMLU | guard | 0.767 | 0.767 | +0.0 pt | 0.3 pt | no |
+| GSM8K | guard | 0.810 | 0.806 | -0.4 pt | 1.1 pt | no |
+| grounded_acc (judge) | reported | 0.917 | 0.907 | -0.9 pt | 2.7 pt | no |
+| cite_supported (judge) | reported | 0.870 | 0.852 | -1.8 pt | 3.2 pt | no |
+| vocab_recall (judge) | reported | 0.838 | 0.852 | +1.4 pt | 2.5 pt | no |
+
+Same data, seed and recipe; two epochs, epoch 2 evaluated. Floor: max(the dpo / dpo-seed1 seed gap, dpo's SE), one seed pair.
+
 ##### Win rate against sft-from-cpt (reported, not read)
 
 | run | win rate | SE | ties | identical greedy answers | n | position consistency |
 |---|---|---|---|---|---|---|
 | dpo | 0.520 | 0.050 | 82 | 58 | 100 | 0.43 |
 | dpo-seed1 | 0.515 | 0.050 | 79 | 60 | 100 | 0.53 |
+| dpo-2ep | 0.520 | 0.050 | 64 | 33 | 100 | 0.54 |
 
 ##### Checks
 
@@ -1230,16 +1296,21 @@ Merge gate (B5, amended): over every sft_val completion position (11,351; dpo_va
 |---|---|---|---|---|---|---|---|
 | dpo | 4 of 11 | 1.084 | 0.06% | 99.44% | 0.3635 | `bf9a01c704d3` | yes |
 | dpo-seed1 | 1 of 11 | 1.089 | 0.04% | 99.56% | 0.3944 | `24405b930436` | yes |
+| dpo-2ep | 5 of 11 | 1.427 | 0.58% | 99.46% | 0.2455 | `b7606d2350fd` | NO |
 
-Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (20 Stage 4 prompts x 4 at T 0.8):
+Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (the eos job: 4 Stage 4 pool prompts per format x 4 at T 0.8; 20 prompts while the pool held replay, 16 after, 2026-10-08):
 
 | run | distinct-4 | entropy (bits) | mean length | distinct-4 general | distinct-4 domain | stopped (T 0.7) | stopped (eos job) |
 |---|---|---|---|---|---|---|---|
 | sft-from-cpt | 0.7724 | 9.0197 | 163.4 | 0.7567 | 0.8646 | 0.98 | 98.8% of 80 |
 | dpo | 0.7963 | 9.2183 | 167.6 | 0.7846 | 0.8729 | 1.0 | 100.0% of 64 |
 | dpo-seed1 | 0.7797 | 9.1358 | 171.5 | 0.7643 | 0.8791 | 0.97 | 100.0% of 64 |
+| dpo-2ep | 0.7992 | 9.2158 | 164.8 | 0.8022 | 0.7855 | 0.99 | 100.0% of 64 |
 | dpo | 0.7963 | 9.2183 | 167.6 | 0.7846 | 0.8729 | 1.0 | 100.0% of 64 |
 | dpo-seed1 | 0.7797 | 9.1358 | 171.5 | 0.7643 | 0.8791 | 0.97 | 100.0% of 64 |
+| dpo-2ep | 0.7992 | 9.2158 | 164.8 | 0.8022 | 0.7855 | 0.99 | 100.0% of 64 |
+
+- **dpo-2ep: merge gate flagged.** Val-loss criterion 0.58% against 0.5% (merged 0.5663, unmerged 0.5696 nats on sft_val). The merge-isolating criteria pass in `merge_diagnose`: 5 added flips of 11, |dlp| ratio 1.43 against 1.5. Evaluated under the rule fixed before the diagnosis (notes/decisions.md, 2026-10-09).
 <!-- stage4-tables:end -->
 
 #### What I would do differently (Stage 4)
@@ -1256,6 +1327,13 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    least ~100, after the set is built.
 4. **Make training restarts exclusive.** A Modal preemption restarted `dpo` while the first
    attempt was still writing. An attempt lock in the output directory would have kept one writer.
+5. **Don't pick a checkpoint on the DPO loss alone.** The rule was built for SFT, where the val
+   loss is the model's likelihood. In DPO the loss can fall while the chosen answers lose
+   probability, and `dpo-2ep`'s did. A rule that also reads `rewards/chosen` (or gold-answer
+   log-probability) would have caught it.
+6. **Watch failed chains, not just finished ones.** `dpo-2ep`'s merge gate stopped its chain at
+   22:38, and it was noticed at 00:28: the wait looked for a completion line a failed run never
+   prints. Waiting on the process's exit status would have shown it at once.
 
 ### 4. Results
 
@@ -1324,6 +1402,7 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 |
 | dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 |
 | dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 |
+| dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -1342,6 +1421,7 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-base-seed1 | 0.898 | 0.991 | 0.880 | 0.013 | 0.009 | 0.829 | 0.911 | 0.752 |
 | dpo-seed1 | 0.907 | 1.000 | 0.880 | 0.026 | 0.000 | 0.848 | 0.891 | 0.807 |
 | dpo | 0.917 | 1.000 | 0.870 | 0.013 | 0.000 | 0.838 | 0.891 | 0.789 |
+| dpo-2ep | 0.907 | 1.000 | 0.852 | 0.013 | 0.000 | 0.852 | 0.921 | 0.789 |
 
 **General benchmarks (5-shot, no chat template) and perplexity (lower is better)**
 
@@ -1360,6 +1440,7 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | sft-from-base-seed1 | 0.768 | 0.732 | 0.706 | 0.857 | 0.813 | 0.790 | 0.799 | 6.32 | 7.01 | 8.25 | 6.31 |
 | dpo-seed1 | 0.765 | 0.726 | 0.701 | 0.858 | 0.811 | 0.807 | 0.795 | 5.81 | 6.89 | 8.07 | 6.30 |
 | dpo | 0.767 | 0.729 | 0.703 | 0.859 | 0.814 | 0.810 | 0.796 | 5.80 | 6.88 | 8.07 | 6.30 |
+| dpo-2ep | 0.767 | 0.730 | 0.701 | 0.862 | 0.812 | 0.806 | 0.802 | 5.89 | 6.97 | 8.11 | 6.38 |
 <!-- results-table:end -->
 
 **Stage 2 (CPT) earned little.**
@@ -1386,6 +1467,20 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - pass/fail closed-book accuracy doesn't resolve it.
 - **Going forward:** `sft-from-cpt` (epoch 1) is the Stage 3 checkpoint; `train/configs/dpo.yaml`
   starts from it.
+
+**Stage 4 (DPO on verifiable preferences):**
+- **The judge failed its benchmark:** it caught 28% of known grounded defects and 9% of definition
+  defects. Every pair is verifier- or rule-labelled: 506 pairs, against 114 as registered.
+- **Holds:** hallucination on unanswerable prompts fell from 4 of 76 to 1-2, beyond the noise but
+  by about 2.5 items. False abstain, `cite_valid`, MMLU, GSM8K and answer length are unchanged.
+- **Inside the noise:** seen and unseen closed-book accuracy, seen `gold_lp`.
+- **A cost:** unseen-half `gold_lp` −0.21 nats (CI [−0.34, −0.10]) on both seeds, accuracy
+  unchanged.
+- **One epoch barely moved the policy** (loss 0.693 → 0.654). **Two epochs** (`dpo-2ep`, ablation)
+  moved it a long way (loss 0.38) and displaced the chosen answers. qa_seen fell 4.8 pt against one
+  epoch, and gold-answer log-probability fell 3.0 (seen) and 4.3 (unseen) nats.
+- **Going forward:** `dpo` (seed 0) is the Stage 4 checkpoint; `train/configs/grpo.yaml` starts
+  from it.
 
 ### 5. Serving
 
@@ -1439,12 +1534,18 @@ tokens max; generated by `train/report.py` from `results/bench/`).
   28% / 9%.
 - **More abstain pairs:** the student answered only 2% of unanswerable samples, so 6 pairs. Harder
   unanswerable prompts (near-miss passages) would give the abstain preference real weight.
-- **Watch the unseen gold-answer log-probability** (−0.21 nats here) as a guard on any further
-  preference training on seen facts.
+- **Guard preference training on likelihood, and add the RPO term before training longer.**
+  - One epoch already cost 0.21 nats of unseen gold-answer log-probability.
+  - Two epochs cost 3-4 nats and 4.8 points of seen accuracy, while the DPO loss kept improving.
+  - Fix: a checkpoint rule that reads `rewards/chosen` or gold_lp, and `loss_type: [sigmoid, sft]`.
+- **One yardstick for the merge gate's loss criterion at every stage:** the sft_val NLL, CPT to
+  GRPO (DPO moved onto it at its freeze), stated in nats next to the relative line. `dpo-2ep`
+  missed 0.5% by an absolute 0.0033 nats while the fp32-referenced criteria passed.
 
 **From Stage 3:**
 - **Check sample diversity before building DPO pairs:** 4 samples per prompt at T 0.7 on the first
-  20 prompts. Near-identical samples give pairs with no margin.
+  20 prompts. Near-identical samples give pairs with no margin. *Done in Stage 4: 0 of 18
+  non-abstain prompts collapsed.*
 - **Weight the loss per format.** SFT's token-weighted loss gives the 500 replay answers 75% of the
   gradient and the closed-book and definition records, the ones the seen half measures, 9%.
   Normalising per record or per format, or capping replay's share, would aim the gradient at the

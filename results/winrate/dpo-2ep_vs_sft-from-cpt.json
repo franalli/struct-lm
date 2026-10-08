@@ -1,0 +1,918 @@
+{
+  "a": "dpo-2ep",
+  "b": "sft-from-cpt",
+  "judge_calls": 102,
+  "overall": {
+    "n": 100,
+    "win_rate": 0.52,
+    "se": 0.05,
+    "ties": 64,
+    "identical": 33,
+    "failed": 0
+  },
+  "position_consistency": 0.5373,
+  "by_format": {
+    "abstain": {
+      "n": 7,
+      "win_rate": 0.5,
+      "se": 0.189,
+      "ties": 7,
+      "identical": 7,
+      "failed": 0
+    },
+    "closed_book": {
+      "n": 45,
+      "win_rate": 0.5333,
+      "se": 0.0744,
+      "ties": 36,
+      "identical": 18,
+      "failed": 0
+    },
+    "definition": {
+      "n": 33,
+      "win_rate": 0.5909,
+      "se": 0.0856,
+      "ties": 15,
+      "identical": 4,
+      "failed": 0
+    },
+    "grounded": {
+      "n": 15,
+      "win_rate": 0.3333,
+      "se": 0.1217,
+      "ties": 6,
+      "identical": 4,
+      "failed": 0
+    }
+  },
+  "per_prompt": [
+    {
+      "id": "fhwa-hif19067:p34:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is closer to the reference (2.5 feet) when converted to the same unit, but neither answer is correct or faithful to the reference.",
+        "Answer 2 is closer to the reference value of 2.5 feet, while Answer 1 is incorrect and does not match the required units."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-15-047:p287:c0:t0:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more concise while remaining correct and faithful to the reference. Answer 2 adds the unnecessary phrase 'structure' which is not present in the reference or request.",
+        "Answer 2 is more concise while remaining correct and faithful to the reference. Both answers meet the first two criteria, but Answer 2 omits the redundant 'structure' (since 'concrete' already implies a structure) and is thus stricter in conciseness."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-6053:p137:c0:q1:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-2078:p172:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 exactly matches the reference formula and adheres strictly to the request's requirements, while Answer 2 incorrectly formats the exponents.",
+        "Answer 2 exactly matches the reference formula and adheres strictly to the requested format, while Answer 1 incorrectly omits the division symbol and uses '2' instead of '\u00b2'."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1913:p159:c0:q1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 does not align with the reference, but Answer 1 is closer to the reference range of one to two percent while still being incorrect.",
+        "Answer 2 is closer to the reference range of one to two percent, though neither is correct."
+      ]
+    },
+    {
+      "id": "fema-p-1024:p321:c0:q2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 matches the reference exactly and adheres strictly to the request's format and content.",
+        "Answer 2 matches the reference exactly and adheres strictly to the request's format and content."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-23-024:p967:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more concise while remaining correct, faithful to the reference, and properly formatted with citations.",
+        "Answer 2 is more concise and exactly matches the reference passage without any additional phrasing."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1003:p178:c0:q1:closed_book:3",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif19063:p60:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-1614:p101:c0:t1:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 is more concise while remaining correct and faithful to the reference, adhering strictly to the request's format without adding unnecessary details (e.g., 'plunges forward').",
+        "Answer 1 is more precise and aligns better with the reference by explicitly mentioning the wave 'plunges forward' upon collapse, which is a key detail in the definition of breaker height. It also adheres strictly to the one-sentence requirement and adds no extraneous information."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-16-016:p65:c0:q1:abstain:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-nhi-04-041:p237:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-1810:p201:c1:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is incorrect but closer in format to the expected reference (Crowell, Leatherman, and Buckley 1991), while Answer 1 is unrelated to the request.",
+        "Answer 2 does not match the reference, while Answer 1 is incorrect but closer in format to the expected citation style."
+      ]
+    },
+    {
+      "id": "fema-p-695:p375:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is closer to the reference value of 0.97, though neither matches exactly, but Answer 1 adds an incorrect value not supported by the reference.",
+        "Answer 2 is closer to the reference value of 0.97, while Answer 1 deviates further."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p142:c0:f1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 is incorrect per the reference, while Answer 2 is also incorrect but Answer 1 deviates further from the correct value.",
+        "Answer 2 is closer to the reference (Chapter 21) and strictly follows the request format, while Answer 1 is incorrect."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2104-2025-01-08-final:p43:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 matches the reference exactly (5-4b is a typo in the reference; the correct paragraph is 5-3b per EM 1110-2-2104).",
+        "Answer 2 is incorrect, while Answer 1 is also incorrect but closer to the reference (5-4b)."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-15-047:p287:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-if-12-027:p171:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 is incorrect per the reference (\u00b15 percent), while Answer 2 introduces an irrelevant unit not specified in the request.",
+        "Answer 2 matches the reference exactly (\u00b1 10 percent), while Answer 1 introduces an incorrect unit and value (\u00b1 0.010 in)."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2104-2025-01-08-final:p43:c0:f1:closed_book:reask:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "nist-gcr-17-917-46v2:p60:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 matches the reference equation (\u00bd(EIsteel + EIcomp)) when simplified, while Answer 2 introduces unnecessary variables and does not align with the reference.",
+        "Answer 1 matches the reference equation (\u00bd(EIsteel + EIcomp)) when simplified, while Answer 2 does not align with the provided reference."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2400:p33:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is correct, concise, and directly matches the reference without adding extraneous information.",
+        "Answer 2 directly matches the reference with the correct recurrence interval and adheres strictly to the request's format and conciseness."
+      ]
+    },
+    {
+      "id": "fema-p-1100:p110:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more faithful to the reference by explicitly including the requirement that the alternate connector must meet the manufacturer's capacity within the same group, while Answer 2 omits this critical detail.",
+        "Answer 2 is more precise and faithful to the reference by explicitly including the requirement that the alternate connector must be within the same group and based on the lowest listed manufacturer's capacity, while Answer 1 omits these details."
+      ]
+    },
+    {
+      "id": "usace-em-1110-1-1002:p13:c0:f3:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 directly matches the reference URL and includes the specific section for survey mark stability configurations, while Answer 1 is less precise.",
+        "Answer 1 is more precise and directly matches the reference URL, including the specific section for stability configurations."
+      ]
+    },
+    {
+      "id": "nasa-std-5019a:p85:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is closer to the reference value of 1.4 but neither matches the exact reference, while Answer 1 is further from the reference.",
+        "Answer 1 is incorrect as it does not match the reference value of 1.4, while Answer 2 is also incorrect but closer evaluation prioritizes strict adherence to the reference."
+      ]
+    },
+    {
+      "id": "fhwa-hif13026:p140:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 strictly adheres to the reference, includes all required details, and provides precise citations for each claim as requested.",
+        "Answer 2 is more faithful to the reference, includes all required details, and adheres strictly to the citation format without omissions."
+      ]
+    },
+    {
+      "id": "fema-p-58-2:p209:c0:f2:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is incorrect and does not match the reference, while Answer 1 is also incorrect but the reference specifies B1044.001 through B1044.083 as the correct codes.",
+        "Answer 2 does not match the reference, but Answer 1 is entirely incorrect and unrelated to FEMA P-58-2."
+      ]
+    },
+    {
+      "id": "fhwa-hif19063:p171:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more concise while remaining correct, faithful to the reference, and properly cited.",
+        "Answer 2 is more precise by including the full equation numbers (6.12.2.2.2g-2 and 6.12.2.2.2g-3) as cited in the reference and passage."
+      ]
+    },
+    {
+      "id": "fema-p-1050-1:p515:c1:t1:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 strictly adheres to the reference by specifying 'collapse risk' and 'current seismic code requirements,' which are key details in the reference. Answer 2 generalizes to 'structural performance,' which is broader than the reference's focus. Both are concise, but Answer 1 is more precise and ",
+        "Answer 2 more precisely aligns with the reference by specifying 'collapse risk' and 'current seismic code requirements,' which are key aspects of the risk-targeted MCER definition. Answer 1 is broader ('structural performance') and less faithful to the reference's focus on collapse risk. Both are co"
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2107:p158:c0:t0:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more concise while remaining correct and faithful to the reference. Both answers meet the criteria of the request, but Answer 2 omits the redundant 'point' after 'pivot,' making it slightly more precise.",
+        "Answer 2 is more concise while remaining correct and faithful to the reference. Both answers are valid, but Answer 2 omits the redundant 'point' after 'pivot,' aligning better with the request's demand for precision and conciseness."
+      ]
+    },
+    {
+      "id": "usace-em-1110-1-4006:p70:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more concise, strictly adheres to the reference, and avoids redundant citations while maintaining accuracy.",
+        "Answer 1 is strictly faithful to the reference passage, avoids adding extraneous details, and correctly cites the supporting passage."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1034:c0:q0:closed_book:3",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif-18-046:p527:c0:f11:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more faithful to the reference by explicitly mentioning 'modal combination method' and 'seismic analysis' context, while Answer 1 introduces terms like 'variance' and 'covariance' not present in the reference. Both are one-sentence answers, but Answer 2 aligns better with the reference's",
+        "Answer 1 is more faithful to the reference, directly addressing the modal combination aspect of CQC in seismic analysis without introducing unrelated concepts like variance or covariance. It also adheres to the one-sentence requirement and is concise."
+      ]
+    },
+    {
+      "id": "nist-gcr-14-917-31:p29:c1:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 matches the reference range of 1.2 to 1.5 more closely and adheres strictly to the requested format.",
+        "Answer 2 matches the reference range of 1.2 to 1.5 more closely and adheres strictly to the requested format."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1416:p73:c0:t0:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more precise and aligns better with the request's requirement of defining the term in one sentence. It is also more concise while maintaining correctness and faithfulness to the reference.",
+        "Answer 2 is more concise while remaining correct and faithful to the reference. Both answers are accurate, but Answer 2 omits unnecessary details (e.g., 'unsteady flow in open channels') and adheres strictly to the one-sentence requirement."
+      ]
+    },
+    {
+      "id": "nasa-std-5001b:p21:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is closer to the reference value of 2.0 but neither matches the exact reference, while Answer 1 is further from the correct value.",
+        "Answer 1 is incorrect as it does not match the reference value of 2.0 specified in NASA-STD-5001B."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2107:p21:c0:f1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 matches the reference exactly and adheres strictly to the requested format, while Answer 1 is incorrect.",
+        "Answer 1 matches the reference exactly and adheres strictly to the requested format without additional text."
+      ]
+    },
+    {
+      "id": "nist-gcr-11-917-11:p36:c0:f1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 matches the reference value \u03c8t = 1.3 exactly and adheres strictly to the requested format.",
+        "Answer 2 matches the reference exactly and adheres strictly to the requested format without additional information."
+      ]
+    },
+    {
+      "id": "fema-p-1051:p44:c0:q1:abstain-hard:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-1-400:p45:c0:f4:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 does not match the reference (Para. 3.5.9), while Answer 2 is incorrect and irrelevant.",
+        "Answer 2 ('6-5') does not match the reference ('Para. 3.5.9'), while Answer 1 ('10-5') is incorrect but closer in format to the expected paragraph-style citation."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1169:c0:q0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-1100-2c:p12:c3:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is strictly correct and concise, matching the reference value without additional context.",
+        "Answer 2 strictly matches the reference value and format without adding extraneous information."
+      ]
+    },
+    {
+      "id": "fema-nehrp-examples-v1:p168:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-2208:p418:c1:f10:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-2055:p29:c0:f9:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more concise, directly aligns with the reference's focus on 'immediate occupancy' and 'critical role in post-disaster operations,' and strictly adheres to the one-sentence requirement without adding extraneous details.",
+        "Answer 2 more closely aligns with the reference by emphasizing 'immediate occupancy' and 'critical functions during and after a disaster,' which directly reflects the reference's focus on 'post-disaster operations.' Answer 1, while accurate, broadens the scope beyond the reference by including 'safe"
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-6051:p105:c0:f3:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 incorrectly specifies a subsection, while Answer 1 correctly identifies the broader section but fails to match the exact reference (paragraph 4-5b).",
+        "Answer 2 is incorrect and overly broad, while Answer 1 is specific but does not match the reference (paragraph 4-5b)."
+      ]
+    },
+    {
+      "id": "nist-gcr-18-917-43:p42:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more concise while remaining correct, faithful to the reference, and properly formatted with citations, whereas Answer 1 redundantly cites the same passage twice.",
+        "Answer 1 is more concise, avoids redundant citations, and strictly adheres to the reference without unnecessary repetition."
+      ]
+    },
+    {
+      "id": "nist-gcr-17-917-44:p80:c0:f1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "nasa-std-5019a:p90:c0:q3:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more concise and correctly cites only the necessary passages without including irrelevant ones, while fully agreeing with the reference.",
+        "Answer 1 is more concise and directly aligns with the reference without including unnecessary citations or extraneous passages."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-3800:p107:c1:f10:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 more closely aligns with the reference by emphasizing 'minimal fracturing' (as 'low deformability' and 'undisturbed unit without significant internal discontinuities') and 'high cementation' (implied by 'high strength' and 'behaves as a single unit'). Answer 1 omits the reference's focus on",
+        "Answer 1 more closely aligns with the reference by emphasizing 'minimal fracturing' and 'behaves as a single, undisturbed unit,' while Answer 2 omits key aspects like 'strong joints' and 'high cementation.' Both are concise, but Answer 1 is more faithful to the reference."
+      ]
+    },
+    {
+      "id": "fema-p-751:p790:c0:q1:abstain-hard:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif19063:p358:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more accurate and complete, as it includes the classification criterion (Equation 6.12.2.2.2c-1) explicitly mentioned in the reference, while Answer 1 omits it and cites an unnecessary passage.",
+        "Answer 1 is strictly correct, cites only the relevant passage, and aligns perfectly with the reference without adding extraneous information."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2906:p58:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 matches the reference value of 1.0 for the group reduction factor (Rg) per EM 1110-2-2906.",
+        "Answer 2 matches the reference value of 0.85 for the group reduction factor (Rg) at 3 times the pile diameter spacing, while Answer 1 does not."
+      ]
+    },
+    {
+      "id": "nist-gcr-17-917-46v2:p60:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 exactly matches the reference formula and adheres strictly to the requested format without additional symbols or deviations.",
+        "Answer 1 exactly matches the reference formula and adheres strictly to the requested format without additional terms or deviations."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2007:p15:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-695:p297:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more concise while remaining correct, faithful to the reference, and properly citing the passage.",
+        "Answer 1 is more concise and directly aligns with the reference without introducing irrelevant details (Figures A-7 and A-8 are not mentioned in the reference)."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2902a:p78:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-3600:p63:c0:q1:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-2200:p12:c1:f3:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-1003:p424:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more concise and correctly cites only the passage that directly supports the claim, while Answer 1 unnecessarily includes an additional citation that does not add new information.",
+        "Answer 1 is more concise and correctly cites only the passage that directly supports the claim, while Answer 2 redundantly cites an additional passage that does not add new information."
+      ]
+    },
+    {
+      "id": "fema-p-154:p117:c0:f5:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif19063:p278:c0:q1:abstain:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-sbdh-ex5:p107:c1:q1:abstain:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-2502:p347:c0:f7:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-795:p41:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is incorrect, but Answer 1 is also incorrect as the correct reference is FEMA P-695, not FEMA P-58-2.",
+        "Answer 1 is incorrect per the reference, while Answer 2 is also incorrect but Answer 1 does not match the required FEMA P-695 reference."
+      ]
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p20:c0:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-424:p355:c0:f1:closed_book:2",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif19067-nov2021:p125:c1:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more faithful to the reference, explicitly mentioning 'concrete' and closely aligning with the reference's phrasing and technical details. It is also concise and adheres to the one-sentence format requested.",
+        "Answer 1 is more faithful to the reference, directly mirroring the key elements (tensile strength, compressive load, cylindrical specimen, splitting along diameter) without introducing additional concepts like 'material property' or 'resistance to tensile stresses.' It is also concise and adheres st"
+      ]
+    },
+    {
+      "id": "fema-p-795:p108:c0:f3:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is closer to the reference but still incorrect, while Answer 1 is entirely incorrect and less concise.",
+        "Answer 2 does not match the reference, while Answer 1 is closer but still incorrect; neither is correct, but Answer 1 aligns better with the request's format and reference proximity."
+      ]
+    },
+    {
+      "id": "fema-p-695:p110:c0:f11:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-nehrp-examples-v1:p230:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more precise, explicitly shows the calculation matching the reference, and adheres strictly to the passage while being equally concise.",
+        "Answer 1 is more concise and explicitly shows the calculation matching the reference, while Answer 2 omits the final result."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2100:p22:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "nist-gcr-14-917-31:p29:c1:f0:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is incorrect, but Answer 1 is also incorrect and does not match the reference value of 80 percent.",
+        "Answer 2 is incorrect but closer to the reference, while Answer 1 is entirely incorrect and unfaithful to the reference."
+      ]
+    },
+    {
+      "id": "fhwa-nhi-04-041:p237:c0:f2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "nist-gcr-14-917-30:p128:c0:q1:abstain:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fhwa-hif-19-088:p126:c0:q2:closed_book:1",
+      "format": "closed_book",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 does not match the reference, but Answer 1 is entirely incorrect and unfaithful to the reference.",
+        "Answer 2 is incorrect, but Answer 1 is also incorrect and does not match the reference (Clause 3.2.3.7)."
+      ]
+    },
+    {
+      "id": "nist-gcr-17-917-46v1:p34:c0:q1:abstain-hard:1",
+      "format": "abstain",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-1611:p62:c0:f11:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 is more faithful to the reference by omitting 'hydraulic efficiency,' which is not mentioned in the reference, and it adheres strictly to the request's requirement of a precise one-sentence definition without additional details.",
+        "Answer 1 is more faithful to the reference by including the concept of hydraulic efficiency, which is implied by the reference's focus on flow resistance and habitat diversity. It remains concise and adheres strictly to the request format."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2107:p50:c0:q4:grounded:1",
+      "format": "grounded",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-2208:p152:c0:f6:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 strictly matches the reference definition by emphasizing the prevention of oscillation without adding extraneous details (e.g., 'shortest time'), while Answer 2 introduces an unsupported criterion ('shortest time').",
+        "Answer 2 is more faithful to the reference by explicitly mentioning the prevention of oscillation and aligning closely with the reference's phrasing. Answer 1, while correct, adds the concept of 'shortest time,' which is not present in the reference. Both are concise and follow the format, but Answe"
+      ]
+    },
+    {
+      "id": "nist-gcr-16-917-41:p28:c1:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more faithful to the reference by correctly identifying the ratio as a measure of relative strength (implied by 'structural analysis') rather than stiffness, and it adheres strictly to the one-sentence requirement without adding extraneous details. Answer 1 incorrectly describes the rati",
+        "Answer 2 does not align with the reference definition, but Answer 1 also fails to match the reference. Neither answer is correct or faithful to the reference. However, since the question requires choosing between the two, Answer 1 is marginally closer in structure (though incorrect in content), whil"
+      ]
+    },
+    {
+      "id": "fema-p-2208:p418:c1:f8:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 aligns more closely with the reference by correctly identifying the displacement as related to flexural deformations and member length (a proxy for elastic stiffness properties), while Answer 2 incorrectly uses 'member depth' instead of length. Answer 1 also adheres strictly to the request'",
+        "Answer 1 aligns more closely with the reference by correctly identifying the displacement as related to flexural deformations and using 'member depth' (a common term in structural engineering for flexural calculations) rather than 'member length' (which is incorrect in this context). It is also conc"
+      ]
+    },
+    {
+      "id": "fema-p-749:p115:c0:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 aligns more closely with the reference by explicitly mentioning the 'total lateral seismic force at its base' and incorporating seismic design parameters (via 'design spectral response acceleration'). It also adheres to the request's format (one precise sentence) and is concise. Answer 1 in",
+        "Answer 1 aligns more closely with the reference by explicitly mentioning the total lateral seismic force at the base, the structure's weight, and seismic design parameters (via 'design spectral response acceleration'). It is also concise and adheres to the one-sentence format. Answer 2 introduces 'f"
+      ]
+    },
+    {
+      "id": "fhwa-hif-19-088:p126:c0:q3:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 aligns more closely with the reference by describing a general planar separation (without restricting it to adhesive failure) and avoids adding extraneous details. It is also concise and adheres to the one-sentence requirement.",
+        "Answer 1 strictly matches the reference's description of a planar discontinuity caused by separation (failure of adhesion), while Answer 2 introduces unrelated causes ('internal stresses or damage') not present in the reference. Answer 1 is also more concise and faithful to the request's format."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p224:c0:f6:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more faithful to the reference, precisely defining retractable seal rings in the context of spherical valves and their function without adding extraneous details. It also adheres strictly to the one-sentence requirement and is concise.",
+        "Answer 2 is more faithful to the reference by specifying 'dynamic seal' and 'preventing fluid leakage,' which aligns with the context of spherical valves and hydraulic operation. Answer 1 incorrectly focuses on 'water ingress' and 'bearing housing,' which are not mentioned in the reference. Answer 2"
+      ]
+    },
+    {
+      "id": "nist-gcr-11-917-15:p69:c0:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more precise and aligns more closely with the reference definition, explicitly stating 'the maximum difference in ground velocity between the highest and lowest points of a seismic wave,' which matches the reference's 'highest difference between the maximum and minimum velocities.' Answe",
+        "Answer 1 is more precise and directly mirrors the reference definition, while Answer 2 introduces slight ambiguity ('upward and downward velocities' instead of 'maximum and minimum velocities') and is marginally less concise."
+      ]
+    },
+    {
+      "id": "usace-em-1110-1-400:p45:c0:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 2 is more precise and aligns better with the reference by specifying the types of resistance (cutting, drilling, physical attack) while remaining a single sentence. Answer 1 is correct but less detailed.",
+        "Answer 1 is more precise, aligns closely with the reference by specifying resistance to 'cutting, drilling, or other forms of physical attack,' and adheres strictly to the one-sentence requirement while being concise. Answer 2 omits key details about the nature of resistance."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1009:p175:c0:f11:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more faithful to the reference by specifying 'GPS relative positioning' (which aligns with GNSS processing context) and explicitly mentions 'systematic errors' in a way that better matches the reference's focus on error detection. Answer 2 is less precise by using the broader term 'GPS m",
+        "Answer 2 is more faithful to the reference by explicitly mentioning 'relative positioning,' which aligns with the context of GNSS processing and satellite pairs. Answer 1 is broader ('GPS measurements') and less precise, while Answer 2 adheres more closely to the technical specificity of the referen"
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2901:p8:c0:f7:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more faithful to the reference by specifying 'excavated material' (matching the reference's 'excavated material during tunnel or shaft construction') and omits unnecessary additions like 'ensure stability,' which is not in the reference. It is also more concise while adhering to the requ",
+        "Answer 2 is more faithful to the reference by explicitly mentioning 'excavated material' (implied in 'dredged material' but less precise) and 'tunnel or shaft construction' (narrowed to 'dredging operations' in Answer 1, which is incorrect). Answer 2 also maintains conciseness and adheres to the one"
+      ]
+    },
+    {
+      "id": "usace-em-1110-1-1002:p13:c0:f7:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 aligns closely with the reference by describing 'points' used to establish lines of position (survey lines) for locating a survey mark, while Answer 2 incorrectly defines origins as intersections of latitude and longitude, which is unrelated to the reference. Answer 1 also adheres to the re",
+        "Answer 2 aligns more closely with the reference by emphasizing 'points from which survey lines radiate to establish control,' which matches the concept of 'prominent reference objects used to establish lines of position for locating a survey mark.' Answer 1 describes coordinate intersections, which "
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1607:p11:c0:q2:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 is more concise and directly aligns with the reference definition without adding extraneous details (e.g., calculation method). It adheres strictly to the request's format and intent.",
+        "Answer 2 is more correct and faithful to the reference, as it does not add the extraneous detail about 'calculated as the area of the inlet multiplied by the tidal range,' which is not present in the reference. Answer 2 also adheres strictly to the one-sentence requirement and is concise."
+      ]
+    },
+    {
+      "id": "fema-p-2078:p172:c0:f10:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 is more faithful to the reference's focus on spectral displacement behavior (uniformity) rather than structural deformation, and it adheres strictly to the request's format and conciseness.",
+        "Answer 2 is incorrect and unfaithful to the reference, while Answer 1 is also incorrect but closer in structure. Neither aligns with the reference, but the request prioritizes correctness. The reference defines 'domain of constant displacement' in the context of a response spectrum, not structural d"
+      ]
+    },
+    {
+      "id": "nist-gcr-11-917-15:p88:c1:f9:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 strictly adheres to the reference, includes all key elements (empirical models, ground motion intensity, earthquake magnitude, distance, and site conditions), and adds no extraneous details. It is also concise and follows the requested format precisely.",
+        "Answer 2 strictly adheres to the reference by including 'earthquake magnitude, distance, and site conditions' and matches the requested format in one precise sentence. Answer 1 introduces additional details ('updated datasets and advanced statistical techniques') not present in the reference."
+      ]
+    },
+    {
+      "id": "fema-p-751:p810:c1:f10:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 strictly adheres to the reference definition without adding extraneous details (e.g., 'ductility' or 'energy dissipation'), while Answer 2 introduces concepts not present in the reference. Both are concise, but Answer 1 is more faithful to the request and reference.",
+        "Answer 2 adheres more strictly to the reference definition, avoids introducing concepts (e.g., 'ductility,' 'dissipate energy,' 'inelastic deformation') not present in the reference, and remains concise while fulfilling the one-sentence requirement."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-1604:p161:c0:f10:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "usace-em-1110-2-2200:p12:c1:f8:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 2 aligns more precisely with the reference's focus on 'a thermal property' and the concept of a 'temperature gradient,' which is implied in the reference's mention of 'temperature-induced stresses.' It is also more concise and adheres strictly to the request's format without adding extraneous",
+        "Answer 2 is more precise and aligns better with the standard definition of thermal conductivity, which is typically expressed as heat transfer per unit area per unit temperature gradient. It also remains concise and faithful to the reference without adding extraneous details."
+      ]
+    },
+    {
+      "id": "fhwa-hif15016:p46:c0:f10:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 aligns more closely with the reference by focusing on the magnitude of stress at the time of loading (implicitly in concrete, as the reference specifies) and avoids introducing unrelated concepts like fatigue analysis. It is also concise and adheres to the one-sentence format.",
+        "Answer 2 is more faithful to the reference by specifying 'the stress level... at the onset of loading' (aligning with 'at the time of loading') and avoids introducing unrelated concepts like fatigue analysis. Answer 1 deviates by focusing on structural components and fatigue, which are not mentioned"
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-2100:p26:c0:f10:definition:1",
+      "format": "definition",
+      "outcome": 1.0,
+      "consistent": true,
+      "reasons": [
+        "Answer 1 aligns with the reference by describing the portion of the foundation under compressive stress, while Answer 2 incorrectly defines it as a transition point to tensile stress, which contradicts the reference. Answer 1 is also concise and adheres to the request format.",
+        "Answer 2 aligns more closely with the reference by describing the portion of the foundation under compressive stress, while Answer 1 incorrectly defines it as a transition point to tensile stress. The reference emphasizes stability and compressive stress, not a zero-stress transition."
+      ]
+    },
+    {
+      "id": "usace-em-1110-2-3600:p100:c1:f6:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "consistent": false,
+      "reasons": [
+        "Answer 1 is more faithful to the reference by explicitly mentioning 'potential errors' and 'review' while adhering to the one-sentence constraint. Answer 2 omits the concept of further review and the context of real-time water management reporting.",
+        "Answer 1 is more concise and directly aligns with the reference by emphasizing the provisional nature due to potential errors and pending review, while Answer 2 introduces additional details ('official use') not present in the reference or request."
+      ]
+    },
+    {
+      "id": "usace-em-1110-1-4008:p48:c0:q3:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "identical": true
+    },
+    {
+      "id": "fema-p-2208:p152:c0:f8:definition:1",
+      "format": "definition",
+      "outcome": 0.5,
+      "identical": true
+    }
+  ]
+}
