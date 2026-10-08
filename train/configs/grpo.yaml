@@ -1,5 +1,5 @@
 model:
-  init_from: checkpoints/dpo-merged
+  init_from: checkpoints/dpo  # stage4-final: dpo (seed 0), merged, sha256 bf9a01c7 (notes/decisions.md, 2026-10-08)
   dtype: bfloat16
 
 lora:

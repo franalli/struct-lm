@@ -3543,3 +3543,34 @@ model's log-probability of unseen gold answers by about 0.2 nats without changin
   `</s>`.
 - **None fired, so the registered rerun is `dpo-lnorm`** (length-normalised, β 5). The pasted
   plan's time condition ("evals in by 15:00") wasn't met; the user decides.
+
+## 2026-10-08: Step 13 outcome: lnorm skipped; dpo-2ep as a post-hoc ablation; stage4-final = dpo (user decisions)
+**As registered:** no trigger fired, so the registered rerun was `dpo-lnorm`. **It is skipped:
+its time condition (evals in by 15:00) wasn't met.** It also wouldn't answer anything here:
+- Tülu's length-normalised objective exists to fight length bias in judge-labelled pairs.
+- These pairs are verifier-labelled, length-capped and mostly one-line closed-book answers.
+- β 5 isn't comparable to β 0.1 across objectives.
+
+**`dpo-2ep`: an ablation, not a candidate. Post-hoc, motivated by train loss 0.654 against a
+starting 0.693 with the margin still rising.**
+- **That is the under-training the trigger was written for.** Its first clause read the win
+  rate, which the judge failure demoted. So "not fired as written" is a clause that can no longer
+  be evaluated, not evidence against.
+- **Recipe:** a fresh run from the SFT start, `num_train_epochs: 2`, everything else identical to
+  `dpo` (seed 0, data_seed 0, LR 1e-5, linear over the doubled 62 steps, 10% warmup).
+  - Saved at the end of each epoch; only the epoch-2 adapter is merged and evaluated.
+  - The epoch-1 checkpoint stops at LR ~5.6e-6, not 0, so it isn't `dpo` and isn't evaluated.
+  - The within-run checkpoint rule (epoch 2 unless the dpo_val loss at step 62 is above its
+    value at step 31) is reported next to the row.
+- **Not a resume with an invented schedule.** Resuming would have jumped the LR from 0 to
+  5.6e-6 at step 32 and confounded the comparison.
+- **Where it goes:** the README's "what more training does" row, on the same verifier metrics
+  and guards, against `dpo` with the Stage 4 seed gap as the floor. If it is clearly better, next
+  steps say two epochs; nothing downstream changes.
+
+**`stage4-final = checkpoints/dpo`** (seed 0, the registered main run; merged checkpoint sha256
+`bf9a01c7…`, preempted and restarted as recorded above). `train/configs/grpo.yaml` `init_from`
+points at it, and close-out is tonight.
+
+**Pair counts:** as registered 114, as trained 506. The estimates were ~300 and ~800-900; the
+amendment's real effect is 114 → 506.
