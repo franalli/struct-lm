@@ -35,61 +35,13 @@ Current baselines: `results/table.md`.
 
 ### CPT corpus (Mac; Stage 1)
 
-```bash
-set -a; . ./.env; set +a                        # HF_TOKEN for the tokenizers and FineWeb-Edu
-make data                                       # all steps below, in order
-.venv/bin/python data/scripts/download.py       # data/sources.csv -> data/raw/<slug>.pdf; writes sha256 + pages back
-.venv/bin/python data/scripts/extract.py        # -> docs_raw.jsonl (header/footer strip, <200-char pages dropped, page offsets)
-.venv/bin/python data/scripts/filter.py         # -> docs.jsonl + dropped_samples.jsonl
-.venv/bin/python data/scripts/dedup.py          # docs.jsonl in place (exact + paragraph MinHash) + duplicates.jsonl
-.venv/bin/python data/scripts/pii.py            # docs.jsonl in place
-.venv/bin/python data/scripts/split.py          # -> train.jsonl / val.jsonl (document-level; eval pool stays in train)
-.venv/bin/python data/scripts/replay.py         # -> replay.jsonl (FineWeb-Edu, 10% of train tokens) + general_val.jsonl (500k, last shard)
-.venv/bin/python data/scripts/tokenizer_coverage.py  # -> tokenizer_coverage.md (committed)
-.venv/bin/python data/scripts/stats.py           # tokens column in sources.csv + corpus card tables for notes/decisions.md
-```
-
-- All outputs land in `data/processed/`; each step writes its own section of `stats.json`.
-  Committed: `stats.json`, `tokenizer_coverage.md`. `dedup.py` and `pii.py` rewrite `docs.jsonl`
-  in place, so after a change to any step rerun from `filter.py` (or `make data`).
-- Stage 2 reads `train.jsonl`, `val.jsonl`, `replay.jsonl` and `general_val.jsonl` from the Modal
-  volume: `modal volume put --force struct-lm data/processed data/processed` after any data change.
-- `split.py` reports the 150-step rule's batch (`stats.json` split.seqs_per_step: 32 at ~20M
-  tokens, 64 at ~40M); set `gradient_accumulation_steps` in `train/configs/cpt*.yaml` to match
-  (`cpt.py` refuses an epoch outside 120-190 steps).
-- New sources: `crawl_index.py <index url or saved .html> --pattern REGEX --publisher P` appends
-  rows to `data/sources.csv`, or add rows by hand. USACE and FEMA block scripts (Akamai 403): save
-  the index page / PDFs from a browser (Chrome DevTools MCP works) into `data/raw/` (as
-  `<slug>.pdf` or the URL's filename) and rerun `download.py`. Hand-check every `copyright_flags` entry `extract.py` prints (rule 1).
-- Read `dropped_samples.jsonl` after any filter change; the tuning rationale is in `filter.py`.
+Corpus build (`make data`), its per-step rules and adding sources: `data/CLAUDE.md` (loads with
+files under `data/`).
 
 ### Eval tasks (Mac)
 
-```bash
-.venv/bin/python data/scripts/extract.py --chunks   # -> data/processed/chunks.jsonl (eval pool only; frozen)
-set -a; . ./.env; set +a
-.venv/bin/python eval/make_tasks.py           # -> eval/tasks/*.jsonl (Mistral API, disk-cached)
-.venv/bin/python eval/sft_split.py            # -> eval/tasks/sft_seen_chunks.txt (seen/unseen halves)
-.venv/bin/python -m pytest tests/             # qa_rules, few-shot guard; with .env loaded, v1/v2/v3 rebuild from the LLM cache
-```
-
-- `--task-version 1` rebuilds the 2026-09-27 eval (130-item domain_qa, `results/table_v1.md`) byte
-  for byte. `2` is the grown set: after rejects it tags `answer_kind`, removes layout
-  locators (`qa_rules.is_locator` -> `locators.jsonl`) and holds identifiers to 20% of the set
-  (`held_back.jsonl`). Reviewer tag corrections live in `eval/tasks/answer_kinds.jsonl`. v2 tags
-  `fewshot_passage_overlap` on qa-0003 / qa-0056 (same passage as a few-shot item, other facts).
-  `3` (default) is v2 with the few-shot split off by passage (322 items, v2 ids kept; qa-1143 moves
-  to `held_back.jsonl`): the committed set from Stage 3 on (`results/table_v2.md` froze v2's table).
-
-`chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt` (the 234
-train documents when the eval was frozen), so corpus expansion can't resample the reviewed tasks;
-`--chunks` must stay byte-identical (`cmp`). `split.py` keeps every pinned document in train.
-Sampling caps source chunks at `--per-doc 6` per document per task.
-After any edit to `make_tasks.py`, rerun it and diff `eval/tasks/` against the reviewed version.
-Byte-identical output needs no re-review; any changed item must be reviewed (rule 9) against
-`notes/eval_review_rubric.md`. A task file that grows makes every earlier run stale for that task:
-`run_eval.py --rescore` refuses generations that miss items (`--allow-partial` scores the subset
-and must not go into `table.md`), so regenerate the affected task for every compared checkpoint.
+Task generation (`make_tasks.py`, `sft_split.py`, `extract.py --chunks`), task versions and the
+frozen-eval rules (rule 9): `eval/CLAUDE.md`.
 
 ### Generation, lm-eval, latency (Modal)
 
@@ -161,44 +113,8 @@ passes flags `run_eval.py` doesn't have).
 
 ### Stage 2: CPT (Modal)
 
-```bash
-M=.venv/bin/modal   # from the repo root; one pipeline.remote() per launch, so --detach is safe
-# smoke tests (20 steps): main, 8B full-parameter (2 GPUs), 2-GPU LoRA scaling
-$M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-cpt --smoke --steps train,merge,ppl
-$M run eval/modal_app.py --which kpi --model /vol/checkpoints/smoke-cpt --run-name smoke-cpt --limit 5 --no-judge --generate-only
-$M run train/modal_train.py --config train/configs/cpt_8b_full.yaml --run-name smoke-8b-full --gpus 2 --smoke --steps train,merge
-$M run train/modal_train.py --config train/configs/cpt.yaml --run-name smoke-fsdp --gpus 2 --smoke --steps train \
-  --overrides "training.gradient_checkpointing=false training.eval_strategy=no"
-# reference row (base-8b already has lm-eval, KPI generation and latency from Stage 0)
-$M run --detach train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b --steps ppl
-# main run: train, read the curve, then merge + perplexity + eval
-$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b --steps train
-$M run --detach train/modal_train.py --run-name cpt-8b --steps merge,ppl,eval
-# ablations: A replay, B 8B full-parameter (2 GPUs), C 2-GPU LoRA scaling (throughput only)
-$M run --detach train/modal_train.py --config train/configs/cpt_replay10.yaml --run-name cpt-8b-replay10
-$M run --detach train/modal_train.py --config train/configs/cpt_8b_full.yaml --run-name cpt-8b-full --gpus 2
-$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-fsdp2 --gpus 2 --steps train \
-  --overrides "training.gradient_accumulation_steps=4 training.gradient_checkpointing=false training.eval_strategy=no run.stop_at_step=100"
-# pull per run, then score locally (no --chat: every Stage 2 checkpoint is a base model)
-$M volume get --force struct-lm results/runs/<run> results/runs/
-$M volume get --force struct-lm results/ppl/<run>.json results/ppl/
-.venv/bin/python eval/run_eval.py --run-name cpt-8b --rescore --lm-eval-dir results/lm_eval \
-  --ppl-dir results/ppl --model /vol/checkpoints/cpt-8b
-.venv/bin/python train/report.py   # -> results/train_runs.md, results/curves/cpt.png, cpt_ppl.png
-.venv/bin/python eval/ppl_compare.py base-8b cpt-8b   # paired bootstrap CIs, nats and % ppl
-.venv/bin/python eval/contamination.py   # 13-gram overlap: val/2026 vs train, benchmarks vs train+replay,
-                                         # few-shot vs domain_qa -> results/contamination.md (rerun after data changes)
-# noise floor and LR-up (decisions.md, ablation rules): same config, one change each
-$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-seed1 --overrides "training.seed=1"
-$M run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b-lr2x --overrides "training.learning_rate=2.0e-4"
-# memorisation probe: corpus vs post-cutoff documents (eval/exposure_sources.csv, PDFs curl'd into
-# data/exposure/, gitignored), base plus the CPT checkpoint as positive control
-.venv/bin/python eval/memorization.py build            # -> data/exposure/docs.jsonl
-$M volume put --force struct-lm data/exposure/docs.jsonl data/exposure/docs.jsonl
-$M run --detach eval/modal_app.py::memorization --model /vol/checkpoints/base-8b-hf --run-name base-8b-hf
-mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/base-8b-hf.json results/exposure/base-8b-hf.json
-.venv/bin/python eval/memorization.py report base-8b-hf cpt-8b-replay10
-```
+Launch commands for every Stage 2 run (smoke tests, main run, ablations, seed/LR-up runs,
+memorisation probe): the `stage2-cpt` skill (`.claude/skills/stage2-cpt/SKILL.md`).
 
 - Override values go through YAML: write floats with a dot (`2.0e-4`; PyYAML reads `2e-4` as a
   string), and `no`/`yes`/`on`/`off` stay strings (`common.parse_config`).
@@ -218,39 +134,7 @@ mkdir -p results/exposure && $M volume get --force struct-lm results/exposure/ba
 
 ### Stage 3: SFT data (Mac)
 
-```bash
-set -a; . ./.env; set +a                    # MISTRAL_API_KEY (~6,000 calls at 30 a minute), HF_TOKEN
-make sft-data                               # all steps below, in order
-.venv/bin/python data/scripts/sft_pool.py        # A1 -> data/sft/work/pool.jsonl (seen half + ~900 allowed chunks)
-.venv/bin/python data/scripts/sft_questions.py   # A2 questions (Large 3, 0.7; title + passage only)
-.venv/bin/python data/scripts/sft_filter.py      # A3 rules, dedup, rule 1/2, caps, passage sets -> questions_kept.jsonl
-.venv/bin/python data/scripts/sft_answers.py     # A4 completions (Large 3 / Medium 3.5 25%), paraphrases, Evol-Instruct
-.venv/bin/python data/scripts/sft_judge.py       # A5 verifier + rubric judge + one revise round
-.venv/bin/python data/scripts/sft_replay.py      # 500 Tulu 3 SFT examples (downloads 1.4 GB once)
-.venv/bin/python data/scripts/sft_assemble.py    # A6/A7 -> data/sft/{train,sft_val}.jsonl, review.md, SHA256SUMS
-.venv/bin/python eval/contamination.py --only sft # section 6 of results/contamination.md
-# quality: full-passage reads of the generated records (packets in data/sft/work/)
-.venv/bin/python data/scripts/sft_audit.py read-packets LABEL # records assembly left unread -> packets
-#   each packet is read with data/sft/read_rubrics.md -> work/read_verdicts_<packet>.jsonl
-.venv/bin/python data/scripts/sft_audit.py read-merge         # -> data/sft/read_filter.jsonl; rerun sft_assemble
-.venv/bin/python data/scripts/sft_audit.py sample [N]         # audit round N sample -> report -> data/sft/audit.md
-```
-
-- Every call is cached in `data/sft/.cache/llm_cache.jsonl` (gitignored, with each prompt), so a
-  rerun pays only for prompts that changed. Each step writes its section of `data/sft/stats.json`.
-- `sft_pool.py --pilot N` builds the first N chunks of each kind (the head of the full pool, same
-  assignments): run it through A2-A5 and read the outputs before a full run.
-- After any change to a step, rerun from that step, then `sft_assemble.py`, the contamination
-  section and `pytest tests/test_sft_data.py`; a changed `train.jsonl` changes `SHA256SUMS` and
-  needs the `review.md` read redone.
-- The Mistral judge passes defects a full-passage read catches (audit 2026-10-05: 18% of judged-kept
-  records), so every closed-book record, definition and grounded answer, every hard-negative abstain
-  set and every record of a document in `sft_common.REGENERATED_DOCS` must be read. A verdict holds for the
-  content it read (`fingerprint`); `sft_assemble.py` leaves the rest out and lists them in
-  `work/unread.jsonl`. Loop: assemble -> `read-packets` -> read -> `read-merge` -> assemble, until
-  `stats.json` assemble.unread is 0 (`tests/test_sft_data.py` checks it). The line that matters in
-  the rubric: a wrong framing, overclaim, scope or example value is a defect even when the answer
-  value is right. Then re-audit a fresh sample (`sample N` names the round).
+Build (`make sft-data`), the full-passage read loop and its rules: `data/CLAUDE.md`.
 
 ### Stage 3: SFT training and eval (Modal)
 
@@ -285,28 +169,47 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
 .venv/bin/python eval/diversity.py score sft-from-cpt     # -> results/diversity/<run>.json
 ```
 
-### Stage 4: pre-pairing probe (rules fixed 2026-10-06, before sampling)
+### Stage 4: DPO on verifiable preferences (data on the Mac, sampling and training on Modal)
+
+Rules, the judge benchmark's failure and the amendment: `notes/decisions.md` (2026-10-08).
+Stage4-final is `checkpoints/dpo` (seed 0); `grpo.yaml` starts from it.
 
 ```bash
-# 20 prompts of data/dpo/prompts.jsonl (the first, in file order) x 4 samples at T 0.7
+make dpo-data                      # pool (data/dpo/prompts.jsonl, dpo_split), benchmark prompts, contamination --only dpo
+for f in prompts.jsonl bench_prompts.jsonl; do $M volume put --force struct-lm data/dpo/$f data/dpo/$f; done
 $M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/sft-from-cpt \
-  --run-name sft-from-cpt --chat --sample-jobs dpo_probe
-$M volume get --force struct-lm results/runs/sft-from-cpt/samples results/runs/sft-from-cpt/
-.venv/bin/python eval/diversity.py collapse sft-from-cpt   # stop rule: > 1/4 of non-abstain prompts collapsed
-set -a; . ./.env; set +a                                    # the A5 judge, paced at 30 a minute
-.venv/bin/python data/scripts/dpo_probe.py sft-from-cpt    # pairable fraction per format (sets the budget)
+  --run-name sft-from-cpt --chat --sample-jobs dpo_probe,dpo_bench
+set -a; . ./.env; set +a
+.venv/bin/python eval/diversity.py collapse sft-from-cpt          # the probe's stop rule
+.venv/bin/python data/scripts/dpo_judge_bench.py run              # listwise judge vs the full-passage reads
+.venv/bin/python data/scripts/dpo_probe.py sft-from-cpt           # pairable fraction -> data/dpo/budget.json
+$M volume put --force struct-lm data/dpo/budget.json data/dpo/budget.json
+$M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/sft-from-cpt \
+  --run-name sft-from-cpt --chat --sample-jobs dpo_pool,dpo_judge
+make dpo-pairs                     # verifier/rule scores -> pairs (+ the as-registered count), contamination, tests
+for f in train.jsonl val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/dpo/$f data/dpo/$f; done
+$M run train/modal_train.py --config train/configs/dpo.yaml --run-name smoke-dpo --smoke --chat \
+  --steps noop,train,merge,mergecheck
+$M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name dpo --chat \
+  --merge-from rule --steps noop,train,merge,mergecheck,ppl,eval,latency,sample
+# dpo-seed1: --overrides "training.seed=1 training.data_seed=1"; dpo-2ep (ablation, epoch-2 adapter only):
+#   --overrides "training.num_train_epochs=2 training.save_strategy=epoch", no --merge-from
+# pull runs/<run>, ppl, lm_eval, bench; score with --chat --ppl-dir results/ppl; then
+.venv/bin/python eval/diversity.py score dpo
+.venv/bin/python eval/winrate.py dpo sft-from-cpt                 # reported only (the judge failed its benchmark)
+.venv/bin/python train/report.py                                  # dpo.png, the Stage 4 read table, README blocks
 ```
 
-- **Stop rule:** a prompt collapses when all 6 pairwise token overlaps are above 0.9. Abstain is
-  out of the share and closed-book in it, both on their own lines. On a stop, temperature 1.0 and
-  the system-prompt variants before any pair is built.
-- **Pairable fraction:** at least one chosen and one rejected of 4.
-  - **Scorers:** the verifier for closed-book (`sft_judge.same_fact`) and abstain (cites or runs
-    past 12 words = answered); the A5 judge margin >= 2 for grounded and definition (a hard-rule
-    failure scores the floor, failed calls are left out).
-  - **It sets the budget:** below half on a non-abstain format, that format gets 8 samples.
-- **Reads the gitignored `data/sft/work/judged.jsonl`** (the builder's records, for gold and
-  passages). Its judge prompts go to the SFT builder's cache, so `relabel` strips every chunk id.
+- **No judge in pair-building:** closed-book by the verifier, abstain by the decline rule, grounded
+  by rules (`cite_valid`, cites the gold passage, no false abstain), no definition pairs. The
+  listwise judge (`sft_judge.judge_list`) caught 28% of grounded and 9% of definition defects.
+- **The trainer gets vLLM's sampled ids** (`prompt_ids`, `chosen_ids`, `rejected_ids`):
+  `train/dpo.py` passes them through TRL's `_prepare_dataset` and computes log-probs in fp32
+  (TRL 0.29.1 sums them in bf16). `tests/test_dpo_data.py` gates launch.
+- **The merge gate runs on `sft_val`** for DPO runs too, since dpo_val (665 positions) is too
+  small for the 0.1% line.
+- **The judge's prompts go to the SFT builder's cache** (`data/sft/.cache`), so `relabel` strips
+  every chunk id (`test_generator_prompts_clean`).
 
 - `train/sft.py` trains on pre-tokenised records (`train/sft_data.py`: mistral-common, the eval's
   `--chat` rendering, `completion_mask`); `tests/test_template.py` is the gate on those tensors.
@@ -386,10 +289,9 @@ set -a; . ./.env; set +a                                    # the A5 judge, pace
     (the SFT builder's only reader of `eval/tasks/`, never imported by a step that calls the LLM),
     which also keeps out every chunk on or next to an unseen eval chunk's page, and checked by
     `tests/test_sft_data.py` and `contamination.py --only sft`. The chat template work is done
-    (Stage 3: `train/sft_data.py`, `tests/test_template.py`). Stage 4's prompt pool
-    (`data/dpo/prompts.jsonl`) and its pre-pairing probe are authorised (2026-10-06). DPO pair
-    labelling waits for the preference judge's benchmark, and GRPO data for the Stage 5 task-set
-    plan.
+    (Stage 3: `train/sft_data.py`, `tests/test_template.py`). Stage 4 is DPO on verifiable
+    preferences: the preference judge failed its benchmark (2026-10-08) and labels nothing. GRPO
+    data waits for the Stage 5 task-set plan.
 11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
     reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
     GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
@@ -413,9 +315,9 @@ set -a; . ./.env; set +a                                    # the A5 judge, pace
 - Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/`, and about
   `common` / `packing` / `modal_app` imports in `train/`, are false positives (`sys.path` imports;
   vLLM and lm-eval are only installed in the Modal image).
-- DPO/GRPO are not wired into `train/modal_train.py` yet, and their configs still say
-  `report_to: wandb` (no W&B secret exists; runs log to `results/runs/<run>/train_log.jsonl`).
-  SFT is wired (`stage: sft`); `tf32: true` is on from Stage 3.
+- GRPO is not wired into `train/modal_train.py` yet, and `grpo.yaml` still says `report_to: wandb`
+  (no W&B secret exists; runs log to `results/runs/<run>/train_log.jsonl`). SFT and DPO are wired
+  (`stage: sft`, `stage: dpo`); `tf32: true` is on from Stage 3.
 - Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
   modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

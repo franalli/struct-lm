@@ -36,7 +36,7 @@ dpo-pairs:
 	$(PY) -m pytest tests/test_dpo_data.py -q
 
 # --- train ------------------------------------------------------------------
-# Stage 2 runs on Modal (commands and ablations: CLAUDE.md, Stage 2); this starts the main run.
+# Stage 2 runs on Modal (commands and ablations: .claude/skills/stage2-cpt/SKILL.md); this starts the main run.
 cpt:  ; $(MODAL) run --detach train/modal_train.py --config train/configs/cpt.yaml --run-name cpt-8b --steps train
 sft:  ; $(PY) train/sft.py  --config train/configs/sft.yaml
 dpo:  ; $(PY) train/dpo.py  --config train/configs/dpo.yaml
