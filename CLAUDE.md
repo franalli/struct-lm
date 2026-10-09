@@ -172,7 +172,9 @@ $M run --detach eval/modal_app.py --which sample --model mistralai/Ministral-3-8
 ### Stage 4: DPO on verifiable preferences (data on the Mac, sampling and training on Modal)
 
 Rules, the judge benchmark's failure and the amendment: `notes/decisions.md` (2026-10-08).
-Stage4-final is `checkpoints/dpo` (seed 0); `grpo.yaml` starts from it.
+Stage4-final is `checkpoints/dpo-strict` (seed 0, strict closed-book labels, 2026-10-09);
+`grpo.yaml` starts from it. `dpo` / `dpo-seed1` are the as-run rows on `same_fact` labels (79 of
+458 closed-book chosen wrong under the strict checker).
 
 ```bash
 make dpo-data                      # pool (data/dpo/prompts.jsonl, dpo_split), benchmark prompts, contamination --only dpo
@@ -198,6 +200,13 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
 .venv/bin/python eval/diversity.py score dpo
 .venv/bin/python eval/winrate.py dpo sft-from-cpt                 # reported only (the judge failed its benchmark)
 .venv/bin/python train/report.py                                  # dpo.png, the Stage 4 read table, README blocks
+# dpo-strict (2026-10-09): closed-book labels by scorers.qa_strict -> data/dpo/strict/ (463 pairs:
+# dpo_pairs.py exits 1 under the 500 floor, overridden for this rerun only)
+make dpo-pairs-strict
+for f in train.jsonl val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/dpo/strict/$f data/dpo/strict/$f; done
+$M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name dpo-strict --chat --merge-from rule \
+  --steps noop,train,merge,mergecheck,ppl,eval,sample \
+  --overrides "data.dir=data/dpo/strict data.train=data/dpo/strict/train.jsonl data.val=data/dpo/strict/val.jsonl"
 ```
 
 - **No judge in pair-building:** closed-book by the verifier, abstain by the decline rule, grounded
@@ -221,6 +230,39 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
   loss within 0.5%) and records the checkpoint's sha256. A failed gate stops the pipeline.
 - Judge a run's generations into the shared cache before its lm-eval lands (`--results-dir
   <scratch> --judge-cache results/judge_cache.jsonl`), then score into `results/` for free.
+
+### Stage 5: GRPO with verifiable rewards (tasks on the Mac, probe and training on Modal)
+
+Pre-registration, corrections and the read: `notes/decisions.md` (2026-10-09).
+
+```bash
+make grpo-data                     # data/grpo/tasks.jsonl (Stage 4 pool minus judge split, + verifiers), contamination --only grpo, tests
+$M volume put --force struct-lm data/grpo/tasks.jsonl data/grpo/tasks.jsonl
+$M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/dpo-strict --run-name dpo-strict \
+  --chat --sample-jobs grpo_probe                                 # 8 x T 1.0 x 256 tokens per task
+.venv/bin/python data/scripts/grpo_probe.py --run dpo-strict      # 1-7 of 8 window -> train/val (50 by fact), SHA256SUMS
+for f in train.jsonl val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/grpo/$f data/grpo/$f; done
+$M run train/modal_train.py --config train/configs/grpo.yaml --run-name smoke-grpo --smoke --chat \
+  --steps noop,train,merge,mergecheck --merge-from rule --overrides "data.train=data/grpo/tasks.jsonl data.val=data/grpo/tasks.jsonl"
+$M run --detach train/modal_train.py --config train/configs/grpo.yaml --run-name grpo --chat --merge-from rule \
+  --steps noop,train,merge,mergecheck,ppl,eval,latency,sample    # sample: eos,diversity,passk,dpo_judge
+# grpo-seed1: --overrides "training.seed=1 training.data_seed=1", no latency
+$M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/<row> --run-name <row> --chat --sample-jobs passk
+# pull runs/<run> (rollouts.jsonl too), ppl, lm_eval, bench; score with --chat --ppl-dir results/ppl; then
+.venv/bin/python eval/qa_strict.py                                # strict closed-book column for every table row
+.venv/bin/python eval/passk.py grpo grpo-seed1                    # pass@1 / maj@8 / pass@8 -> results/passk/
+.venv/bin/python data/scripts/grpo_audit.py grpo                  # the 50 top-reward rollouts, rule flags; read, verdicts only
+.venv/bin/python train/report.py                                  # grpo.png, passk.png, the Stage 5 tables, README blocks
+```
+
+- **The reward** (`train/grpo_rewards.py`): format 0.1 (a gate), correctness 0.9 (closed-book by
+  `scorers.qa_strict`, grounded cites the gold passage in at most 2, abstain the exact sentence),
+  length 0 to -0.1. The probe scorer, the trainer and the DPO strict labels share it.
+- **The rollout engine:** `train/grpo.py` wraps TRL's colocated `LLM(...)` with rule 3's settings
+  and the run's seed, and keeps sleep mode off (TRL reloads weights from disk on wake, which would
+  drop the LoRA sync). `grpo_image` in `modal_train.py` is the training pins plus vllm 0.30.0.
+- **Rollouts:** `results/runs/<run>/rollouts.jsonl`, one row per completion; its `format` field is
+  the gate's verdict, the task's format is in `data/grpo/tasks.jsonl`.
 
 ## Decisions (rules to keep)
 
@@ -257,7 +299,9 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
    plus `mmlu` and its four groups / `gsm8k` (strict-match) / `hellaswag` (acc_norm), and from
    Stage 2 `ppl_train` / `ppl_domain_val` / `ppl_general_val` (`eval/perplexity.py`, lower is
    better; `ppl_train` is measured on a train slice, for base too) and `ppl_postcutoff` (the 13
-   2026 reports, `--only postcutoff`). `gold_lp` / `gold_lp_seen` / `gold_lp_unseen`: mean
+   2026 reports, `--only postcutoff`). `qa_strict` (`eval/qa_strict.py` -> `results/qa_strict/`,
+   not a table column): the strict checker on the stored answers; Stage 5's primary reads it.
+   `gold_lp` / `gold_lp_seen` / `gold_lp_unseen`: mean
    log-probability of the gold QA answer in nats per item (`eval/gold_lp.py`, computed in the
    generation engine; Instruct in chat format, not comparable to base rows). It scores the answer
    plus the end token the prompt uses after answers ("\n\n"; a lone "\n" penalised CPT, fixed
@@ -290,11 +334,11 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
     which also keeps out every chunk on or next to an unseen eval chunk's page, and checked by
     `tests/test_sft_data.py` and `contamination.py --only sft`. The chat template work is done
     (Stage 3: `train/sft_data.py`, `tests/test_template.py`). Stage 4 is DPO on verifiable
-    preferences: the preference judge failed its benchmark (2026-10-08) and labels nothing. GRPO
-    data waits for the Stage 5 task-set plan.
+    preferences: the preference judge failed its benchmark (2026-10-08) and labels nothing. Stage
+    5's tasks are the Stage 4 pool's prompts in the probe's window; compute tasks are not built.
 11. **Reference model = the previous stage, not the base:** with LoRA and `ref_model=None`, TRL's
     reference is the adapter-disabled `init_from` checkpoint, so DPO's is the SFT checkpoint and
-    GRPO's the DPO checkpoint. Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
+    GRPO's the DPO checkpoint (`dpo-strict`). Each stage's KL term (DPO's `beta`, GRPO's logged `kl`) measures drift
     from the previous stage, not from the base. Drift from the base shows only in the eval rows.
     `grpo.yaml` has `beta: 0.0` (no KL term, no reference) until raised.
 12. **Checkpoints:** no checkpoint with a row in a results table is deleted until that stage's
@@ -315,9 +359,11 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
 - Pyright errors about `prompts` / `scorers` / `judge` / `vllm` imports in `eval/`, and about
   `common` / `packing` / `modal_app` imports in `train/`, are false positives (`sys.path` imports;
   vLLM and lm-eval are only installed in the Modal image).
-- GRPO is not wired into `train/modal_train.py` yet, and `grpo.yaml` still says `report_to: wandb`
-  (no W&B secret exists; runs log to `results/runs/<run>/train_log.jsonl`). SFT and DPO are wired
-  (`stage: sft`, `stage: dpo`); `tf32: true` is on from Stage 3.
+- No W&B secret exists; every stage logs to `results/runs/<run>/train_log.jsonl`. CPT, SFT, DPO
+  and GRPO are wired into `train/modal_train.py` (`stage:` in the config); `tf32: true` is on from
+  Stage 3.
+- PEFT's merge/unmerge for each GRPO weight sync edits the bf16 base in place (one ulp,
+  `base_drift_max` in the summary); the merged checkpoint uses the untouched base from disk.
 - Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
   modal.com/pricing before quoting dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

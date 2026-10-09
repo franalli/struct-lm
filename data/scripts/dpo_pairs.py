@@ -1,7 +1,8 @@
 """Stage 4 step 6: preference pairs from the scored pool samples -> data/dpo/{train,val}.jsonl,
 SHA256SUMS, pairs_meta.json
 
-  .venv/bin/python data/scripts/dpo_pairs.py
+  .venv/bin/python data/scripts/dpo_pairs.py            # the as-run set (dpo, dpo-seed1, dpo-2ep)
+  .venv/bin/python data/scripts/dpo_pairs.py --strict   # -> data/dpo/strict/ (dpo-strict): dpo_score.py --strict's labels
 
 Rules fixed 2026-10-08 before sampling, as amended the same evening before any pool sample
 existed (notes/decisions.md): DPO on verifiable preferences, no judge in pair-building, no
@@ -25,6 +26,7 @@ the trainer reads (prompt_ids, chosen_ids, rejected_ids: the exact on-policy tok
 completion is the SFT model's own sample (rule 13: no Claude-written text).
 """
 
+import argparse
 import hashlib
 import json
 import statistics
@@ -120,8 +122,13 @@ def summary(made: list[tuple], drops: Counter) -> dict:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true", help="pairs from dpo_score.py --strict")
+    args = ap.parse_args()
+    out = OUT / "strict" if args.strict else OUT
+    scored = out / "work/scored.jsonl" if args.strict else SCORED
     pool = {r["id"]: r for r in read_jsonl(POOL)}
-    rows = [r for r in read_jsonl(SCORED)
+    rows = [r for r in read_jsonl(scored)
             if pool[r["id"]]["dpo_split"] in ("train", "val") and r["format"] in PAIRED]  # fmt: skip
     registered, reg_drops = build(rows, "registered", cap=True)
     made, drops = build(rows, "amended", cap=False)
@@ -133,6 +140,7 @@ def main() -> None:
     meta: dict = {
         "status": status,
         "rule": "2026-10-08 amendment: verifier/rule labels only, no closed-book cap, no definitions",
+        "closed_book_verifier": "scorers.qa_strict" if args.strict else "sft_judge.same_fact",
         "amended": summary(made, drops),
         "as_registered": summary(registered, reg_drops),
         "under_smol_floor": len(made) < SMOL_FLOOR,
@@ -150,16 +158,16 @@ def main() -> None:
             },
         }  # fmt: skip
     for split, rs in recs.items():
-        write_jsonl(OUT / f"{split}.jsonl", rs)
+        write_jsonl(out / f"{split}.jsonl", rs)
     sums = "".join(
-        f"{hashlib.sha256((OUT / f'{s}.jsonl').read_bytes()).hexdigest()}  {s}.jsonl\n"
+        f"{hashlib.sha256((out / f'{s}.jsonl').read_bytes()).hexdigest()}  {s}.jsonl\n"
         for s in ("train", "val")
     )
-    (OUT / "SHA256SUMS").write_text(sums)
+    (out / "SHA256SUMS").write_text(sums)
     meta["dataset_hash"] = hashlib.sha256(sums.encode()).hexdigest()
     bench = json.loads((REPO / "results/dpo/judge_bench.json").read_text())
     meta["judge_bench"] = bench["chosen"]
-    (OUT / "pairs_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    (out / "pairs_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(json.dumps(meta, indent=2))
     if status == "stop":
         sys.exit(f"{len(made)} pairs < {FLOOR_PAIRS}: stop and report (2026-10-08 shortfall rule)")

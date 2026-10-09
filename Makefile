@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data sft-data dpo-data dpo-pairs train eval serve all
+.PHONY: data sft-data dpo-data dpo-pairs dpo-pairs-strict grpo-data train eval serve all
 
 # --- data -------------------------------------------------------------------
 # Stage 1 corpus: data/sources.csv -> data/processed/{docs_raw,docs,train,val,replay,general_val}.jsonl
@@ -34,6 +34,18 @@ dpo-pairs:
 	$(PY) data/scripts/dpo_pairs.py
 	$(PY) eval/contamination.py --only dpo
 	$(PY) -m pytest tests/test_dpo_data.py -q
+# dpo-strict (2026-10-09): closed-book labels by eval/scorers.qa_strict -> data/dpo/strict/.
+# dpo_pairs.py exits 1 at 463 pairs (< the 500 floor, overridden for this rerun: notes/decisions.md).
+dpo-pairs-strict:
+	$(PY) data/scripts/dpo_score.py --strict
+	-$(PY) data/scripts/dpo_pairs.py --strict
+	$(PY) eval/contamination.py --only dpo
+	$(PY) -m pytest tests/test_dpo_data.py tests/test_qa_strict.py -q
+# Stage 5: candidate tasks with verifiers; the window (train/val) comes from the probe, grpo_probe.py
+grpo-data:
+	$(PY) data/scripts/grpo_tasks.py
+	$(PY) eval/contamination.py --only grpo
+	$(PY) -m pytest tests/test_qa_strict.py tests/test_grpo_rewards.py tests/test_grpo_data.py -q
 
 # --- train ------------------------------------------------------------------
 # Stage 2 runs on Modal (commands and ablations: .claude/skills/stage2-cpt/SKILL.md); this starts the main run.

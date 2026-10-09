@@ -79,8 +79,10 @@ DPO_COLORS = {
     "dpo-lr5e-6": "#eda100",
 }
 DPO_START = "sft-from-cpt"  # stage3-final: every DPO run's start and reference
+GRPO_COLORS = {"grpo": "#2a78d6", "grpo-seed1": "#2a78d6"}
+GRPO_START = "dpo-strict"  # stage4-final (2026-10-09): GRPO's start
 # another seed of a config
-TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1", "sft-from-base-seed1", "dpo-seed1"}
+TWIN = {"cpt-8b-seed1", "sft-from-cpt-seed1", "sft-from-base-seed1", "dpo-seed1", "grpo-seed1"}
 PPL_METRICS = [
     ("ppl_train", "train slice\n(seen once by CPT)"),
     ("ppl_domain_val", "domain val\n(held-out documents)"),
@@ -1501,6 +1503,290 @@ def stage4_md(runs: dict, usd: float) -> str:
     return md
 
 
+# ---- Stage 5: GRPO ----------------------------------------------------------------------------
+
+GRPO_PAIR = ("grpo", "grpo-seed1")
+QA_STRICT = Path("results/qa_strict/evals.json")
+PASSK = Path("results/passk")
+GRPO_ROWS = [  # the pre-registered read (2026-10-09): primary, reported, guards
+    ("qa_strict seen (the reward's rule)", "qa_strict_seen", "kpi", "qa_seen", "primary"),
+    ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
+    ("qa_acc seen (original scorer)", "qa_seen", "kpi", "qa_seen", "reported"),
+    ("qa_strict unseen", "qa_strict_unseen", "kpi", "qa_unseen", "reported"),
+    ("qa_acc unseen (original scorer)", "qa_unseen", "kpi", "qa_unseen", "reported"),
+    ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen", "reported"),
+    ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial", "guard"),
+    ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded", "guard"),
+    ("cite_valid", "cite_valid", "kpi", "grounded", "guard"),
+    ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none"), "guard"),
+    ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match"), "guard"),
+    ("grounded_acc (judge)", "grounded_acc", "kpi", "grounded", "reported"),
+    ("cite_supported (judge)", "cite_supported", "kpi", "grounded", "reported"),
+]
+
+
+def metrics_with_strict(runs) -> dict:
+    """metrics.json per run, plus the strict closed-book columns (eval/qa_strict.py)."""
+    strict = json.loads(QA_STRICT.read_text()) if QA_STRICT.exists() else {}
+    m = {}
+    for r in runs:
+        f = RUNS / r / "metrics.json"
+        if not f.exists():
+            continue
+        m[r] = json.loads(f.read_text())
+        if r in strict:
+            m[r].update(qa_strict=strict[r]["qa_strict"], qa_strict_seen=strict[r].get("seen_strict"),
+                        qa_strict_unseen=strict[r].get("unseen_strict"))  # fmt: skip
+    return m
+
+
+def change_row(m, label, key, kind, extra, start, pair, start_pairs, sizes):
+    """(cells, beyond) for one metric: the mean of `pair` (or the one run) minus `start`, against
+    max(the pair's seed gap, the start's SE, each start pair's own seed gap); gold_lp also needs
+    its item-bootstrap 95% CI to exclude 0."""
+    runs = [r for r in pair if r in m and m[r].get(key) is not None]
+    if start not in m or m[start].get(key) is None or not runs:
+        return None
+    st = m[start][key]
+    scale = 1 if kind == "lp" else 100
+    change = (sum(m[r][key] for r in runs) / len(runs) - st) * scale
+    gaps = [noise(m, pp, key, kind, extra, sizes) for pp in start_pairs if all(r in m for r in pp)]
+    if kind == "lp":
+        own = noise(m, pair, key, kind, extra, sizes) if len(runs) == 2 else 0
+        ci = bootstrap_diff(item_lp(start, extra), mean_lp(runs, extra))["ci"]
+        excl, note = ci[0] > 0 or ci[1] < 0, f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]"
+        floor, unit = max([own or 0, *(g or 0 for g in gaps)]), "{:.3f}"
+    else:
+        if kind == "lm":
+            se = lm_se(start, *extra)
+        else:
+            k = sizes.get(extra) or m[start]["n"].get(extra, 0)
+            se = math.sqrt(st * (1 - st) / k) * 100 if k else 0
+        own = abs(m[runs[0]][key] - m[runs[1]][key]) * 100 if len(runs) == 2 else 0
+        excl, note = True, f"{change:+.1f} pt"
+        floor, unit = max([own, se, *(g or 0 for g in gaps)]), "{:.1f} pt"
+    beyond = abs(change) > floor and excl
+    return [note, unit.format(floor), "yes" if beyond else "no"], beyond
+
+
+def grpo_delta_table() -> str:
+    """Each GRPO run against the start (dpo-strict) and the mean change of the two seeds. Floor:
+    max(the GRPO seed gap, the start's SE, the start's own seed gap). dpo-strict has no twin, so
+    its gap is the lenient dpo / dpo-seed1 pair's (2026-10-09). One seed pair each: 1 df."""
+    m = metrics_with_strict((GRPO_START, *GRPO_PAIR, *DPO_PAIR))
+    if not all(r in m for r in (GRPO_START, *GRPO_PAIR)):
+        return ""
+    sizes = half_sizes()
+    head = ["metric", "read", GRPO_START, *GRPO_PAIR, "change (mean of 2)", "floor", "beyond"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra, role in GRPO_ROWS:
+        row = change_row(m, label, key, kind, extra, GRPO_START, GRPO_PAIR, (DPO_PAIR,), sizes)
+        if row is None:
+            continue
+        vals = [m[r].get(key) for r in (GRPO_START, *GRPO_PAIR)]
+        cells = [label, role, *("" if v is None else f"{v:.3f}" for v in vals), *row[0]]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def two_algorithm_table() -> str:
+    """Same verifier, two algorithms: dpo-strict (offline pairs, one run) and grpo (on-policy
+    groups, two seeds) against the SFT start, each with its floor (its own seed gap where it has
+    a twin, the start's SE and the start's seed gap; dpo-strict borrows the lenient DPO pair's)."""
+    m = metrics_with_strict((DPO_START, *SFT_SEED_PAIR, GRPO_START, *DPO_PAIR, *GRPO_PAIR))
+    if not all(r in m for r in (DPO_START, GRPO_START, *GRPO_PAIR)):
+        return ""
+    sizes = half_sizes()
+    head = ["metric", DPO_START, "dpo-strict change", "floor", "beyond", "grpo change (mean of 2)",
+            "floor", "beyond"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for label, key, kind, extra, role in GRPO_ROWS:
+        if role == "reported" and key not in ("qa_strict_unseen", "gold_lp_unseen"):
+            continue
+        d = change_row(
+            m, label, key, kind, extra, DPO_START, (GRPO_START,), (SFT_SEED_PAIR, DPO_PAIR), sizes
+        )
+        g = change_row(m, label, key, kind, extra, DPO_START, GRPO_PAIR, (SFT_SEED_PAIR,), sizes)
+        if d is None or g is None:
+            continue
+        lines.append("| " + " | ".join([label, f"{m[DPO_START][key]:.3f}", *d[0], *g[0]]) + " |")
+    return "\n".join(lines)
+
+
+PASSK_ROWS = ["sft-from-cpt", "dpo", "dpo-seed1", "dpo-strict", "grpo", "grpo-seed1", "instruct-8b"]
+
+
+def passk_table() -> str:
+    """pass@1, maj@8 and pass@8 (strict scorer) on the seen and unseen closed-book items, 8 samples
+    at T 0.7 (eval/passk.py), with the per-item SE."""
+    rows = {r: json.loads((PASSK / f"{r}.json").read_text()) for r in PASSK_ROWS
+            if (PASSK / f"{r}.json").exists()}  # fmt: skip
+    if not rows:
+        return ""
+    head = ["run", *(f"{h} {k}" for h in ("seen", "unseen") for k in ("pass@1", "maj@8", "pass@8"))]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for r, d in rows.items():
+        cells = [r]
+        for h in ("seen", "unseen"):
+            for k in ("pass@1", "maj@n", "pass@n"):
+                cells.append(f"{d[h][f'strict_{k}']:.3f} ± {d[h][f'strict_{k}_se']:.3f}")
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def plot_passk(out: Path) -> None:
+    """pass@1 against pass@8 per run (strict scorer), seen and unseen: RL that sharpens moves a
+    point right (pass@1) without moving it up (pass@8)."""
+    rows = {r: json.loads((PASSK / f"{r}.json").read_text()) for r in PASSK_ROWS
+            if (PASSK / f"{r}.json").exists()}  # fmt: skip
+    if not rows:
+        return
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    color = {"sft-from-cpt": "#52514e", "instruct-8b": "#eda100", "dpo": "#eb6834",
+             "dpo-seed1": "#eb6834", "dpo-strict": "#1baf7a", "grpo": "#2a78d6",
+             "grpo-seed1": "#2a78d6"}  # fmt: skip
+    for ax, half in zip(axes, ("seen", "unseen")):
+        labels = []
+        for r, d in rows.items():
+            x, y = d[half]["strict_pass@1"], d[half]["strict_pass@n"]
+            ax.errorbar(x, y, xerr=d[half]["strict_pass@1_se"], yerr=d[half]["strict_pass@n_se"],
+                        fmt="o", ms=8, color=color.get(r, INK_2), mec=SURFACE, mew=1.5,
+                        mfc="none" if r in TWIN else color.get(r, INK_2), elinewidth=1)  # fmt: skip
+            labels.append((r, x, y, False))
+        style(ax, f"{half} items: pass@1 vs pass@8 (strict)", "pass@1 (8 samples, T 0.7)", "pass@8")
+        end_labels(ax, labels)
+    fig.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, facecolor=SURFACE)
+    print(f"-> {out}")
+
+
+def grpo_table(runs: dict, usd: float) -> str:
+    head = ["run", "start", "tasks", "steps", "stop", "rule picks", "grpo_val pass@1 / pass@8 at the pick",
+            "final train reward", "final entropy", "mean length", "base drift", "wall (h)", "GPU-h", "$",
+            "peak GB"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for name, (s, _) in runs.items():
+        b4 = RUNS / name / "b4.json"
+        pick = json.loads(b4.read_text()) if b4.exists() else {}
+        at = {e["step"]: e for e in s.get("val_curve", [])}.get(pick.get("picked_step"), {})
+        stop = s.get("stop")
+        cells = [
+            name, Path(s["base"]).name, s["tasks"], s["steps"],
+            f"step {stop['step']}: {stop['reason']}" if stop else "none",
+            f"step {pick['picked_step']} (best {pick['best_step']})" if pick else "",
+            f"{at['val_pass@1']:.3f} / {at['val_pass@8']:.3f}" if at else "",
+            s.get("final_reward"), s.get("final_entropy"), s.get("final_mean_length"),
+            "" if s.get("base_drift_max") is None else f"{s['base_drift_max']:.1e}",
+            f"{s['wall_s'] / 3600:.2f}", f"{s['gpu_hours']:.2f}", f"{s['gpu_hours'] * usd:.2f}",
+            f"{s['peak_mem_gb']:.0f}" if s.get("peak_mem_gb") else "",
+        ]  # fmt: skip
+        lines.append("| " + " | ".join("" if c is None else str(c) for c in cells) + " |")
+    return "\n".join(lines)
+
+
+def plot_grpo(runs: dict, out: Path) -> None:
+    """Six panels: train reward, grpo_val pass@1 / pass@8 (points), mean completion length,
+    entropy, frac_reward_zero_std, and the rollout engine's log-prob gap to the policy."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(2, 3, figsize=(16, 8.4), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    panels = [
+        (axes[0, 0], "reward", "Train reward (0.1 format + 0.9 correct + length)", "reward"),
+        (axes[0, 2], "completions/mean_length", "Mean completion length", "tokens"),
+        (axes[1, 0], "entropy", "Policy entropy", "nats / token"),
+        (axes[1, 1], "frac_reward_zero_std", "Groups with zero reward spread", "share"),
+        (
+            axes[1, 2],
+            "sampling/sampling_logp_difference/mean",
+            "vLLM vs policy log-prob gap",
+            "nats / token",
+        ),
+    ]
+    last_step = max(s["steps"] for s, _ in runs.values())
+    for ax, key, title, ylabel in panels:
+        labels = []
+        for name, (_, log) in runs.items():
+            color, ls = GRPO_COLORS.get(name, INK_2), "--" if name in TWIN else "-"
+            pts = [p for p in val_curve([r for r in log if "val_pass@1" not in r], key)]
+            if pts:
+                x, y = np.array([p[0] for p in pts]), smooth(np.array([p[1] for p in pts]))
+                ax.plot(x, y, color=color, lw=2, ls=ls, solid_capstyle="round")
+                labels.append((name, x[-1], y[-1], False))
+        style(ax, title, "", ylabel)
+        ax.set_xlim(0, last_step * 1.3)
+        end_labels(ax, labels)
+    ax, labels = axes[0, 1], []
+    for name, (_, log) in runs.items():
+        color = GRPO_COLORS.get(name, INK_2)
+        for key, mk in (("val_pass@1", "o"), ("val_pass@8", "s")):
+            if pts := val_curve(log, key):
+                x, y = zip(*pts)
+                ax.plot(x, y, marker=mk, ls="--" if name in TWIN else "-", lw=1, ms=6, color=color,
+                        mec=SURFACE, mew=1.5)  # fmt: skip
+                labels.append((f"{name} {key[4:]}", x[-1], y[-1], False))
+    style(ax, "grpo_val pass@1 (circles) and pass@8 (squares)", "", "share of 50 tasks")
+    ax.set_xlim(-5, last_step * 1.3)
+    end_labels(ax, labels)
+    for a in axes[1]:
+        a.set_xlabel("optimizer step", color=INK_2)
+    fig.suptitle(f"Stage 5 GRPO: train ({SMOOTH}-step moving average) and grpo_val (points)",
+                 color=INK, fontsize=11, x=0.01, ha="left")  # fmt: skip
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    print(f"-> {out}")
+
+
+def stage5_md(runs: dict, usd: float) -> str:
+    md = "## Training runs\n\n" + grpo_table(runs, usd)
+    md += (
+        "\n\nThe checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or "
+        "before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 "
+        f"samples at T 1.0. $ at {usd} per GPU-hour (assumed).\n"
+    )
+    if dt := grpo_delta_table():
+        md += (
+            f"\n## The read: change against {GRPO_START}, next to the noise\n\n" + dt + "\n\n"
+            "Rows marked primary are the pre-registered read (2026-10-09); guards must stay within "
+            "the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO "
+            f"seed gap, the start's SE, the start's own seed gap: {GRPO_START} has no twin, so the "
+            f"lenient {DPO_PAIR[0]} / {DPO_PAIR[1]} gap). One seed pair each (1 df).\n"
+        )
+    if ta := two_algorithm_table():
+        md += (
+            f"\n## Same verifier, two algorithms: change against {DPO_START}\n\n" + ta + "\n\n"
+            "dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict "
+            "checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each "
+            f"floor also takes {DPO_START}'s own seed gap.\n"
+        )
+    if pk := passk_table():
+        md += (
+            "\n## pass@k on the closed-book eval (strict scorer)\n\n" + pk + "\n\n"
+            "8 samples per item at T 0.7 (eval/passk.py); ± is the SE over items.\n"
+        )
+    checks = checks_table(
+        names=list(runs),
+        starts=(GRPO_START,),
+        gate="over every sft_val completion position (11,351) against an fp32 reference, the "
+        "argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions)",
+        diversity=(GRPO_START,),
+    )
+    if checks:
+        md += "\n## Checks\n\n" + checks + "\n"
+    return md
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
@@ -1511,11 +1797,14 @@ def main() -> None:
     every = {d.name: r for d in sorted(RUNS.iterdir()) if d.is_dir() and (r := load(d))}
     if not every:
         raise SystemExit(f"no train_summary.json + train_log.jsonl under {RUNS}")
-    runs = {k: v for k, v in every.items() if v[0].get("stage") not in ("sft", "dpo")}
+    # Stage 2 is every run without a later stage's tag (GRPO's section is written with its results)
+    runs = {k: v for k, v in every.items() if v[0].get("stage") not in ("sft", "dpo", "grpo")}
     sft = {k: v for k, v in every.items() if v[0].get("stage") == "sft"}
     sft_runs = {r: sft[r] for r in [*[r for r in SFT_COLORS if r in sft], *sorted(sft)]}
     dpo = {k: v for k, v in every.items() if v[0].get("stage") == "dpo"}
     dpo_runs = {r: dpo[r] for r in [*[r for r in DPO_COLORS if r in dpo], *sorted(dpo)]}
+    grpo = {k: v for k, v in every.items() if v[0].get("stage") == "grpo"}
+    grpo_runs = {r: grpo[r] for r in [*[r for r in GRPO_COLORS if r in grpo], *sorted(grpo)]}
     order = [*[r for r in COLORS if r in runs], *[r for r in runs if r not in COLORS]]
     runs = {r: runs[r] for r in order}
     md = "## Training runs\n\n" + table(runs, args.usd_per_gpu_hour)
@@ -1544,13 +1833,15 @@ def main() -> None:
         )
     md3 = stage3_md(sft_runs, args.usd_per_gpu_hour) if sft_runs else ""
     md4 = stage4_md(dpo_runs, args.usd_per_gpu_hour) if dpo_runs else ""
+    md5 = stage5_md(grpo_runs, args.usd_per_gpu_hour) if grpo_runs else ""
     Path("results/train_runs.md").write_text(
         "# Stage 2: CPT\n\n"
         + md
         + ("\n# Stage 3: SFT\n\n" + md3 if md3 else "")
         + ("\n# Stage 4: DPO\n\n" + md4 if md4 else "")
+        + ("\n# Stage 5: GRPO\n\n" + md5 if md5 else "")
     )
-    print(md + md3 + md4)
+    print(md + md3 + md4 + md5)
     if args.readme:
         # the README nests these under "#### Stage N": their own headings go two levels down
         update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
@@ -1558,6 +1849,8 @@ def main() -> None:
             update_readme(Path(args.readme), "stage3-tables", re.sub(r"(?m)^## ", "##### ", md3))
         if md4:
             update_readme(Path(args.readme), "stage4-tables", re.sub(r"(?m)^## ", "##### ", md4))
+        if md5:
+            update_readme(Path(args.readme), "stage5-tables", re.sub(r"(?m)^## ", "##### ", md5))
         update_readme(Path(args.readme), "results-table", results_table())
         update_readme(Path(args.readme), "serving-table", serving_table())
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
@@ -1569,6 +1862,9 @@ def main() -> None:
         plot_sft_kpi(Path("results/curves/sft_kpi.png"))
     if dpo_runs:
         plot_dpo(dpo_runs, Path("results/curves/dpo.png"))
+    if grpo_runs:
+        plot_grpo(grpo_runs, Path("results/curves/grpo.png"))
+        plot_passk(Path("results/curves/passk.png"))
 
 
 if __name__ == "__main__":

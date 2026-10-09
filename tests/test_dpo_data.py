@@ -23,6 +23,8 @@ FORMATS = ("closed_book", "definition", "grounded", "abstain")
 
 POOL = pytest.mark.skipif(not (DPO / "prompts.jsonl").exists(), reason="no data/dpo/prompts.jsonl")
 PAIRS = pytest.mark.skipif(not (DPO / "train.jsonl").exists(), reason="no data/dpo/train.jsonl")
+# the as-run set (dpo, dpo-seed1, dpo-2ep) and the strict rebuild (dpo-strict, 2026-10-09)
+PAIR_DIRS = [d for d in (DPO, DPO / "strict") if (d / "train.jsonl").exists()]
 
 
 def jsonl(path: Path) -> list[dict]:
@@ -34,9 +36,14 @@ def pool():
     return jsonl(DPO / "prompts.jsonl")
 
 
+@pytest.fixture(scope="module", params=PAIR_DIRS, ids=lambda d: d.name)
+def pair_dir(request):
+    return request.param
+
+
 @pytest.fixture(scope="module")
-def pairs():
-    return {s: jsonl(DPO / f"{s}.jsonl") for s in ("train", "val")}
+def pairs(pair_dir):
+    return {s: jsonl(pair_dir / f"{s}.jsonl") for s in ("train", "val")}
 
 
 @pytest.fixture(scope="module")
@@ -137,10 +144,10 @@ def five_per_format(rows: list[dict]) -> list[dict]:
 
 
 @PAIRS
-def test_dataset_hash_and_splits(pairs, pool):
+def test_dataset_hash_and_splits(pairs, pool, pair_dir):
     import sft_data
 
-    sft_data.dataset_hash(DPO)  # SystemExit on any mismatch
+    sft_data.dataset_hash(pair_dir)  # SystemExit on any mismatch
     split = {r["id"]: r["dpo_split"] for r in pool}
     for name, rows in pairs.items():
         assert rows, name
@@ -204,3 +211,28 @@ def test_collator_builds_prompt_plus_completion(pairs):
             assert got == want
             mask = batch["completion_mask"][half * n + k][: len(want)].tolist()
             assert mask == [0] * len(r["prompt_ids"]) + [1] * len(r[key])
+
+
+@pytest.mark.skipif(not (DPO / "strict/train.jsonl").exists(), reason="no data/dpo/strict")
+def test_strict_labels():
+    """dpo-strict's closed-book labels are the strict checker's: every chosen answer passes it
+    (one line, scorers.qa_strict), every rejected one fails it."""
+    sys.path.insert(0, str(REPO / "eval"))
+    from scorers import answer_line, qa_strict
+
+    gold = {}
+    for line in (SFT / "work/judged.jsonl").open():
+        r = json.loads(line)
+        gold[r["eid"]] = (r["gold"], r["kind"])
+    ok = lambda t, g: (
+        len([x for x in t.splitlines() if x.strip()]) == 1 and qa_strict(answer_line(t), *g)
+    )
+    rows = [r for s in ("train", "val") for r in jsonl(DPO / f"strict/{s}.jsonl")]
+    cb = [r for r in rows if r["format"] == "closed_book"]
+    assert cb
+    for r in cb:
+        g = gold[r["prompt_id"]]
+        assert ok(r["chosen"][0]["content"], g), r["id"]
+        assert not ok(r["rejected"][0]["content"], g), r["id"]
+    meta = json.loads((DPO / "strict/pairs_meta.json").read_text())
+    assert meta["closed_book_verifier"] == "scorers.qa_strict"

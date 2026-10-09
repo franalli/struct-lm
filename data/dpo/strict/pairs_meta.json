@@ -1,0 +1,77 @@
+{
+  "status": "stop",
+  "rule": "2026-10-08 amendment: verifier/rule labels only, no closed-book cap, no definitions",
+  "closed_book_verifier": "scorers.qa_strict",
+  "amended": {
+    "pairs": 463,
+    "by_format": {
+      "abstain": 6,
+      "closed_book": 415,
+      "grounded": 42
+    },
+    "drops": {
+      "length_ratio": 22
+    }
+  },
+  "as_registered": {
+    "pairs": 114,
+    "by_format": {
+      "abstain": 6,
+      "closed_book": 57,
+      "grounded": 51
+    },
+    "drops": {
+      "length_ratio": 22,
+      "closed_book_cap": 358
+    }
+  },
+  "under_smol_floor": true,
+  "train": {
+    "pairs": 445,
+    "prompts": 340,
+    "by_format": {
+      "abstain": 6,
+      "closed_book": 400,
+      "grounded": 39
+    },
+    "by_format_source": {
+      "abstain:verifier": 6,
+      "closed_book:verifier": 400,
+      "grounded:rule": 39
+    },
+    "length_ratio_median": {
+      "abstain": 0.145,
+      "closed_book": 1.0,
+      "grounded": 1.237
+    }
+  },
+  "val": {
+    "pairs": 18,
+    "prompts": 15,
+    "by_format": {
+      "closed_book": 15,
+      "grounded": 3
+    },
+    "by_format_source": {
+      "closed_book:verifier": 15,
+      "grounded:rule": 3
+    },
+    "length_ratio_median": {
+      "closed_book": 1.0,
+      "grounded": 1.193
+    }
+  },
+  "dataset_hash": "5e3effafd69de0e2b87240b5a4ff7d7161916a32193838e0c794d989a55bf0cc",
+  "judge_bench": {
+    "grounded": {
+      "variant": "a5",
+      "recall": 0.2833,
+      "passed": false
+    },
+    "definition": {
+      "variant": "a5",
+      "recall": 0.087,
+      "passed": false
+    }
+  }
+}

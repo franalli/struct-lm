@@ -94,6 +94,38 @@ image = (
     .add_local_dir("train", remote_path="/root/train")
     .add_local_dir("eval", remote_path="/root/eval")  # perplexity.py, and modal_app for include
 )
+# Stage 5 (GRPO): the training pins plus vLLM, which TRL colocates on the training GPU for the
+# rollouts. vllm 0.30.0 is uv.lock's pair with torch 2.13.0, so the trainer's torch is SFT/DPO's;
+# the SFT/DPO image above is untouched (its runs stay reproducible). The engine runs in-process
+# (TRL syncs the LoRA-merged weights through llm_engine.model_executor.driver_worker), and
+# FlashInfer's sampler JIT-compiles with nvcc, which debian_slim lacks (as eval/modal_app.py).
+grpo_image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .pip_install(
+        "torch==2.13.0",
+        "vllm==0.30.0",
+        "transformers==5.16.1",
+        "trl==0.29.1",
+        "peft==0.21.0",
+        "accelerate==1.15.0",
+        "datasets==5.0.1",
+        "mistral-common==1.12.0",
+        "numpy",
+        "pyyaml",
+    )
+    .env(
+        {
+            "HF_HOME": "/vol/hf",
+            "HF_XET_HIGH_PERFORMANCE": "1",
+            "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+            "TOKENIZERS_PARALLELISM": "false",
+            "VLLM_ENABLE_V1_MULTIPROCESSING": "0",
+            "VLLM_USE_FLASHINFER_SAMPLER": "0",
+        }
+    )
+    .add_local_dir("train", remote_path="/root/train")
+    .add_local_dir("eval", remote_path="/root/eval")
+)
 COMMON = {
     "image": image,
     "volumes": {"/vol": vol},
@@ -106,15 +138,21 @@ SFT_VAL = (
     "data/sft/sft_val.jsonl"  # the merge gate's val set, DPO runs included (2026-10-08 freeze)
 )
 DPO_NAME = re.compile(r"(^|[/_-])dpo([/_-]|$)")  # run_eval.needs_chat's convention
+GRPO_NAME = re.compile(r"(^|[/_-])grpo([/_-]|$)")
+
+
+def is_stage(stage: str, config: str, run_name: str) -> bool:
+    """A run of this stage: its config says `stage: <stage>` (read from /root/<config> in a
+    container, the repo locally), or, for a merge or eval without a config, its run name has the
+    stage's token."""
+    if config:
+        path = Path(f"/root/{config}") if Path(f"/root/{config}").exists() else Path(config)
+        return yaml.safe_load(path.read_text()).get("stage") == stage
+    return bool({"dpo": DPO_NAME, "grpo": GRPO_NAME}[stage].search(run_name))
 
 
 def is_dpo(config: str, run_name: str) -> bool:
-    """A DPO run: its config says `stage: dpo` (read from /root/<config> in a container, the repo
-    locally), or, for a merge or eval without a config, its run name has a dpo token."""
-    if config:
-        path = Path(f"/root/{config}") if Path(f"/root/{config}").exists() else Path(config)
-        return yaml.safe_load(path.read_text()).get("stage") == "dpo"
-    return bool(DPO_NAME.search(run_name))
+    return is_stage("dpo", config, run_name)
 
 
 def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> list[str]:
@@ -134,6 +172,16 @@ def cpt_args(config: str, run_name: str, overrides: list[str], smoke: bool) -> l
 def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
     """cpt.py, sft.py or dpo.py (the config's `stage`) in-process on one H100, committing the
     volume on every save and eval."""
+    return run_stage(config, run_name, overrides, smoke)
+
+
+@app.function(**{**COMMON, "image": grpo_image}, gpu="H100", timeout=6 * 3600)
+def train_grpo(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
+    """grpo.py on one H100 with vLLM colocated (grpo_image), committing on every save and eval."""
+    return run_stage(config, run_name, overrides, smoke)
+
+
+def run_stage(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict:
     import os
 
     os.chdir("/vol")
@@ -146,6 +194,8 @@ def train(config: str, run_name: str, overrides: list[str], smoke: bool) -> dict
         import sft as stage
     elif cfg.get("stage") == "dpo":
         import dpo as stage
+    elif cfg.get("stage") == "grpo":
+        import grpo as stage
     else:
         import cpt as stage
 
@@ -364,16 +414,17 @@ def b4_checkpoint(run_name: str) -> str:
     return ckpt
 
 
-def dpo_checkpoint(run_name: str) -> str:
-    """Stage 4's checkpoint rule (dpo.checkpoint_rule, pre-registered) applied to the run's own
-    train_summary.json for an unattended chain: the final step unless dpo_val loss at the end is
-    above its value at step 50 (runs under 100 steps: the save nearest the midpoint). Written to
-    /vol/results/runs/<run>/b4.json before the merge; returns "" (the final adapter) or
-    checkpoint-N."""
+def rule_checkpoint(run_name: str, stage: str) -> str:
+    """The stage's pre-registered checkpoint rule applied to the run's own train_summary.json for
+    an unattended chain. Stage 4 (dpo.checkpoint_rule): the final step unless dpo_val loss at the
+    end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint).
+    Stage 5 (grpo.checkpoint_rule): the best grpo_val pass@1 among the saves at or before the
+    stop, ties within one SE to the earliest. Written to /vol/results/runs/<run>/b4.json before
+    the merge; returns "" (the final adapter) or checkpoint-N."""
     import json
 
     sys.path.insert(0, "/root/train")
-    from dpo import checkpoint_rule
+    checkpoint_rule = __import__(stage).checkpoint_rule
 
     vol.reload()
     src = Path(f"/vol/checkpoints/_train/{run_name}")
@@ -428,13 +479,14 @@ def pipeline(
     calls = {}
     if "noop" in steps:  # independent of training: runs alongside it
         calls["noop"] = noop_control.spawn(config, run_name, overrides, smoke)
+    grpo = is_stage("grpo", config, run_name)
     if "train" in steps:
-        fn = train_fsdp if gpus == 2 else train
+        fn = train_fsdp if gpus == 2 else train_grpo if grpo else train
         print(fn.remote(config, run_name, overrides, smoke))
     if merge_from == "b4":  # the pre-registered rule picks the epoch, before anything is merged
         merge_from = b4_checkpoint(run_name)
-    elif merge_from == "rule":  # Stage 4's: final step or step 50, from the dpo_val curve
-        merge_from = dpo_checkpoint(run_name)
+    elif merge_from == "rule":  # Stage 4's (dpo_val curve) or Stage 5's (grpo_val pass@1)
+        merge_from = rule_checkpoint(run_name, "grpo" if grpo else "dpo")
     if "merge" in steps:
         model = merge.remote(run_name, "" if "train" in steps else model, merge_from)
     if "mergecheck" in steps:
@@ -479,9 +531,11 @@ def main(
     overrides: str = "",
     smoke: bool = False,
     chat: bool = False,  # KPI eval and sampling in the chat template: every SFT/DPO/GRPO checkpoint
-    # checkpoint-77: merge that adapter; "b4": apply B4 after training (SFT); "rule": Stage 4's rule
+    # checkpoint-77: merge that adapter; "b4": apply B4 after training (SFT); "rule": Stage 4's
+    # or Stage 5's rule
     merge_from: str = "",
-    # eval/sample.py jobs for the sample step; default eos,diversity (DPO runs: + dpo_judge)
+    # eval/sample.py jobs for the sample step; default eos,diversity (DPO runs: + dpo_judge;
+    # GRPO runs: + passk, dpo_judge)
     sample_jobs: str = "",
 ) -> None:
     """Checks the arguments locally, before any container starts, then starts pipeline."""
@@ -504,20 +558,28 @@ def main(
     from run_eval import needs_chat
 
     dpo = is_dpo(config, run_name)
-    chat_ckpt = needs_chat(model, run_name) or "sft" in Path(config).stem or dpo
+    grpo = is_stage("grpo", config, run_name)
+    chat_ckpt = needs_chat(model, run_name) or "sft" in Path(config).stem or dpo or grpo
     if set(todo) & {"eval", "sample"} and chat_ckpt and not chat:
         raise SystemExit(f"{run_name} is a chat checkpoint: its KPI eval and samples need --chat")
     if chat and not chat_ckpt:
         raise SystemExit(f"--chat on {run_name or model}, which isn't a chat checkpoint (rule 2)")
-    if gpus == 2 and ("sft" in Path(config).stem or dpo):
-        raise SystemExit("SFT and DPO run on one GPU (sft.py and dpo.py have no FSDP path)")
+    if gpus == 2 and ("sft" in Path(config).stem or dpo or grpo):
+        raise SystemExit("SFT, DPO and GRPO run on one GPU (no FSDP path; vLLM is colocated)")
     if merge_from and not {"merge", "mergecheck"} & set(todo):
         raise SystemExit("--merge-from names the adapter for the merge and mergecheck steps")
-    if merge_from == "rule" and not dpo:
-        raise SystemExit("--merge-from rule is Stage 4's checkpoint rule: DPO runs only")
-    if merge_from == "b4" and dpo:
-        raise SystemExit("--merge-from b4 is Stage 3's epoch rule; DPO runs use --merge-from rule")
-    sample_jobs = sample_jobs or ("eos,diversity,dpo_judge" if dpo else "eos,diversity")
+    if merge_from == "rule" and not (dpo or grpo):
+        raise SystemExit("--merge-from rule is Stage 4's or Stage 5's checkpoint rule")
+    if merge_from == "b4" and (dpo or grpo):
+        raise SystemExit("--merge-from b4 is Stage 3's epoch rule; DPO/GRPO use --merge-from rule")
+    default_jobs = (
+        "eos,diversity,passk,dpo_judge"
+        if grpo
+        else "eos,diversity,dpo_judge"
+        if dpo
+        else "eos,diversity"
+    )
+    sample_jobs = sample_jobs or default_jobs
     pipeline.remote(
         config,
         run_name,

@@ -524,19 +524,29 @@ def sft_report(s: dict) -> list[str]:
 # ---- Stage 4: the DPO prompt pool (and, once built, its pairs) ----
 
 
-def dpo_checks(tok: Tok, bench: dict[str, list[str]]) -> dict:
+DPO_PAIRS = ("data/dpo/train.jsonl", "data/dpo/val.jsonl",
+             "data/dpo/strict/train.jsonl", "data/dpo/strict/val.jsonl")  # fmt: skip
+
+
+def dpo_checks(
+    tok: Tok,
+    bench: dict[str, list[str]],
+    pool_file: str = "data/dpo/prompts.jsonl",
+    pair_files: tuple[str, ...] = DPO_PAIRS,
+    label: str = "dpo",
+) -> dict:
     """Section 7. The reference is every pool prompt (data/dpo/prompts.jsonl), plus each pair's
-    chosen and rejected text once data/dpo/{train,val}.jsonl exist. Rule 1 and the unseen-term
-    block on each prompt's own question or term (sft_guard), the eval sets at 13 tokens, the
-    benchmarks at 13 tokens and at Tulu 3's 8 tokens / 50% coverage, and a positive control at both
-    lengths."""
+    chosen and rejected text once data/dpo/{train,val}.jsonl exist (and dpo-strict's,
+    data/dpo/strict/). Rule 1 and the unseen-term block on each prompt's own question or term
+    (sft_guard), the eval sets at 13 tokens, the benchmarks at 13 tokens and at Tulu 3's 8 tokens /
+    50% coverage, and a positive control at both lengths. Section 8 (grpo_checks) runs the same
+    checks on the GRPO task file."""
     global N
     sys.path.insert(0, str(ROOT / "data/scripts"))
     from sft_guard import Guard
 
-    pool = jsonl(ROOT / "data/dpo/prompts.jsonl")
-    pairs = [r for f in ("train", "val") if (ROOT / f"data/dpo/{f}.jsonl").exists()
-             for r in jsonl(ROOT / f"data/dpo/{f}.jsonl")]  # fmt: skip
+    pool = jsonl(ROOT / pool_file)
+    pairs = [r for f in pair_files if (ROOT / f).exists() for r in jsonl(ROOT / f)]
     seen = set((TASKS / "sft_seen_chunks.txt").read_text().split())
     eval_ids = set((TASKS / "eval_chunk_ids.txt").read_text().split())
     work = {}
@@ -581,30 +591,42 @@ def dpo_checks(tok: Tok, bench: dict[str, list[str]]) -> dict:
                 [tok.grams(tok.encode(t)) for t in texts], [str(k) for k in range(len(texts))]
             )
             if n == 13:
-                res["eval"] = {k: items_vs(tok, v, {"dpo": idx}) for k, v in sets.items()}
-            res[f"benchmarks_{n}"] = {k: items_vs(tok, v, {"dpo": idx}) for k, v in bench.items()}
+                res["eval"] = {k: items_vs(tok, v, {label: idx}) for k, v in sets.items()}
+            res[f"benchmarks_{n}"] = {k: items_vs(tok, v, {label: idx}) for k, v in bench.items()}
             ctl = Index(
                 [tok.grams(tok.encode(t)) for t in texts + planted],
                 [str(k) for k in range(len(texts) + len(planted))],
             )
-            m = items_vs(tok, planted, {"dpo": ctl})
-            res[f"control_{n}"] = {"planted": len(planted), "found_ge80": m["dpo"]["ge80"],
-                                   "found_ge50": m["dpo"]["ge50"]}  # fmt: skip
+            m = items_vs(tok, planted, {label: ctl})
+            res[f"control_{n}"] = {"planted": len(planted), "found_ge80": m[label]["ge80"],
+                                   "found_ge50": m[label]["ge50"]}  # fmt: skip
     finally:
         N = keep
     return res
 
 
-def dpo_report(d: dict) -> list[str]:
-    row = lambda name, m: [name, m["items"], m["dpo"]["any"], m["dpo"]["ge50"], m["dpo"]["ge80"]]
+def grpo_checks(tok: Tok, bench: dict[str, list[str]]) -> dict:
+    """Section 8: Stage 5's task file (data/grpo/tasks.jsonl, a subset of the Stage 4 pool with
+    its verifiers; no completions), through dpo_checks."""
+    return dpo_checks(tok, bench, "data/grpo/tasks.jsonl", (), "grpo")
+
+
+def dpo_report(d: dict, label: str = "dpo") -> list[str]:
+    row = lambda name, m: [name, m["items"], m[label]["any"], m[label]["ge50"], m[label]["ge80"]]
     head = ["items", "n", "any n-gram", ">= 50%", ">= 80%"]
+    title, ref = {
+        "dpo": ("## 7. DPO prompt pool and pairs (Stage 4) vs the eval and the benchmarks",
+                (f"`data/dpo/prompts.jsonl` ({d['prompts']:,} prompts) plus the chosen and rejected"
+                 f" text of {d['pairs']:,} pairs (as run and dpo-strict) as the reference.")),
+        "grpo": ("## 8. GRPO task set (Stage 5) vs the eval and the benchmarks",
+                 f"`data/grpo/tasks.jsonl` ({d['prompts']:,} task prompts) as the reference."),
+    }[label]  # fmt: skip
     return [
         "",
-        "## 7. DPO prompt pool and pairs (Stage 4) vs the eval and the benchmarks",
+        title,
         "",
         (
-            f"`data/dpo/prompts.jsonl` ({d['prompts']:,} prompts) plus the chosen and rejected text"
-            f" of {d['pairs']:,} pairs as the reference. Eval chunk ids outside the seen half:"
+            f"{ref} Eval chunk ids outside the seen half:"
             f" {len(d['leaked_chunks'])}; prompts copying an eval question (rule 1):"
             f" {len(d['rule1'])}; definitions of a blocked term: {len(d['term_block'])}. Positive"
             f" control (20 unseen domain_qa + 20 MMLU planted): {d['control_13']['found_ge80']} of"
@@ -624,10 +646,10 @@ def dpo_report(d: dict) -> list[str]:
                 [
                     k,
                     m["items"],
-                    m["dpo"]["any"],
-                    m["dpo"]["ge50"],
-                    d["benchmarks_8"][k]["dpo"]["any"],
-                    d["benchmarks_8"][k]["dpo"]["ge50"],
+                    m[label]["any"],
+                    m[label]["ge50"],
+                    d["benchmarks_8"][k][label]["any"],
+                    d["benchmarks_8"][k][label]["ge50"],
                 ]
                 for k, m in d["benchmarks_13"].items()
             ],
@@ -893,6 +915,8 @@ def report(res: dict, flag: float) -> str:
         out += sft_report(res["sft"])
     if "dpo" in res:
         out += dpo_report(res["dpo"])
+    if "grpo" in res:
+        out += dpo_report(res["grpo"], "grpo")
     return "\n".join(out) + "\n"
 
 
@@ -916,8 +940,8 @@ def main() -> None:
     ap.add_argument("--out", default="results/contamination")
     ap.add_argument(
         "--only",
-        choices=["sft", "dpo"],
-        help="add section 6 (sft) or 7 (dpo) to the existing --out .json and rewrite the .md",
+        choices=["sft", "dpo", "grpo"],
+        help="add section 6 (sft), 7 (dpo) or 8 (grpo) to the existing --out .json and rewrite the .md",
     )
     args = ap.parse_args()
     N = args.n
@@ -926,7 +950,7 @@ def main() -> None:
     if args.only:
         res = json.loads(out.with_suffix(".json").read_text())
         print(f"{args.only} data vs eval and benchmarks")
-        check = sft_checks if args.only == "sft" else dpo_checks
+        check = {"sft": sft_checks, "dpo": dpo_checks, "grpo": grpo_checks}[args.only]
         res[args.only] = check(tok, benchmarks())
         out.with_suffix(".json").write_text(json.dumps(res, indent=1) + "\n")
         out.with_suffix(".md").write_text(report(res, args.flag))
@@ -1084,7 +1108,7 @@ def main() -> None:
     res["qa"] = qa_checks(tok)
     prev = out.with_suffix(".json")
     old = json.loads(prev.read_text()) if prev.exists() else {}
-    for k in ("sft", "dpo"):  # sections 6 and 7 are refreshed by --only sft / --only dpo
+    for k in ("sft", "dpo", "grpo"):  # sections 6-8 are refreshed by --only sft / dpo / grpo
         if k in old:
             res[k] = old[k]
 

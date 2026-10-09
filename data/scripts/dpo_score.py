@@ -1,7 +1,8 @@
 """Stage 4 step 5: score every pool sample with verifiers and rules; no judge (2026-10-08
 amendment, notes/decisions.md: the judge failed its benchmark and is out of pair-building).
 
-  .venv/bin/python data/scripts/dpo_score.py   # -> data/dpo/work/scored.jsonl, results/dpo/score_log.json
+  .venv/bin/python data/scripts/dpo_score.py            # -> data/dpo/work/scored.jsonl, results/dpo/score_log.json
+  .venv/bin/python data/scripts/dpo_score.py --strict   # -> data/dpo/strict/work/scored.jsonl, results/dpo/score_log_strict.json
 
 Reads results/runs/sft-from-cpt/samples/dpo_pool.jsonl (eval/sample.py's dpo_pool job). A sample
 that doesn't end on </s> is dropped. Per format:
@@ -14,8 +15,14 @@ that doesn't end on </s> is dropped. Per format:
                registered rules and under the amendment's (cite_valid, cites the gold passage, no
                false abstain): 5 if all of a rule set pass, else 1
   definition   not scored: no pairs (no verifier knows a definition's quality)
+
+--strict (2026-10-09, the dpo-strict rerun): closed-book by the strict checker instead
+(scorers.qa_strict on the answer line, plus exactly one non-empty line: the GRPO reward's rule);
+79 of the as-run set's 458 closed-book chosen answers fail it (results/qa_strict/dpo_pairs.json).
+Everything else is unchanged.
 """
 
+import argparse
 import json
 import statistics
 import sys
@@ -26,7 +33,7 @@ from sft_common import pmap, read_jsonl, write_jsonl
 from sft_judge import same_fact
 
 sys.path.insert(0, str(REPO / "eval"))
-from scorers import answer_line, citations
+from scorers import answer_line, citations, qa_strict
 
 SAMPLES = REPO / "results/runs/sft-from-cpt/samples/dpo_pool.jsonl"
 SCORED = REPO / "data/dpo/work/scored.jsonl"
@@ -39,7 +46,12 @@ def no_repeated_line(t: str) -> bool:
     return len(lines) == len(set(lines))
 
 
-def score_prompt(row: dict, rec: dict, cb_median: float) -> dict:
+def strict_ok(t: str, rec: dict) -> bool:
+    one_line = len([x for x in t.splitlines() if x.strip()]) == 1
+    return one_line and qa_strict(answer_line(t), rec["gold"], rec["kind"])
+
+
+def score_prompt(row: dict, rec: dict, cb_median: float, strict: bool = False) -> dict:
     fmt = row["format"]
     kept: list[dict] = [
         {**s, "k": k} for k, s in enumerate(row["samples"]) if s["finish_reason"] == "stop"
@@ -49,7 +61,11 @@ def score_prompt(row: dict, rec: dict, cb_median: float) -> dict:
     for s in kept:
         t = s["text"].strip()
         if fmt == "closed_book":
-            ok = same_fact(answer_line(t) or t, rec["gold"], rec["kind"])
+            ok = (
+                strict_ok(t, rec)
+                if strict
+                else same_fact(answer_line(t) or t, rec["gold"], rec["kind"])
+            )
             s.update(eff=5.0 if ok else FLOOR, source="verifier", correct=ok,
                      form_ok=no_repeated_line(t) and s["n_tokens"] < 2 * cb_median)  # fmt: skip
         elif fmt == "abstain":
@@ -67,14 +83,21 @@ def score_prompt(row: dict, rec: dict, cb_median: float) -> dict:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true", help="closed-book by scorers.qa_strict")
+    args = ap.parse_args()
+    scored_path = REPO / "data/dpo/strict/work/scored.jsonl" if args.strict else SCORED
+    log_path = REPO / "results/dpo/score_log_strict.json" if args.strict else LOG
     rows = read_jsonl(SAMPLES)
     recs = records({r["id"] for r in rows})
     cb = [s["n_tokens"] for r in rows if r["format"] == "closed_book" for s in r["samples"]
           if s["finish_reason"] == "stop"]  # fmt: skip
     cb_median = statistics.median(cb)
-    scored = pmap(lambda r: score_prompt(r, recs[r["id"]], cb_median), rows)
-    write_jsonl(SCORED, scored)
-    log: dict = {"closed_book_median_tokens": cb_median, "rule_sets": RULE_SETS, "by_format": {}}
+    scored = pmap(lambda r: score_prompt(r, recs[r["id"]], cb_median, args.strict), rows)
+    scored_path.parent.mkdir(parents=True, exist_ok=True)
+    write_jsonl(scored_path, scored)
+    log: dict = {"closed_book_median_tokens": cb_median, "rule_sets": RULE_SETS, "by_format": {},
+                 "closed_book_verifier": "scorers.qa_strict" if args.strict else "sft_judge.same_fact"}  # fmt: skip
     for f in ("closed_book", "definition", "grounded", "abstain"):
         sel = [r for r in scored if r["format"] == f]
         flat = [s for r in sel for s in r["samples"]]
@@ -99,8 +122,8 @@ def main() -> None:
         if f == "closed_book":
             d["form_fail_among_correct"] = sum(1 for s in flat if s["correct"] and not s["form_ok"])
         log["by_format"][f] = d
-    LOG.parent.mkdir(parents=True, exist_ok=True)
-    LOG.write_text(json.dumps(log, indent=2) + "\n")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(json.dumps(log, indent=2) + "\n")
     print(json.dumps(log, indent=2))
 
 

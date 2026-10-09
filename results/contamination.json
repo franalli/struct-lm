@@ -6199,7 +6199,7 @@
  },
  "dpo": {
   "prompts": 2506,
-  "pairs": 506,
+  "pairs": 969,
   "leaked_chunks": [],
   "rule1": [],
   "term_block": [],
@@ -6689,6 +6689,511 @@
       "token_frac": 0.125,
       "found_in": [
        "dpo"
+      ],
+      "longest_span": " 6 inches (150 mm)",
+      "text": "Personal Care and Style: How to make curls with a flat iron. Select a skinny flat iron. You need one no wider than one or two inches. A paddle iron will be too wide.  Prepare your hair for exposure to heat. Lightly spray your hair from about 6 inches (150 mm) away with a heat protectant."
+     }
+    ]
+   }
+  },
+  "control_8": {
+   "planted": 40,
+   "found_ge80": 40,
+   "found_ge50": 40
+  }
+ },
+ "grpo": {
+  "prompts": 1619,
+  "pairs": 0,
+  "leaked_chunks": [],
+  "rule1": [],
+  "term_block": [],
+  "eval": {
+   "domain_qa seen: questions": {
+    "items": 167,
+    "checkable": 166,
+    "grpo": {
+     "any": 81,
+     "ge50": 22,
+     "ge80": 2,
+     "mean_token_frac": 0.22050126067771791
+    },
+    "either": {
+     "any": 81,
+     "ge50": 22,
+     "ge80": 2,
+     "mean_token_frac": 0.22050126067771791
+    },
+    "examples": [
+     {
+      "item": 94,
+      "token_frac": 0.8333333333333334,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " NASA-STD-5020B, what is the maximum coefficient of friction",
+      "text": "In NASA-STD-5020B, what is the maximum coefficient of friction for uncoated, non-lubricated metal surfaces cleaned by a qualified process in joint-slip analysis?"
+     },
+     {
+      "item": 137,
+      "token_frac": 0.8,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " aspect ratio for cold-formed steel shear walls sheathed with wood structural panels",
+      "text": "What is the maximum aspect ratio for cold-formed steel shear walls sheathed with wood structural panels per NIST GCR 16-917-38?"
+     },
+     {
+      "item": 152,
+      "token_frac": 0.7647058823529411,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " continuous work period for surface preparation, thermal spray application, and sealing",
+      "text": "What is the maximum continuous work period for surface preparation, thermal spray application, and sealing per USACE EM 1110-2-3401?"
+     }
+    ]
+   },
+   "domain_qa seen: answers": {
+    "items": 167,
+    "checkable": 5,
+    "grpo": {
+     "any": 1,
+     "ge50": 1,
+     "ge80": 1,
+     "mean_token_frac": 0.005988023952095809
+    },
+    "either": {
+     "any": 1,
+     "ge50": 1,
+     "ge80": 1,
+     "mean_token_frac": 0.005988023952095809
+    },
+    "examples": [
+     {
+      "item": 97,
+      "token_frac": 1.0,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": "EM 1110-2-4300",
+      "text": "EM 1110-2-4300"
+     }
+    ]
+   },
+   "vocab seen: definitions": {
+    "items": 101,
+    "checkable": 100,
+    "grpo": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   },
+   "domain_qa unseen: questions": {
+    "items": 155,
+    "checkable": 155,
+    "grpo": {
+     "any": 49,
+     "ge50": 9,
+     "ge80": 0,
+     "mean_token_frac": 0.13492629929324043
+    },
+    "either": {
+     "any": 49,
+     "ge50": 9,
+     "ge80": 0,
+     "mean_token_frac": 0.13492629929324043
+    },
+    "examples": [
+     {
+      "item": 137,
+      "token_frac": 0.6071428571428571,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " in AASHTO LRFD Article 6.5.4.2",
+      "text": "What is the resistance factor for bolts bearing on material in AASHTO LRFD Article 6.5.4.2?"
+     },
+     {
+      "item": 0,
+      "token_frac": 0.6,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " AASHTO LRFD-8 Bridge Design Specifications (2017",
+      "text": "What is the minimum width requirement for temporary panel support in AASHTO LRFD-8 Bridge Design Specifications (2017)?"
+     },
+     {
+      "item": 13,
+      "token_frac": 0.5517241379310345,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " USACE EM 1110-1-1005,",
+      "text": "In USACE EM 1110-1-1005, what is the recommended maximum interval for establishing permanent traverse points?"
+     }
+    ]
+   },
+   "domain_qa unseen: answers": {
+    "items": 155,
+    "checkable": 10,
+    "grpo": {
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.02534562211981567
+    },
+    "either": {
+     "any": 4,
+     "ge50": 4,
+     "ge80": 4,
+     "mean_token_frac": 0.02534562211981567
+    },
+    "examples": [
+     {
+      "item": 86,
+      "token_frac": 1.0,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": "EM 1110-2-2904",
+      "text": "EM 1110-2-2904"
+     },
+     {
+      "item": 90,
+      "token_frac": 1.0,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": "EM 1110-2-1615",
+      "text": "EM 1110-2-1615"
+     },
+     {
+      "item": 95,
+      "token_frac": 1.0,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": "ER 1110-2-1806",
+      "text": "ER 1110-2-1806"
+     }
+    ]
+   },
+   "vocab unseen: definitions": {
+    "items": 109,
+    "checkable": 109,
+    "grpo": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   },
+   "grounded: questions": {
+    "items": 108,
+    "checkable": 108,
+    "grpo": {
+     "any": 4,
+     "ge50": 2,
+     "ge80": 0,
+     "mean_token_frac": 0.016344487762616416
+    },
+    "either": {
+     "any": 4,
+     "ge50": 2,
+     "ge80": 0,
+     "mean_token_frac": 0.016344487762616416
+    },
+    "examples": [
+     {
+      "item": 71,
+      "token_frac": 0.5263157894736842,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " ASCE/SEI 7-16 Section 12.10.3 for",
+      "text": "What types of diaphragms are required to use the alternative design forces specified in ASCE/SEI 7-16 Section 12.10.3 for their design?"
+     },
+     {
+      "item": 15,
+      "token_frac": 0.5,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " Buckling-Restrained Braced Frames (BRBFs)",
+      "text": "Why are Buckling-Restrained Braced Frames (BRBFs) selected for the lateral force-resisting system in this building?"
+     },
+     {
+      "item": 78,
+      "token_frac": 0.4888888888888889,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " in ASCE/SEI 41-17 Section 11.3.2.3",
+      "text": "What requirement in ASCE/SEI 41-17 Section 11.3.2.3 affects the inclusion of rocking wall piers in lines of resistance that are not classified as all deformation-controlled?"
+     }
+    ]
+   },
+   "adversarial: questions": {
+    "items": 76,
+    "checkable": 76,
+    "grpo": {
+     "any": 1,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00641025641025641
+    },
+    "either": {
+     "any": 1,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00641025641025641
+    },
+    "examples": [
+     {
+      "item": 66,
+      "token_frac": 0.48717948717948717,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " the AASHTO LRFD (7th Edition, 2014)",
+      "text": "What is the maximum spacing between cross-frames that the AASHTO LRFD (7th Edition, 2014) permits for straight girder bridges under typical conditions?"
+     }
+    ]
+   }
+  },
+  "benchmarks_13": {
+   "MMLU (test)": {
+    "items": 14042,
+    "checkable": 14042,
+    "grpo": {
+     "any": 3,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 3.401476299019897e-05
+    },
+    "either": {
+     "any": 3,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 3.401476299019897e-05
+    },
+    "examples": [
+     {
+      "item": 3606,
+      "token_frac": 0.30612244897959184,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " in the 1960s and 1970s",
+      "text": "Which theory below was used as justification for US involvement in Vietnam in the 1960s and 1970s?\nA. Devolution\nB. Colonialism\nC. Heartland theory\nD. Containment theory"
+     },
+     {
+      "item": 13259,
+      "token_frac": 0.12389380530973451,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " the 1960s and 1970s",
+      "text": "Which of the following events can be regarded as contributing to the emergence of environmental security during the 1960s and 1970s?\nA. From the 1970s a number of scholars attempted to critique orthodox security discourse and practices, highlighting their inability to manage environmental risks to national and international security.\nB. There became a growing recognition that environmental changes do not merely pose risks to ecosystems - they also pose risks to human well-being.\nC. A shared environmental consciousness emerged in developing countries.\nD. All of these options."
+     },
+     {
+      "item": 5773,
+      "token_frac": 0.047619047619047616,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " in the 1960s and 1970s",
+      "text": "This question refers to the following information.\n\"The economic ills we suffer have come upon us over several decades. They will not go away in days, weeks, or months, but they will go away. They will go away because we as Americans have the capacity now, as we've had in the past, to do whatever needs to be done to preserve this last and greatest bastion of freedom. In this present crisis, government is not the solution to our problem; government is the problem. . . .\n\"It is my intention to curb the size and influence of the Federal establishment and to demand recognition of the distinction between the powers granted to the Federal Government and those reserved to the States or to the people. All of us need to be reminded that the Federal Government did not create the States; the States created the Federal Government.\"\n\u2014Ronald Reagan, First Inaugural Address, January 21, 1981\nThe conservative political revival that led to President Ronald Reagan's election in 1980 held the view that\nA. political leaders in the 1960s and 1970s did not do enough to challenge the racial and economic status quo.\nB. the United States had relied too heavily on military solutions and needed to pursue a more isolationist foreign policy.\nC. religious leaders had become too assertive in governmental policy and had blurred the separation of church and state.\nD. liberal laws and court decisions in the 1960s and a general moral decline were undermining the United States."
+     }
+    ]
+   },
+   "GSM8K (test)": {
+    "items": 1319,
+    "checkable": 1319,
+    "grpo": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   },
+   "HellaSwag (val)": {
+    "items": 10042,
+    "checkable": 10042,
+    "grpo": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "either": {
+     "any": 0,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0
+    },
+    "examples": []
+   }
+  },
+  "control_13": {
+   "planted": 40,
+   "found_ge80": 40,
+   "found_ge50": 40
+  },
+  "benchmarks_8": {
+   "MMLU (test)": {
+    "items": 14042,
+    "checkable": 14042,
+    "grpo": {
+     "any": 188,
+     "ge50": 1,
+     "ge80": 0,
+     "mean_token_frac": 0.0012857762928584818
+    },
+    "either": {
+     "any": 188,
+     "ge50": 1,
+     "ge80": 0,
+     "mean_token_frac": 0.0012857762928584818
+    },
+    "examples": [
+     {
+      "item": 7521,
+      "token_frac": 0.6470588235294118,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 200,000,000,000",
+      "text": "Approximately how many movies are watched in homes in the United States in one year?\nA. 200,000,000\nB. 2,000,000,000\nC. 20,000,000,000\nD. 200,000,000,000"
+     },
+     {
+      "item": 10249,
+      "token_frac": 0.37894736842105264,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 100,000 to 10,000",
+      "text": "There is evidence that premodern Homo sapiens existed:\nA. 800,000 to 200,000 years ago.\nB. 600,000 to 30,000 years ago.\nC. 400,000 to 10,000 years ago.\nD. 100,000 to 10,000 years ago."
+     },
+     {
+      "item": 10326,
+      "token_frac": 0.3764705882352941,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 100,000",
+      "text": "The pharaoh ruled a population of ________, of which _________ were farmers.\nA. 100,000; 25%\nB. 1,000,000; 50%\nC. 3,000,000; 75%\nD. 5,000,000; 100%"
+     }
+    ]
+   },
+   "GSM8K (test)": {
+    "items": 1319,
+    "checkable": 1319,
+    "grpo": {
+     "any": 10,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0004200444755926607
+    },
+    "either": {
+     "any": 10,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.0004200444755926607
+    },
+    "examples": [
+     {
+      "item": 1206,
+      "token_frac": 0.14622641509433962,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 100,000-60,000",
+      "text": "Question: John decides to get a loan by mortgaging his home.  His house is worth $250,000.  He gets a loan worth 40% of that.  He uses 60% of that to pay off his debts.  How much money did he have leftover after paying debt?\nAnswer: His loan is worth 250,000*.4=$<<250000*.4=100000>>100,000\nThat means he uses 100,000*.6=$<<100000*.6=60000>>60,000 to pay off debts\nSo he has 100,000-60,000=$<<100000-60000=40000>>40,000 leftover\n#### 40,000"
+     },
+     {
+      "item": 602,
+      "token_frac": 0.0784313725490196,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " is 1200/3",
+      "text": "Question: A plane travels 1200 miles in 3 hours. At the same rate, how many additional hours would it take to travel an additional 2000 miles?\nAnswer: The rate is 1200/3=<<1200/3=400>>400 mph.\nThen it would take 2000/400=<<2000/400=5>>5 hours more.\n#### 5"
+     },
+     {
+      "item": 657,
+      "token_frac": 0.0625,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " $150,000",
+      "text": "Question: James buys a plane.  The plane cost $150,000.  He pays $5000 a month to rent a hanger to keep it in.  He also spends twice as much as that on fuel per month.  How much did it cost him to get and maintain the plane for the first year?\nAnswer: The fuel cost 5000*2=$<<5000*2=10000>>10000 per month\nWith the hanger that means he pays 10000+5000=$<<10000+5000=15000>>15,000 per month\nSo he spends 12*15000=$<<12*15000=180000>>180,000 a year\nThat means the total cost was 150,000+180,000=$<<150000+180000=330000>>330,000\n#### 330000"
+     }
+    ]
+   },
+   "HellaSwag (val)": {
+    "items": 10042,
+    "checkable": 10042,
+    "grpo": {
+     "any": 11,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00010330263884367164
+    },
+    "either": {
+     "any": 11,
+     "ge50": 0,
+     "ge80": 0,
+     "mean_token_frac": 0.00010330263884367164
+    },
+    "examples": [
+     {
+      "item": 5292,
+      "token_frac": 0.1836734693877551,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 1/4 to 1/2",
+      "text": "Personal Care and Style: How to stretch suede shoes. Try a spray solution to stretch your shoes 1/4 to 1/2 a size. Spraying your shoes then wearing them for a few hours is a quick fix. If you only need to stretch them 1/4 to 1/2 a shoe size, a spray could do the trick.  Spray solutions are also your most affordable option.. Purchase an immediate-use solution marked for suede shoes."
+     },
+     {
+      "item": 6299,
+      "token_frac": 0.14285714285714285,
+      "found_in": [
+       "grpo"
+      ],
+      "longest_span": " 24 by 24 inches",
+      "text": "Family Life: How to swaddle a newborn. Obtain your swaddling blanket. Be sure to use a cotton or muslin blanket that is at least 24 by 24 inches (61 by 61 cm). You can also purchase blankets that are specially made for swaddling.  This is the standard size for swaddling a nearly newborn baby. As the baby grows, you may need to use a larger blanket, about 40 by 40 inches (100 by 100 cm)."
+     },
+     {
+      "item": 4985,
+      "token_frac": 0.125,
+      "found_in": [
+       "grpo"
       ],
       "longest_span": " 6 inches (150 mm)",
       "text": "Personal Care and Style: How to make curls with a flat iron. Select a skinny flat iron. You need one no wider than one or two inches. A paddle iron will be too wide.  Prepare your hair for exposure to heat. Lightly spray your hair from about 6 inches (150 mm) away with a heat protectant."

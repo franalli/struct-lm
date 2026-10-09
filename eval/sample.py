@@ -19,6 +19,12 @@ checks that need more than the greedy KPI outputs. One engine load serves every 
              prompt by format; up to 512 tokens; written per format as each finishes
   dpo_judge  the pool's 100 judge-split prompts, greedy, up to 1,024 tokens: the win-rate answers
              (eval/winrate.py), from the SFT start and from each DPO run
+  grpo_probe the GRPO candidate tasks (data/grpo/tasks.jsonl) x 8 samples at temperature 1.0, up to
+             256 tokens (the training rollout's settings): the calibration probe that keeps the
+             tasks the start policy sometimes solves (data/scripts/grpo_probe.py)
+  passk      the KPI's 322 domain_qa prompts (run_eval.build_items: the same few-shot prompt) x 8
+             samples at temperature 0.7, with the KPI's limits (chat: 64 tokens; base: 48, stop at
+             "\n"): pass@1, pass@8 and maj@8 (eval/passk.py)
 
   python eval/sample.py --model /vol/checkpoints/sft-from-cpt --run-name sft-from-cpt --chat \
       --jobs eos,diversity
@@ -47,6 +53,8 @@ JOBS = {
     "dpo_bench": {"prompts": pathlib.Path("data/dpo/bench_prompts.jsonl"), "n": 3, "temperature": 0.7, "max_tokens": 512},
     "dpo_pool": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "budget": pathlib.Path("data/dpo/budget.json"), "max_tokens": 512, "exclude_split": "judge"},
     "dpo_judge": {"prompts": pathlib.Path("data/dpo/prompts.jsonl"), "n": 1, "temperature": 0.0, "max_tokens": 1024, "only_split": "judge"},
+    "grpo_probe": {"prompts": pathlib.Path("data/grpo/tasks.jsonl"), "n": 8, "temperature": 1.0, "max_tokens": 256},
+    "passk": {"kpi": "domain_qa", "n": 8, "temperature": 0.7, "max_tokens": 64, "base": {"max_tokens": 48, "stop": ["\n"]}},
 }  # fmt: skip
 # the pool-sized jobs: vLLM's batch width and prefix cache (n samples share one prompt) set explicitly
 POOL_ENGINE = {"max_num_seqs": 256, "enable_prefix_caching": True}
@@ -59,6 +67,11 @@ def h(key: str) -> str:
 def prompts_for(job: str) -> list[dict]:
     """[{id, format, prompt}] for a job. The Stage 4 pool stores the prompt as a message list."""
     spec = JOBS[job]
+    if "kpi" in spec:  # the KPI eval's own prompts for one task
+        from run_eval import build_items
+
+        items = build_items(HERE / "tasks", None, [spec["kpi"]])
+        return [{"id": it["id"], "format": spec["kpi"], "prompt": it["prompt"]} for it in items]
     rows = [json.loads(line) for line in spec["prompts"].read_text().splitlines()]
     out = []
     for r in rows:
@@ -100,7 +113,7 @@ def main() -> None:
         ap.error(f"unknown jobs {sorted(unknown)}")
     from vllm import SamplingParams
 
-    pool_sized = {"dpo_pool", "dpo_bench", "dpo_judge"} & set(jobs)
+    pool_sized = {"dpo_pool", "dpo_bench", "dpo_judge", "grpo_probe", "passk"} & set(jobs)
     llm = make_llm(
         args.model,
         1,
@@ -123,11 +136,13 @@ def main() -> None:
         else:
             groups = [(None, items, spec["n"])]
             temperature, top_p = spec["temperature"], 1.0
+        limits = {
+            "max_tokens": spec["max_tokens"],
+            **(spec.get("base", {}) if not args.chat else {}),
+        }
         rows = []
         for fmt, group, n in groups:
-            params = SamplingParams(
-                n=n, temperature=temperature, top_p=top_p, max_tokens=spec["max_tokens"], seed=0
-            )
+            params = SamplingParams(n=n, temperature=temperature, top_p=top_p, seed=0, **limits)
             part = generate(llm, group, params, args.chat)
             if fmt is not None:
                 write_jsonl(out_dir / f"{job}.{fmt}.jsonl", part)

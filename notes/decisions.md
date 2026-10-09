@@ -3729,3 +3729,237 @@ It is the strongest evidence in the repo for why the chain ends with verifiers o
 **The chain:** `stage4-final = dpo`, as registered. It is the SFT checkpoint within noise, so
 GRPO starts from a policy that is effectively the SFT checkpoint. Stage 5 becomes the clean
 comparison: the same verifier reward, offline pairs against on-policy groups.
+
+## 2026-10-09: The strict closed-book checker; Stage 4's labels and every eval row re-scored; dpo-strict launched past the 500 floor (user decisions)
+
+**Why now:** Stage 4's closed-book verifier (`sft_judge.same_fact`) was about to become the GRPO
+reward. An audit of what it passed found two holes RL would game inside 50 steps:
+- it passed any piece of the gold ("Section" for "Section 17.8.2"); 116 Stage 4 pool samples
+  passed only that way;
+- it judged multi-number golds on their first number ("class 8" for "8 x 19").
+
+The verifier was caught by auditing its passes before it became an RL reward: the RLHF Book's
+ch. 14 lesson (over-optimisation finds the proxy's slack) applied before the optimiser could.
+
+**The strict checker** (`eval/scorers.qa_strict`; fixtures in `tests/test_qa_strict.py`, 69 cases):
+- **Normalisation, on both sides:** case, whitespace, unit spellings, and "Article/Section/§"
+  stripped. "6.10.10" passes for "Article 6.10.10" (a must-pass fixture).
+- **Values:** every gold number is in the answer within tolerance, in a compatible unit. No other
+  answer number may carry a gold number's unit.
+- **One candidate per line:** an alternative ("or", ";") or a range the gold lacks fails. It is a
+  format failure in the GRPO reward.
+- **Two choices of mine, as operationalised (no alias lists exist: one gold string per item):**
+  - Identifiers: designations are normalised ("C 1138" = "C1138", "FEMA P-361" = "FEMA 361"). The
+    answer must contain every gold word and end on the gold's numbered token. A named document
+    passes ("AASHTO LRFD Article 6.5.4.2" for "6.5.4.2"); a fragment, a child or parent section,
+    or a dropped part of the gold fails.
+  - Terms: the whole gold, with at most 3 added context words. The hand read found right answers
+    that add a noun ("Level III operations", "triangular or trapezoidal cross sections"). A piece
+    of the gold never passes ("Collapse" for "low likelihood of collapse").
+- **Every change of verdict was read against the gold before the numbers were used** (rule 8).
+
+**The as-run DPO set** (`results/qa_strict/dpo_pairs.json`): 79 of the 458 closed-book chosen
+labels fail the strict rule (17%).
+- 36 state a wrong value, range, unit or section, or hedge.
+- 24 give a fragment of a phrase gold.
+- 10 give the right section without the document the gold names.
+- 9 give a different edition of the document.
+- No pair is inverted (chosen wrong and rejected right). In 6 pairs the rejected answer also
+  passes.
+- On the whole pool, the closed-book samples the strict rule passes fall from 34.4% to 30.1%
+  (1,305 of 4,336), and prompts with mixed samples from 409 to 381.
+
+**The eval:** `qa_acc` is `scorers.qa_correct`, not `same_fact`, so it never had the fragment
+hole. It is lenient in other ways:
+- a range for a point value;
+- the first number of a fraction ("1/2 inch" passed for "1 in.");
+- no unit check;
+- child sections passing by containment.
+
+Every row's stored generations were re-scored (`eval/qa_strict.py` → `results/qa_strict/evals.md`).
+- **16 distinct verdicts change across the 15 rows; all were read.** 14 strict verdicts are right.
+  2 are arguable, both Large 3: "SSPC-SP 10 / NACE No. 2", the joint designation, and "50 ± 5 % RH".
+- **The changes are small, and no ordering moves:**
+
+  | Row | `qa_acc` | strict |
+  |---|---|---|
+  | base-8b-hf | 0.121 | 0.121 |
+  | instruct-8b | 0.099 | 0.096 |
+  | cpt-8b | 0.146 | 0.146 |
+  | sft-from-cpt | 0.211 | 0.205 |
+  | dpo | 0.227 | 0.214 |
+  | dpo-seed1 | 0.211 | 0.202 |
+  | Large 3 | 0.280 | 0.261 |
+
+- The gold log-probability rows are untouched: they never depended on a string match.
+- **One fix after the probe, before any GRPO run:** the range detector missed a gold's own range
+  when a unit sat between the number and "to" ("20 to 100 percent" failed for "20% to 100%"). It
+  changes none of the 4,336 Stage 4 pool verdicts, so dpo-strict's labels are the fixed rule's.
+  It moves single eval items; the table above is after the fix.
+
+**dpo-strict: the same recipe on strict labels.**
+- **Pairs:** `dpo_score.py --strict`, then `dpo_pairs.py --strict` → `data/dpo/strict/`, hash
+  5e3effaf. 463 pairs: train 445 (closed-book 400, grounded 39, abstain 6), val 18. The grounded
+  and abstain labels are unchanged.
+- **Run:** `dpo.yaml` with `data.dir=data/dpo/strict`, seed 0, the same pre-registered checkpoint
+  rule, and ~28 steps.
+- **Rows:** the lenient `dpo` and `dpo-seed1` stay in the tables as the as-run rows, with the
+  wrong-chosen count beside them. No strict seed twin: dpo-strict's floor is taken from the lenient
+  seed pair, and the read says so. `dpo-2ep` is not rerun: its finding is about the dynamics, not
+  the labels.
+
+**The 500 floor, overridden for this rerun only (user decision):**
+> The 500 floor was a stop rule for a different question: whether the first DPO set was large
+> enough to be worth training at all. That question was answered by the 506-pair run and `dpo-2ep`;
+> the result at this scale is known. This run exists to fix a label error in the same recipe, and
+> holding it at 463 would mean the chain keeps a checkpoint trained on labels the repo now knows
+> were wrong, to protect a count that is 7% short of a line set for another purpose.
+
+The floor stays on the books.
+
+**Expectation, written before dpo-strict reports:**
+- With 43 fewer pairs and the same 1e-5 schedule, dpo-strict will move the policy even less than
+  `dpo` did.
+- **If it lands inside the noise of SFT on every line:** that is the expected outcome, and the
+  README says label noise was not the reason DPO did not move.
+- **If seen qa_acc or hallucination moves beyond the floor with 445 clean pairs:** that is a real
+  finding and gets its own paragraph.
+
+**The chain:**
+- `stage4-final -> dpo-strict` once its merge gate passes, and GRPO launches from it.
+- The strict checker is the reward from here on.
+- The README's "same reward, two algorithms" becomes "same verifier family: Stage 4 as run was
+  lenient, with 79 of 458 closed-book chosen labels wrong under the strict rule; dpo-strict and
+  Stage 5 are strict".
+
+## 2026-10-09: Stage 5 pre-registration: GRPO with verifiable rewards; tasks frozen, dataset hash 4db8f7a6 (user decisions, fixed before any GRPO training)
+
+**Start: `stage4-final = dpo-strict`** (seed 0, strict labels, 28 steps, checkpoint sha256 e686ca7b).
+- Its merge gate passed:
+  - added flips −5 (limit 11);
+  - |Δlp| ratio 1.083 (limit 1.5);
+  - sft_val loss within 0.078% (limit 0.5%), 0.00044 nats.
+- `train/configs/grpo.yaml` starts from it with a fresh LoRA.
+- No reference model and no KL (beta 0; rule 11's reference would be dpo-strict with the adapter
+  disabled).
+
+**Candidate tasks** (`data/scripts/grpo_tasks.py` → `data/grpo/tasks.jsonl`, sha256 5037b804):
+- every closed-book, grounded and abstain prompt of the Stage 4 pool outside its judge split:
+  1,084 closed-book (623 facts), 359 grounded, 176 abstain;
+- each with the verifier the reward reads.
+- No alias lists exist, so closed-book is judged against the one gold string with the strict
+  checker. Compute tasks are not built (no generator yet).
+- **Contamination** (`contamination.py --only grpo`, section 8):
+  - 0 leaked eval chunks, 0 rule-1 hits, 0 blocked terms;
+  - positive control 40 of 40 at 13 and at 8 tokens;
+  - the remaining overlaps are the document designations Stage 4 already listed (the set is a
+    subset of that pool; the counts match).
+
+**The reward** (`train/grpo_rewards.py`; fixtures in `tests/test_grpo_rewards.py` and
+`tests/test_qa_strict.py`):
+- **Format, 0.1:** terminated on `</s>`.
+  - Closed-book: exactly one non-empty line with one candidate. The prompts ask for a bare value;
+    0 of 4,336 Stage 4 samples wrote "Answer:", so the gate is not an "Answer:" line.
+  - Grounded: every bracket is one of the task's four chunk ids.
+  - Abstain: the sentence, or a grounded-form answer.
+- **Correctness, 0.9, only when format passed:**
+  - closed-book by `scorers.qa_strict`;
+  - grounded: cites the gold passage, at most 2 distinct passages, no abstain sentence;
+  - abstain: exactly the sentence.
+- **Length, 0 to −0.1:** zero up to 192 tokens, linear to −0.1 at 256, on every completion.
+- The three functions are summed with weights [1, 1, 1].
+
+**Probe** (`eval/sample.py grpo_probe` on dpo-strict, then `data/scripts/grpo_probe.py`):
+- **Settings:** 8 samples per task at T 1.0, up to 256 tokens (the rollout's settings), scored by
+  the reward itself.
+- **Sample accuracy:** closed-book 29.2% (34.4% under the lenient checker at T 0.7 on SFT),
+  grounded 93.2%, abstain 96.9%.
+- **The window (1-7 of 8 correct):** 672 tasks.
+
+  | | value | identifier | term | grounded | abstain |
+  |---|---|---|---|---|---|
+  | In the window | 346 | 151 | 31 | 121 | 23 |
+  | grpo_val | 26 | 11 | 2 | 9 | 2 |
+
+  - 38 of the grounded tasks are in it only through the ≤ 2-passage rule (the guard against
+    citing every passage). A third of the grounded signal is "cite at most two", the teacher's
+    norm (371 of 374).
+- **The split:** train 622, `grpo_val` 50, held out by `fact_id` (every paraphrase with its fact)
+  and stratified by format and answer kind.
+- **Dataset hash:** sha256 of `data/grpo/SHA256SUMS`,
+  `4db8f7a6ab678a52387df08102d2082c858842795d1d644e5702eef689ee2830`.
+- **Tests:** `tests/test_grpo_data.py`, `test_grpo_rewards.py` and `test_grpo_train.py` pass. The
+  last includes `grpo.train()` end to end on CPU and the TRL prompt render equal to
+  mistral-common's.
+
+**Config** (`train/configs/grpo.yaml`; the pasted plan with the corrections the code forced):
+- **Group:** G = 8; 128 completions = 16 tasks per optimizer step; generated once per step and used
+  once (`num_iterations` 1).
+- **Loss:**
+  - `loss_type: dapo` (token-level), `scale_rewards: batch`;
+  - epsilon 0.2 / `epsilon_high` 0.28, beta 0;
+  - `mask_truncated_completions`.
+- **Optimiser:**
+  - LoRA r 64 / α 128, dropout off;
+  - lr 1e-5 constant after 10 warmup steps, AdamW (0.9, 0.999), wd 0, clip 1.0;
+  - 150 steps (~3.9 passes over 622 tasks).
+- **Sampling:** T 1.0, top_p 1.0, 256 tokens.
+- **vLLM colocated** (vllm 0.30.0, uv.lock's pair with torch 2.13.0):
+  - **Engine settings:** gpu_memory_utilization 0.35, max_model_length 3,072, IS correction
+    `token_truncate` cap 3 (classic TIS). The engine is built with the rule-3 settings and the
+    run's seed (TRL passes neither).
+  - **Changed from the plan:**
+    - **No sleep mode:** TRL 0.29.1's `generate()` reloads the weights from disk after waking a
+      sleeping engine (the vLLM #29341 workaround). That would overwrite the LoRA-merged weights
+      it syncs just before, so rollouts would come from the start at every step.
+    - **Micro-batch:** 8 × GA 16 instead of 16 × 8, to fit next to the engine's 28 GB.
+  - **Probability checks:** fp32 log-probs as in Stage 4. Step 1's importance-sampling ratio
+    (LoRA B = 0) is logged as the train/inference consistency check.
+- **Evaluation:**
+  - grpo_val at step 0 and every 25 steps: pass@1 and pass@8 from 8 samples per task, with the
+    per-task SE;
+  - a save at every evaluation;
+  - 10 fixed greedy generations against the start's at every save.
+
+**Checkpoint rule:** the best grpo_val pass@1 among the saves at or before any stop. Within one SE
+of the best counts as a tie, and ties go to the earliest save (`grpo.checkpoint_rule`). It applies
+unattended through `--merge-from rule`.
+
+**Stop rules** (each saves the stop step, and the rule takes the best save before it):
+- `frac_reward_zero_std` > 0.8 for 10 consecutive steps;
+- entropy under a third of its steps 1-5 mean;
+- no new best grpo_val pass@1 in 2 evaluations while the 25-step mean train reward rose.
+
+**Runs:** `grpo` (seed 0) and `grpo-seed1` (seed 1, data_seed 1), in parallel, one H100 each. The
+chain: noop, train, merge, mergecheck (sft_val, nats line now reported), ppl, eval, latency on
+`grpo` only, sample (eos, diversity, passk, dpo_judge).
+
+**The read, pre-registered:**
+1. **Primary:** `grpo` against dpo-strict on seen strict closed-book accuracy (`qa_strict`, the
+   reward's own rule on the eval's 167 seen items) and seen `gold_lp`.
+   - A move counts beyond max(GRPO seed gap, SE, the start's own seed gap). The start has no
+     strict twin, so its gap is the lenient `dpo`/`dpo-seed1` pair's, and the read says so.
+   - Expected: +3 to +8 points on seen.
+   - `qa_acc` (the eval's original scorer) is reported next to it.
+2. **Pass@1 vs pass@8** on the 322 closed-book items (8 samples at T 0.7, `eval/passk.py`, strict
+   and original scorers; maj@8 reported):
+   - pass@1 up with pass@8 within noise is sharpening (DeepSeekMath §5.2);
+   - if pass@8 also rises, it is reported and not explained.
+3. **Unseen accuracy and gold_lp** are reported, not argued. A cost like Stage 4's is named as one.
+4. **Guards:**
+   - MMLU and GSM8K within noise;
+   - hallucination ≤ 2 of 76, false abstain ≤ 1 of 108, `cite_valid` 1.000;
+   - mean length within +30%;
+   - the hack audit (the 50 highest-reward rollouts of the last 25 steps, read for multiple
+     answers, repetition, special characters and stock phrases) under 5 of 50.
+5. **Same verifier, two algorithms:** dpo-strict and `grpo` deltas from sft-from-cpt side by
+   side, with their floors. The lenient `dpo` row stays as run, with its 79 wrong chosen labels.
+6. **Floor:** max(seed gap, SE), with the one-degree-of-freedom caveat as in Stages 3 and 4.
+
+**Failure modes, decided before launch** (from the pasted plan, adjusted):
+- **Colocate OOM:** per-device 4 × GA 32, then server mode on a second GPU.
+- **grpo_val pass@1 flat for 50 steps while the train reward rises:** the stop rule.
+- **Length past 1.5× the start while reward rises:** length penalty to −0.3 at the cap, one rerun.
+- **IS ratio mean off 1.0 by more than 10%:** check the weight sync first.
+- **A hack pattern in the audit:** tighten the gate, one rerun, and the pattern goes in the
+  README.

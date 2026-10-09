@@ -65,3 +65,4 @@ data/sft/work/
 
 # Stage 4 scoring scratch (every pool sample with its scores; rebuilt by data/scripts/dpo_score.py)
 data/dpo/work/
+data/dpo/strict/work/

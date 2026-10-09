@@ -1,0 +1,573 @@
+{
+  "pairs": 458,
+  "chosen_wrong": {
+    "phrase": 58,
+    "two_candidates": 5,
+    "missing_number": 11,
+    "conflict": 1,
+    "unit": 4
+  },
+  "rejected_right": 6,
+  "inverted": 0,
+  "examples": [
+    {
+      "id": "fhwa-hif18029:p3:c0:f4:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "FHWA’s YouTube channel",
+      "chosen": "YouTube",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-e-74:p704:c0:q1:closed_book:2#0",
+      "kind": "value",
+      "gold": "steel shapes",
+      "chosen": "steel shape, angle, or tee",
+      "reason": "two_candidates"
+    },
+    {
+      "id": "fema-p-749:p175:c0:q2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 41-17",
+      "chosen": "ASCE/SEI 41",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-695:p393:c0:f2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7-05 Section 11.4.3",
+      "chosen": "11.4.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1100-app-a:p14:c0:f4:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Appendix A",
+      "chosen": "Appendix 1",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2000:p42:c1:f3:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ACI 224R",
+      "chosen": "ACI 224R-80",
+      "reason": "phrase"
+    },
+    {
+      "id": "nist-gcr-11-917-11:p36:c0:f0:closed_book:1#0",
+      "kind": "value",
+      "gold": "3 inches",
+      "chosen": "3/16 inch",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-1911:p46:c0:f3:closed_book:1#1",
+      "kind": "value",
+      "gold": "110 or 230 V",
+      "chosen": "110-V source",
+      "reason": "missing_number"
+    },
+    {
+      "id": "fhwa-hif-18-046:p527:c0:f3:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD 4.7.4.3.1",
+      "chosen": "4.7.4.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2602:p57:c0:f1:closed_book:2#1",
+      "kind": "identifier",
+      "gold": "ACI 224 R-80",
+      "chosen": "ACI 224",
+      "reason": "phrase"
+    },
+    {
+      "id": "nist-gcr-11-917-15:p88:c1:f2:closed_book:1#0",
+      "kind": "value",
+      "gold": "0.5 to 1.0",
+      "chosen": "0.5 to 2.0",
+      "reason": "missing_number"
+    },
+    {
+      "id": "fema-p-695:p393:c0:f2:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7-05 Section 11.4.3",
+      "chosen": "Section 11.4.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-154:p117:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "FEMA P-155 Third Edition",
+      "chosen": "FEMA P-155",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-1026:p90:c0:f10:closed_book:2#0",
+      "kind": "term",
+      "gold": "flat-beam analogy",
+      "chosen": "beam analogy",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-1026:p90:c0:f10:closed_book:2#1",
+      "kind": "term",
+      "gold": "flat-beam analogy",
+      "chosen": "\"beam analogy\"",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1911:p46:c0:f3:closed_book:2#0",
+      "kind": "value",
+      "gold": "110 or 230 V",
+      "chosen": "110 V",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p224:c0:f3:closed_book:2#0",
+      "kind": "value",
+      "gold": "self-lubricating bronze sleeves",
+      "chosen": "bronze",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p224:c0:f3:closed_book:2#1",
+      "kind": "value",
+      "gold": "self-lubricating bronze sleeves",
+      "chosen": "bronze",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1010:c0:q2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD Specifications",
+      "chosen": "AASHTO LRFD",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1005:c1:q2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD Article 6.10.2.2",
+      "chosen": "6.10.2.2",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2901:p47:c0:f3:closed_book:1#0",
+      "kind": "value",
+      "gold": "3 days",
+      "chosen": "3 days or more",
+      "reason": "two_candidates"
+    },
+    {
+      "id": "usace-em-1110-1-1802:p150:c1:q1:closed_book:3#0",
+      "kind": "value",
+      "gold": "higher than normal",
+      "chosen": "higher",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2082-1:p101:c0:q2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AISC 360, Section I2.1b",
+      "chosen": "AISC 360",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1613:p54:c0:f2:closed_book:2#0",
+      "kind": "value",
+      "gold": "1.1",
+      "chosen": "1.1 to 1.15",
+      "reason": "two_candidates"
+    },
+    {
+      "id": "fema-p-2082-1:p506:c1:f3:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "C17.8.2.2",
+      "chosen": "C17.8.2",
+      "reason": "phrase"
+    },
+    {
+      "id": "nist-gcr-14-917-30:p68:c0:q2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ACI 318-11",
+      "chosen": "ACI 318",
+      "reason": "phrase"
+    },
+    {
+      "id": "nist-gcr-14-917-30:p68:c0:q2:closed_book:1#1",
+      "kind": "identifier",
+      "gold": "ACI 318-11",
+      "chosen": "ACI 318",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-nhi-23-024:p1217:c0:f0:closed_book:1#0",
+      "kind": "value",
+      "gold": "3 ft",
+      "chosen": "3 to 5 ft",
+      "reason": "two_candidates"
+    },
+    {
+      "id": "fema-p-1050-1:p486:c0:f4:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "C18.2.1.2",
+      "chosen": "C18.2.1",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1810:p92:c0:f1:closed_book:1#0",
+      "kind": "value",
+      "gold": "basinward-dipping",
+      "chosen": "basinward",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1100-app-a:p14:c0:f1:closed_book:2#0",
+      "kind": "value",
+      "gold": "1 inch",
+      "chosen": "1 3/8 inches",
+      "reason": "conflict"
+    },
+    {
+      "id": "fema-p-2082-1:p251:c0:f1:closed_book:1#0",
+      "kind": "value",
+      "gold": "1 to 3.3",
+      "chosen": "1.0 to 4.0",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-1415:p104:c0:q1:closed_book:1#1",
+      "kind": "value",
+      "gold": "largest value first",
+      "chosen": "largest values",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2208:p557:c0:f2:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 41-17 Section 3.4.1",
+      "chosen": "Section 3.4.1",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2107:p158:c0:f10:closed_book:2#1",
+      "kind": "term",
+      "gold": "hydraulic cylinder hoist system",
+      "chosen": "hydraulic cylinder hoist",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2901:p8:c0:f2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "General Design Memorandum",
+      "chosen": "Design Memorandum",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2901:p8:c0:f2:closed_book:1#1",
+      "kind": "identifier",
+      "gold": "General Design Memorandum",
+      "chosen": "design memorandum",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-nehrp-examples-v1:p248:c0:f1:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7-22 Section 12.10.4",
+      "chosen": "Section 12.10",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1100-app-a:p14:c0:f4:closed_book:2#1",
+      "kind": "identifier",
+      "gold": "Appendix A",
+      "chosen": "Appendix E",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-1026:p41:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7-22 Section 12.11.2",
+      "chosen": "Section 12.11.2",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p392:c0:f4:closed_book:2#0",
+      "kind": "value",
+      "gold": "low likelihood of collapse",
+      "chosen": "Collapse",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p392:c0:f4:closed_book:2#1",
+      "kind": "value",
+      "gold": "low likelihood of collapse",
+      "chosen": "Collapse",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-232:p211:c0:f1:closed_book:1#0",
+      "kind": "value",
+      "gold": "four No. 4 bars",
+      "chosen": "No. 4 bars",
+      "reason": "unit"
+    },
+    {
+      "id": "fhwa-nhi-15-047:p1055:c0:f3:closed_book:2#0",
+      "kind": "value",
+      "gold": "uniform stress field",
+      "chosen": "uniform stress",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2082-1:p506:c1:f0:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Section 17.8.2",
+      "chosen": "Section 17.8.2.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-nhi-23-024:p1217:c0:f11:closed_book:1#0",
+      "kind": "term",
+      "gold": "direct transmission method",
+      "chosen": "direct transmission",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-58-2:p69:c0:f3:closed_book:2#0",
+      "kind": "value",
+      "gold": "5 feet, 10 feet, 15 feet",
+      "chosen": "5 ft to 10 ft",
+      "reason": "two_candidates"
+    },
+    {
+      "id": "fhwa-nhi-15-047:p154:c1:f3:closed_book:1#0",
+      "kind": "value",
+      "gold": "full deck overhang width",
+      "chosen": "overhang width",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1613:p39:c0:f1:closed_book:2#0",
+      "kind": "value",
+      "gold": "0.2 to 0.7",
+      "chosen": "0.2 to 0.5",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-1613:p39:c0:f1:closed_book:2#1",
+      "kind": "value",
+      "gold": "0.2 to 0.7",
+      "chosen": "0.20 to 0.60",
+      "reason": "missing_number"
+    },
+    {
+      "id": "fema-p-749:p115:c0:f3:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7",
+      "chosen": "ASCE/SEI 7-05",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-1-1002:p13:c0:f0:closed_book:1#0",
+      "kind": "value",
+      "gold": "100 meters (328 feet)",
+      "chosen": "100 ft",
+      "reason": "unit"
+    },
+    {
+      "id": "fhwa-sbdh-ex2b:p19:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD 7th Edition, 2014",
+      "chosen": "7th Edition, 2014",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1611:p22:c0:f1:closed_book:2#0",
+      "kind": "value",
+      "gold": "15 days",
+      "chosen": "15 minutes",
+      "reason": "unit"
+    },
+    {
+      "id": "fema-p-2208:p557:c0:f0:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 41-17 Section 3.4.1",
+      "chosen": "Section 3.4.1",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p142:c0:f2:closed_book:2#0",
+      "kind": "value",
+      "gold": "bottom of the heat exchanger",
+      "chosen": "bottom",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p142:c0:f2:closed_book:2#1",
+      "kind": "value",
+      "gold": "bottom of the heat exchanger",
+      "chosen": "bottom",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-hif17019:p101:c0:q0:closed_book:1#1",
+      "kind": "value",
+      "gold": "beam seat",
+      "chosen": "seat",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2208:p557:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 41-17 Section 3.4.1",
+      "chosen": "Section 3.4.1",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-hif-18-046:p527:c0:f3:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD 4.7.4.3.1",
+      "chosen": "4.7.4.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2355:p34:c0:f2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Section 5.4",
+      "chosen": "Section 5",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3001:p21:c2:f1:closed_book:1#0",
+      "kind": "value",
+      "gold": "12 to 18 percent",
+      "chosen": "12 to 15 percent",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-1613:p39:c0:f1:closed_book:1#0",
+      "kind": "value",
+      "gold": "0.2 to 0.7",
+      "chosen": "0.2 to 0.6",
+      "reason": "missing_number"
+    },
+    {
+      "id": "fema-p-1026:p145:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "ASCE/SEI 7-22 Section 12.10.4.1",
+      "chosen": "Section 12.10.4",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-154:p117:c0:f1:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Level 1 Data Collection Form",
+      "chosen": "Data Collection Form",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3006-2024apr22:p224:c0:f3:closed_book:1#0",
+      "kind": "value",
+      "gold": "self-lubricating bronze sleeves",
+      "chosen": "bronze sleeves",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-1050-1:p362:c0:f0:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Section 13.2.2",
+      "chosen": "Section 13.2",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-hif-18-046:p527:c0:f2:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD 4.7.4.3",
+      "chosen": "4.7.4.3",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-hif15016:p46:c0:f1:closed_book:2#0",
+      "kind": "value",
+      "gold": "higher relative humidity",
+      "chosen": "humidity",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-nehrp-2000-commentary:p20:c0:f0:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "Part 2 Commentary",
+      "chosen": "Commentary",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-795:p41:c0:f2:closed_book:2#0",
+      "kind": "identifier",
+      "gold": "Section 2.3",
+      "chosen": "Section 2.3.5",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-1050-1:p486:c0:f4:closed_book:1#1",
+      "kind": "identifier",
+      "gold": "C18.2.1.2",
+      "chosen": "C18.2.1",
+      "reason": "phrase"
+    },
+    {
+      "id": "fema-p-2082-1:p507:c0:f3:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "Item 2(b)",
+      "chosen": "Item 2",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-sbdh-v19:p24:c0:q0:closed_book:1#0",
+      "kind": "value",
+      "gold": "820 to 900 °F",
+      "chosen": "820 to 860 °F",
+      "reason": "missing_number"
+    },
+    {
+      "id": "usace-em-1110-2-2107:p158:c0:f10:closed_book:1#1",
+      "kind": "term",
+      "gold": "hydraulic cylinder hoist system",
+      "chosen": "hydraulic cylinder hoist",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-2302:p48:c0:f3:closed_book:1#0",
+      "kind": "value",
+      "gold": "5 feet",
+      "chosen": "every 5 min.",
+      "reason": "unit"
+    },
+    {
+      "id": "usace-em-1110-2-2602:p57:c0:f1:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "ACI 224 R-80",
+      "chosen": "ACI 224",
+      "reason": "phrase"
+    },
+    {
+      "id": "fhwa-sbdh-ex2b:p19:c0:f0:closed_book:1#0",
+      "kind": "identifier",
+      "gold": "AASHTO LRFD 7th Edition, 2014",
+      "chosen": "7th Edition (2014)",
+      "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-3200:p235:c0:q0:closed_book:2#0",
+      "kind": "value",
+      "gold": "8 x 19",
+      "chosen": "class 8",
+      "reason": "missing_number"
+    }
+  ],
+  "chosen_wrong_total": 79,
+  "by_kind": {
+    "identifier": 39,
+    "value": 35,
+    "term": 5
+  }
+}

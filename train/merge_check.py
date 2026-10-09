@@ -185,9 +185,14 @@ def gate(diag: dict) -> dict:
         "val_loss_unmerged": diag["nll_unmerged_bf16"],
         "val_loss_merged": diag["nll_merged_bf16"],
         "val_loss_rel_diff": round(rel, 6),
+        # the same yardstick at every stage, in nats next to the relative line (2026-10-09)
+        "val_loss_abs_diff_nats": round(
+            abs(diag["nll_merged_bf16"] - diag["nll_unmerged_bf16"]), 6
+        ),
         "merged_vs_unmerged_top1": diag["merged_vs_unmerged_bf16"]["top1_agreement"],
         "rule": f"added flips <= {allowed} of {diag['positions']}, merged |dlp| <= "
-        f"{LP_RATIO_MAX}x unmerged's (both against fp32), val loss within {LOSS_TOL:.1%}",
+        f"{LP_RATIO_MAX}x unmerged's (both against fp32), sft_val loss within {LOSS_TOL:.1%} "
+        f"(|merged - unmerged| reported in nats)",
         "passed": added <= allowed and lp_ratio <= LP_RATIO_MAX and rel <= LOSS_TOL,
     }
 

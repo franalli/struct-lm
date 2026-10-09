@@ -125,6 +125,172 @@ def qa_correct(pred: str, gold: str, answer_type: str, tolerance: float = 0.02) 
     return exact_match(pred, gold)
 
 
+# The strict closed-book checker (2026-10-09), written when Stage 4's verifier (sft_judge.same_fact)
+# was about to become the GRPO reward: same_fact passed any piece of the gold ("Section" for
+# "Section 17.8.2") and judged multi-number golds on their first number ("class 8" for "8 x 19"),
+# and qa_correct above passes a range ("10 to 15 ft" for "10 ft"), a wrong unit ("800 ksi" for
+# "800 psi") and a gold buried in any first line. Rules, by the answer's kind:
+#   value (kind value/number, gold with a number): every gold number appears in the answer within
+#     tolerance, in a compatible unit (the same after UNITS spellings, or either side unitless), and
+#     no other answer number carries a gold number's unit (a conflicting value). Number words
+#     zero-twelve read as digits; "2-1/2" is 2 and 0.5.
+#   identifier with a number: designations normalised ("Article/Section/§" dropped, "C 1138" =
+#     "C1138", "FEMA P-361" = "FEMA 361", an ASTM metric companion "/A820M" dropped), then every
+#     gold word is in the answer and the answer's last numbered token is the gold's. A named
+#     document passes ("AASHTO LRFD Article 6.5.4.2" for "6.5.4.2"); a fragment ("Section" for
+#     "Section 17.8.2", "EM" for "EM 1110-2-2400"), a child or sibling section ("4.6.2.1.8" for
+#     "4.6.2.1") and a dropped part of the gold ("Article C4.6.2.6.1" for "AASHTO LRFD Article
+#     C4.6.2.6.1") fail. No alias lists exist (one gold string per item), so this is the rule-derived
+#     stand-in for "full match against the alias list".
+#   term (and any other gold without a number): one of the gold's forms (the gold, or without a
+#     trailing parenthetical: "polar moment of inertia (Jr)") is the answer, or a whole phrase in it
+#     with at most CONTEXT_WORDS more words ("Level III operations" for "Level III"); case,
+#     punctuation, hyphens, articles and plural s ignored. Never a piece of the gold: "Collapse"
+#     fails "low likelihood of collapse", "beam analogy" fails "flat-beam analogy".
+#   a value gold's trailing parenthetical is a conversion and may be left out ("100 mm" for
+#     "100 mm (4 in.)"); "8x19" = "8 x 19".
+#   an "N:1" ratio gold is the value N ("10" for "10:1", the 2026-10-04 eval audit's ruling).
+#   every kind: one candidate. "or", "and/or", "vs" or ";" the gold lacks, or (values) a range the
+#     gold lacks, fails ("two values on the answer line"; the GRPO reward's format gate).
+STRICT_KINDS = {
+    "value": "value",
+    "number": "value",
+    "identifier": "phrase",
+    "term": "phrase",
+    "other": "phrase",
+}
+# sft_judge.NUMBER_WORDS
+NUMBER_WORDS = {w: str(k) for k, w in enumerate(
+    ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+)}  # fmt: skip
+_QTY = re.compile(r"(?<![\w.,/])(-?\d[\d,]*(?:\.\d+)?)(?:/(\d+(?:\.\d+)?))?")
+_UNIT = re.compile(r"\s*-?\s*([A-Za-z]+|[%°′″'\"])")
+UNITS = {a: canon for canon, aliases in {
+    "ft": ("ft", "feet", "foot", "'", "′"), "in": ("in", "inch", "inches", '"', "″"),
+    "m": ("m", "meter", "meters", "metre", "metres"), "mm": ("mm", "millimeter", "millimeters"),
+    "cm": ("cm", "centimeter", "centimeters"), "km": ("km", "kilometer", "kilometers"),
+    "mi": ("mi", "mile", "miles"), "yd": ("yd", "yard", "yards"),
+    "lb": ("lb", "lbs", "lbf", "pound", "pounds"), "kip": ("kip", "kips"), "kn": ("kn",),
+    "kg": ("kg", "kilogram", "kilograms"), "psi": ("psi",), "ksi": ("ksi",), "psf": ("psf",),
+    "pcf": ("pcf",), "pa": ("pa", "pascal", "pascals"), "kpa": ("kpa",), "mpa": ("mpa",), "gpa": ("gpa",),
+    "%": ("%", "percent", "pct"), "s": ("s", "sec", "second", "seconds"),
+    "min": ("min", "minute", "minutes"), "h": ("h", "hr", "hrs", "hour", "hours"), "day": ("day", "days"),
+    "week": ("week", "weeks"), "month": ("month", "months"), "yr": ("yr", "yrs", "year", "years"),
+    "deg": ("deg", "degree", "degrees", "°"), "mph": ("mph",), "hz": ("hz", "hertz"),
+}.items() for a in aliases}  # fmt: skip
+_ALT = re.compile(r"\b(?:or|and/or|either|versus|vs)\b|;", re.IGNORECASE)
+# a range: a number, up to a unit's worth of text ("20% to 100%", "3” to 4”"), then to or a dash
+_RANGE = re.compile(r"\d[^\d;]{0,12}?(?:\bto\b|[-–—])\s*[\d.]")
+CONTEXT_WORDS = 3
+_LOCATOR = re.compile(r"(?:\b(?:articles?|sections?)\b|§+)", re.IGNORECASE)
+
+
+def _digits(t: str) -> str:
+    words = "|".join(NUMBER_WORDS)
+    return re.sub(rf"\b({words})\b", lambda m: NUMBER_WORDS[m[1].lower()], t, flags=re.IGNORECASE)
+
+
+def quantities(text: str) -> list[tuple[float, str | None]]:
+    """Every number in text with the unit written right after it (canonical UNITS name or None)."""
+    out, d = [], re.sub(r"(\d)\s*[x×]\s*(?=\d)", r"\1 x ", _digits(text))
+    for m in _QTY.finditer(d):
+        try:
+            v = float(m[1].replace(",", ""))
+            if m[2]:
+                v /= float(m[2])
+        except (ValueError, ZeroDivisionError):
+            continue
+        u = _UNIT.match(d, m.end())
+        out.append((v, UNITS.get(u[1].lower()) if u else None))
+    return out
+
+
+def _close(a: float, g: float, tol: float) -> bool:
+    return abs(a) < 1e-9 if g == 0 else abs(a - g) / abs(g) <= tol + 1e-12
+
+
+def _norm_id(text: str) -> str:
+    t = _LOCATOR.sub(" ", text.replace("’", "'").replace("‘", "'"))
+    t = re.sub(r"/\s*[A-Za-z]?\d+M\b", "", t)  # ASTM's metric companion: "A820/A820M"
+    t = re.sub(r"\b([A-Za-z]) (?=\d)", r"\1", t)  # "C 1138" = "C1138" (before normalize drops "a")
+    t = re.sub(
+        r"(?<=[A-Za-z] )([A-Z])\b(?![-'’\d])", r"\1_", t
+    )  # "Appendix A": a designation, not an article
+    t = normalize(t)
+    t = re.sub(r"\bfema p ?(?=\d)", "fema ", t)  # "FEMA P-361" = "FEMA 361"
+    return re.sub(r"(?<=[a-z]{3})s\b", "", t).rstrip(". ")
+
+
+def _forms(text: str) -> set[str]:
+    return {f for t in (text, re.sub(r"\s*\([^()]*\)\s*$", "", text)) if (f := _norm_id(t))}
+
+
+def _term_ok(line: str, gold: str) -> bool:
+    a = _forms(line)
+    for g in _forms(gold):
+        if g in a or any(
+            re.search(rf"(?<!\w){re.escape(g)}(?!\w)", f)
+            and len(f.split()) <= len(g.split()) + CONTEXT_WORDS
+            for f in a
+        ):
+            return True
+    return False
+
+
+def _identifier_ok(line: str, gold: str) -> bool:
+    a, g = _norm_id(line).split(), _norm_id(gold).split()
+    numbered = lambda ws: [w for w in ws if re.search(r"\d", w)]
+    return set(g) <= set(a) and bool(numbered(a)) and numbered(a)[-1] == numbered(g)[-1]
+
+
+def one_candidate(line: str, gold: str, kind: str) -> bool:
+    if _ALT.search(line) and not _ALT.search(gold):
+        return False
+    rng = lambda t: _RANGE.search(_digits(t))
+    return not (STRICT_KINDS.get(kind) == "value" and rng(line) and not rng(gold))
+
+
+def qa_strict_reason(pred: str, gold: str, kind: str, tolerance: float = 0.02) -> str | None:
+    """None if the answer (first line of pred) is right under the strict rules, else why not:
+    two_candidates, missing_number, unit, conflict or phrase."""
+    line = first_line(pred)
+    if not line:
+        return "phrase"
+    if not one_candidate(line, gold, kind):
+        return "two_candidates"
+    ratio = _RATIO_TO_ONE.match(gold)
+    if ratio:
+        gold, line = ratio[1], re.sub(r"\s*:\s*1\b", "", line)
+    gq = quantities(gold) if STRICT_KINDS.get(kind, "phrase") == "value" or ratio else []
+    if not gq:
+        if kind == "identifier" and re.search(r"\d", gold):
+            return None if _identifier_ok(line, gold) else "phrase"
+        return None if _term_ok(line, gold) else "phrase"
+    bare = re.sub(r"\s*\([^()]*\)\s*$", "", gold)
+    if bare != gold and quantities(bare) and _values(line, quantities(bare), tolerance) is None:
+        return None
+    return _values(line, gq, tolerance)
+
+
+def _values(line: str, gq: list, tolerance: float) -> str | None:
+    aq, used = quantities(line), set()
+    compat = lambda u, w: u is None or w is None or u == w
+    for gv, gu in gq:
+        hit = next((i for i, (av, au) in enumerate(aq)
+                    if i not in used and _close(av, gv, tolerance) and compat(au, gu)), None)  # fmt: skip
+        if hit is None:
+            return "unit" if any(_close(av, gv, tolerance) for av, _ in aq) else "missing_number"
+        used.add(hit)
+    gunits = {gu for _, gu in gq}
+    if any(i not in used and au in gunits for i, (_, au) in enumerate(aq)):
+        return "conflict"
+    return None
+
+
+def qa_strict(pred: str, gold: str, kind: str, tolerance: float = 0.02) -> bool:
+    return qa_strict_reason(pred, gold, kind, tolerance) is None
+
+
 # A bracketed span with no nested brackets: "[fhwa-nhi-15-047:p12:c0]". Non-greedy, so
 # "[a] and [b]" gives two citations, not one.
 _CITE = re.compile(r"\[([^\[\]]+?)\]")

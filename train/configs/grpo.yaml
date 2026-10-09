@@ -1,41 +1,89 @@
+# Stage 5 GRPO: LoRA on stage4-final with the rule-based reward (train/grpo_rewards.py), from the
+# probe's in-window tasks (data/grpo/, hash in notes/decisions.md). Rules and reasons:
+# notes/decisions.md (Stage 5 pre-registration). Relative paths resolve against the repo root
+# locally and /vol on Modal.
+#   grpo         this file as is
+#   grpo-seed1   --overrides "training.seed=1 training.data_seed=1"
+stage: grpo  # modal_train.py dispatches on it (train/grpo.py)
+
 model:
-  init_from: checkpoints/dpo  # stage4-final: dpo (seed 0), merged, sha256 bf9a01c7 (notes/decisions.md, 2026-10-08)
+  # stage4-final: dpo-strict (seed 0, strict labels), merged; sha256 in notes/decisions.md. No
+  # reference model: beta 0 (rule 11's reference would be this checkpoint, adapter disabled)
+  init_from: checkpoints/dpo-strict
   dtype: bfloat16
+  attn_implementation: sdpa
 
 lora:
-  r: 16
-  lora_alpha: 32
+  r: 64
+  lora_alpha: 128
   lora_dropout: 0.0
-  target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
+  bias: none
   # text layers only; bare names / all-linear would also hit the vision tower
+  target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)'
 
 data:
+  dir: data/grpo  # SHA256SUMS: the run refuses any other files
   train: data/grpo/train.jsonl
+  val: data/grpo/val.jsonl  # grpo_val: pass@1 / pass@8, the checkpoint rule's input
 
-rewards:
-  functions: [format_reward, correctness_reward, length_penalty]
-  weights: [0.2, 1.0, 0.1]
+run:
+  results_dir: results
 
 training:
-  output_dir: checkpoints/grpo
-  num_train_epochs: 1
-  per_device_train_batch_size: 8
-  gradient_accumulation_steps: 4
-  num_generations: 8             # group size; advantages are relative within a group
-  # no max_prompt_length: TRL 0.29 removed it (DPO bounds prompt + completion with max_length,
-  # GRPO the completion with max_completion_length); keep prompts short in the data
-  max_completion_length: 1024
+  output_dir: checkpoints/_train/grpo  # modal_train.py sets checkpoints/_train/<run>
+  run_name: grpo
+  # rollouts: 16 tasks x 8 completions = 128 per optimizer step, generated once per step
+  # (steps_per_generation = gradient_accumulation_steps) and used once (num_iterations 1: on-policy)
+  num_generations: 8
+  per_device_train_batch_size: 8   # completions per micro-batch (1 task's group)
+  gradient_accumulation_steps: 16
+  num_iterations: 1
+  max_steps: 150                   # ~5 passes over ~450 tasks (RLHF Book ch. 7: many epochs, small set)
   temperature: 1.0
-  learning_rate: 1.0e-6
-  beta: 0.0                      # no KL term (DAPO / Dr. GRPO practice); raise if it drifts
+  top_p: 1.0
+  max_completion_length: 256
+  # loss: DAPO token-level normalisation, advantages scaled by the batch std (Dr. GRPO / Magistral),
+  # clip-higher, no KL, truncated completions out of the loss
+  loss_type: dapo
+  scale_rewards: batch
+  epsilon: 0.2
+  epsilon_high: 0.28
+  beta: 0.0
+  mask_truncated_completions: true
+  # vLLM colocated on the training GPU, no sleep mode (train/grpo.py: TRL reloads weights from disk
+  # on wake); 3,072 tokens covers the longest prompt (2,202) plus 256
   use_vllm: true
   vllm_mode: colocate
+  vllm_gpu_memory_utilization: 0.35
+  vllm_max_model_length: 3072
+  vllm_importance_sampling_correction: true
+  vllm_importance_sampling_mode: token_truncate   # classic TIS
+  vllm_importance_sampling_cap: 3.0
+  # optimiser: constant LR after warmup (RL runs are not decayed)
+  learning_rate: 1.0e-5
+  lr_scheduler_type: constant_with_warmup
+  warmup_steps: 10
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  weight_decay: 0.0
+  max_grad_norm: 1.0
   bf16: true
   tf32: true  # fp32 matmuls on TF32 tensor cores (decisions.md, numeric precision)
   gradient_checkpointing: true
-  logging_steps: 5
+  gradient_checkpointing_kwargs: {use_reentrant: false}
+  disable_dropout: true
+  # grpo_val every 25 steps and at step 0, 8 samples per task (10 tasks per eval batch); a save at
+  # every evaluation (the checkpoint rule picks among them); every step logged
+  eval_strategy: steps
+  eval_steps: 25
+  eval_on_start: true
+  num_generations_eval: 8
+  per_device_eval_batch_size: 80
+  save_strategy: steps
+  save_steps: 25
+  logging_steps: 1
   log_completions: true
-  save_steps: 200
-  report_to: wandb
-  run_name: grpo
-  seed: 42
+  num_completions_to_print: 8
+  report_to: none
+  seed: 0
+  data_seed: 0

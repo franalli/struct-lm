@@ -1,0 +1,101 @@
+{
+  "source": "data/dpo/prompts.jsonl minus the judge split; closed_book, grounded, abstain",
+  "tasks": 1619,
+  "by_format": {
+    "grounded": 359,
+    "closed_book": 1084,
+    "abstain": 176
+  },
+  "by_closed_book_kind": {
+    "value": 639,
+    "identifier": 400,
+    "term": 45
+  },
+  "closed_book_facts": 623,
+  "sha256": "5037b804342ce7047c303379b8bb721d691b10fff5f2255bb9d06576dbe6264c",
+  "probe": {
+    "run": "dpo-strict",
+    "samples_per_task": 8,
+    "window": "1 to 7 of 8 correct",
+    "sample_accuracy": {
+      "grounded": 0.9321,
+      "closed_book": 0.2924,
+      "abstain": 0.9688
+    },
+    "histogram": {
+      "abstain": {
+        "1": 2,
+        "2": 1,
+        "6": 4,
+        "7": 16,
+        "8": 153
+      },
+      "closed_book:identifier": {
+        "0": 231,
+        "1": 37,
+        "2": 27,
+        "3": 19,
+        "4": 13,
+        "5": 17,
+        "6": 20,
+        "7": 18,
+        "8": 18
+      },
+      "closed_book:term": {
+        "0": 5,
+        "1": 8,
+        "2": 4,
+        "3": 1,
+        "4": 1,
+        "6": 4,
+        "7": 13,
+        "8": 9
+      },
+      "closed_book:value": {
+        "0": 230,
+        "1": 98,
+        "2": 59,
+        "3": 43,
+        "4": 41,
+        "5": 28,
+        "6": 41,
+        "7": 36,
+        "8": 63
+      },
+      "grounded": {
+        "0": 2,
+        "3": 1,
+        "4": 3,
+        "5": 8,
+        "6": 29,
+        "7": 80,
+        "8": 236
+      }
+    },
+    "in_window": {
+      "closed_book:value": 346,
+      "closed_book:identifier": 151,
+      "closed_book:term": 31,
+      "abstain": 23,
+      "grounded": 121
+    },
+    "in_window_total": 672,
+    "train": {
+      "closed_book:value": 320,
+      "closed_book:identifier": 140,
+      "closed_book:term": 29,
+      "abstain": 21,
+      "grounded": 112
+    },
+    "val": {
+      "closed_book:value": 26,
+      "grounded": 9,
+      "closed_book:identifier": 11,
+      "closed_book:term": 2,
+      "abstain": 2
+    },
+    "train_total": 622,
+    "val_total": 50,
+    "dataset_hash": "4db8f7a6ab678a52387df08102d2082c858842795d1d644e5702eef689ee2830"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "run": "smoke-grpo",
+  "rule": "best grpo_val pass@1 among saves <= the stop; within 1 SE of the best = tie -> earliest",
+  "steps": 3,
+  "stop": null,
+  "best_step": 3,
+  "best_val_pass@1": 0.8,
+  "best_se": 0.0935,
+  "picked_step": 3,
+  "picked_val_pass@1": 0.8,
+  "checkpoint": "checkpoint-3"
+}
