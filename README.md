@@ -1002,6 +1002,15 @@ targets and are marked as such.
 | stops before the cap; latency (B5/B6 checks, not B7) | 100%; 159 ms vs 1,753 ms | pass |
 | hallucination against Instruct (not a target: B7 listed Instruct's 0.013 as a reference, and its abstain target is above) | 4 of 76 vs 1 of 76 | worse, inside the run-to-run spread (the seed twin has 1 of 76) |
 
+**The guard that fails under the strict checker is a second line of evidence for what CPT bought.**
+- **The base arm hedged:** SFT from the base lost 3 to 4 points of unseen strict accuracy, and its
+  lenient-only passes were hedges, ranges and fractions where the gold was one number.
+- **The CPT arm did not.**
+- **That is Gekhman et al. (2024) in miniature:** SFT on facts the model doesn't hold teaches it to
+  hedge or invent, and the CPT arm held them. It sits beside unseen `gold_lp` (+0.41 nats on the
+  answer tokens) as evidence for CPT.
+- **Caveat:** one seed pair per arm (1 df).
+
 **What SFT did, and what it didn't.** SFT did its job, behaviour and the facts it was shown, and
 it did not erase CPT's knowledge. It did not generalise to unseen facts, which was never a
 target.
@@ -2000,12 +2009,13 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
     facts that were in the training set.
   - The unseen half moved inside the noise.
 
-  | closed-book, strict checker | seen half (167) | unseen half (155) |
-  |---|---|---|
-  | instruct-8b | 11.4% | 7.7% |
-  | sft-from-cpt | 28.7% | 11.6% |
+  | closed-book, strict checker | seen half (167) | unseen half (155) | identifiers (64) |
+  |---|---|---|---|
+  | instruct-8b | 11.4% | 7.7% | 3.1% |
+  | sft-from-cpt | 28.7% | 11.6% | 20.3% |
 
-  (Lenient, as first reported: 11.4% / 8.4% and 28.1% / 13.5%. No ordering changes.)
+  (Lenient, as first reported: 11.4% / 8.4% / 3.1% and 28.1% / 13.5% / 20.3%; identifiers don't
+  change under the strict rule. No ordering changes.)
 - **Attribution:** SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
   knowledge. It did not generalise to unseen facts, which was never a target; only more varied CPT
   exposure acts on those.
@@ -2071,6 +2081,20 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
     a small calibration cost (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 /
     1.32).
   - Stage 6 serves `dpo-strict`, the SFT model within noise.
+
+**What the whole chain shows: knowledge went in once, at CPT.** Every number in this paragraph is
+on the gold answer's tokens alone (the end token excluded), unseen half, with item-bootstrap 95%
+CIs.
+- **CPT is the only stage that raised the probability of unseen gold answers:**
+  - +0.66 nats in Stage 2 (`cpt-8b-replay10`, the chain's CPT, [+0.45, +0.90]; +0.56 over all
+    items for `cpt-8b`);
+  - +0.41 [+0.23, +0.60] across the Stage 3 arms, CPT's knowledge surviving SFT.
+- **Every stage after it that can be measured lowered them:**
+  - DPO by 0.38 [0.27, 0.50];
+  - GRPO by 1.32 [1.08, 1.58].
+  - SFT's own change can't be read, since it moves the model from base format to chat format.
+- **The trade:** each later stage bought behaviour with a little of the knowledge, and the sharper
+  the optimiser, the larger the trade.
 
 ### 5. Serving
 

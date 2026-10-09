@@ -4387,3 +4387,23 @@ headline change was decomposed, each with an item-bootstrap 95% CI.
 
 **From here on:** every gold_lp row in the generated tables shows both parts (`report.LP_PART`: `lp`,
 `lp_ans`, `lp_end`), with floors computed on each part. The README's metric definition gives both.
+
+## 2026-10-09: Three additions to the write-up (user review)
+
+1. **Stage 3, beside the guard table:**
+   - The base arm's failure under the strict checker is a second line of evidence for what CPT
+     bought: SFT from the base hedged on unseen facts (ranges, fractions), and SFT from CPT did not.
+   - That is Gekhman et al. (2024) in miniature: SFT on facts the model doesn't hold teaches it to
+     hedge or invent.
+   - Caveat: one seed pair per arm (1 df).
+2. **Results summary, under the chain sentence: "knowledge went in once, at CPT".** On the answer
+   tokens, unseen half:
+   - CPT is the only stage that raised the gold answers' probability:
+     - +0.66 nats in Stage 2 for cpt-8b-replay10, the chain's CPT. The user's +0.56 is the
+       all-items figure for cpt-8b; both are given;
+     - +0.41 across the Stage 3 arms.
+   - DPO lowered it by 0.38 and GRPO by 1.32.
+   - SFT's own change can't be read across the base-to-chat format change, and the paragraph says
+     so rather than implying it lowered anything.
+3. **The summary's strict-checker table gains the identifiers column** (3.1% against 20.3%;
+   identifiers don't change under the strict rule).
