@@ -1274,20 +1274,22 @@ DPO_ROWS = [  # the amended read (2026-10-08): primary verifier lines, then the 
 
 
 def dpo_delta_table() -> str:
-    """Each DPO run against the start, the mean change of the two seeds, and the noise:
-    max(the DPO seed gap, the start's SE: binomial on its items, lm-eval's stderr, or for gold_lp
-    the paired per-item SE of the twins). gold_lp also gets the item-bootstrap 95% CI of the
-    two-seed mean minus the start. Beyond the noise: |change| > noise (and, for gold_lp, the CI
-    excludes 0). One seed pair: the noise has 1 df."""
+    """Each DPO run against the start and the mean change of the two seeds, read two ways:
+    - as written (pre-registered): noise = max(the DPO seed gap, the start's SE);
+    - the Stage 3 way (2026-10-09 review): the floor also takes the start's own seed gap
+      (sft-from-cpt vs sft-from-cpt-seed1), since the start is one run of a noisy stage.
+    gold_lp gets the item-bootstrap 95% CI of the two-seed mean minus the start; beyond needs
+    |change| > floor (and, for gold_lp, the CI excluding 0). One seed pair each: 1 df."""
     m = {}
-    for r in (DPO_START, *DPO_PAIR):
+    for r in (DPO_START, *DPO_PAIR, *SFT_SEED_PAIR):
         f = RUNS / r / "metrics.json"
         if f.exists():
             m[r] = json.loads(f.read_text())
-    if not all(r in m for r in (DPO_START, *DPO_PAIR)):
+    if not all(r in m for r in (DPO_START, *DPO_PAIR, *SFT_SEED_PAIR)):
         return ""
     sizes = half_sizes()
-    head = ["metric", "read", DPO_START, *DPO_PAIR, "change (mean of 2)", "noise", "beyond noise"]
+    head = ["metric", "read", DPO_START, *DPO_PAIR, "change (mean of 2)", "noise as written",
+            "beyond (as written)", "floor with the start's seed gap", "beyond (Stage 3 way)"]  # fmt: skip
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for label, key, kind, extra, role in DPO_ROWS:
         vals = [m[r].get(key) for r in (DPO_START, *DPO_PAIR)]
@@ -1296,23 +1298,24 @@ def dpo_delta_table() -> str:
         start, a, b = vals
         scale = 1 if kind == "lp" else 100
         change = ((a + b) / 2 - start) * scale
+        n_start = noise(m, SFT_SEED_PAIR, key, kind, extra, sizes) or 0
         if kind == "lp":
             n = max(abs(a - b), paired_lp(DPO_PAIR[1], DPO_PAIR[0], extra).get("se", 0))
             ci = bootstrap_diff(item_lp(DPO_START, extra), mean_lp(list(DPO_PAIR), extra))["ci"]
-            beyond = abs(change) > n and (ci[0] > 0 or ci[1] < 0)
-            note = f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]"
-            unit = "{:.3f}"
+            excl = ci[0] > 0 or ci[1] < 0
+            note, unit = f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]", "{:.3f}"
         else:
             if kind == "lm":
                 n = max(abs(a - b) * 100, lm_se(DPO_START, *extra))
             else:
                 k = sizes.get(extra) or m[DPO_START]["n"].get(extra, 0)
                 n = max(abs(a - b) * 100, math.sqrt(start * (1 - start) / k) * 100 if k else 0)
-            beyond = abs(change) > n
-            note = f"{change:+.1f} pt"
-            unit = "{:.1f} pt"
+            excl = True
+            note, unit = f"{change:+.1f} pt", "{:.1f} pt"
+        floor = max(n, n_start)
         cells = [label, role, *(f"{v:.3f}" for v in vals), note, unit.format(n),
-                 "yes" if beyond else "no"]  # fmt: skip
+                 "yes" if abs(change) > n and excl else "no", unit.format(floor),
+                 "yes" if abs(change) > floor and excl else "no"]  # fmt: skip
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
@@ -1469,8 +1472,10 @@ def stage4_md(runs: dict, usd: float) -> str:
         md += (
             f"\n## The read: change against {DPO_START}, next to the noise\n\n" + dt + "\n\n"
             "Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must "
-            "stay within the noise; judge-scored rows are reported, not read. Noise is max(the DPO "
-            "seed gap, the start's SE), one seed pair (1 df).\n"
+            "stay within the noise; judge-scored rows are reported, not read. As written: max(the DPO "
+            "seed gap, the start's SE). The Stage 3 way also takes the start's own seed gap "
+            f"({SFT_SEED_PAIR[0]} vs {SFT_SEED_PAIR[1]}): the start is one run. One seed pair each "
+            "(1 df). The verdict uses the Stage 3 way.\n"
         )
     if mt := dpo_more_table():
         md += (

@@ -3672,3 +3672,60 @@ dpo's SE)):
     DPO loss alone.
 
 No rerun: dpo-2ep is an ablation, the scope was fixed, and `stage4-final` stays `dpo`.
+
+## 2026-10-09: Stage 4 read restated (user review): one epoch indistinguishable from the start; the displacement curve and the judge are the findings
+**The floor, done the Stage 3 way.** The registered noise was max(DPO seed gap, start's SE). The
+start is one run, and its own seed gap is known: sft-from-cpt against sft-from-cpt-seed1 is 3.9
+points on hallucination (4 vs 1 of 76) and 0.258 nats on unseen `gold_lp`. With that in the floor:
+- hallucination −3.3 pt against 3.9: inside (as written, 2.6: beyond at 1.3×);
+- unseen `gold_lp` −0.21 nats against 0.258: inside (as written, 0.187: beyond at 1.1×);
+- every other primary line is inside either way.
+
+The report table shows both readings (`train/report.py dpo_delta_table`), and **the verdict uses
+the Stage 3 way.** This supersedes the "beyond the noise" verdicts in the 2026-10-08 read entry
+above, which stays as the rule-as-written record.
+
+**The first sentence of the stage:** one epoch of DPO on 484 verifier pairs is indistinguishable
+from its SFT start on every pre-registered line; two epochs fit the pairs and displaced.
+- 58 of 100 greedy answers are byte-identical to SFT's, and 82 of 100 judge comparisons are ties.
+- **The hallucination gain carries no headline:** it rests on 6 abstain pairs, and the SFT twin
+  already sits at 1 of 76.
+
+**The finding is the displacement curve** (the RLHF Book's ch. 8 preference displacement,
+measured end to end on a verifier-labelled set with no judge noise to blame):
+- **At 31 steps the policy barely moved:** val margin 0.06, `rewards/chosen` near 0.
+- **At 62 steps it fit the pairs:** train accuracy 0.95, val flat at 0.68.
+  - the chosen answers lost 2.3 nats;
+  - gold answers lost 3.0 (seen) and 4.3 (unseen) nats;
+  - seen qa_acc fell 4.8 points.
+- **Why:** with 484 near-duplicate pairs, the usable window between no effect and displacement is
+  too narrow to land in. Closed-book chosen and rejected are a median 5-token answer differing in
+  a median 3 tokens, the value.
+- **Next steps, in this order:**
+  1. the NLL anchor on chosen (RPO: `rpo_alpha` in the literature, ch. 15;
+     `loss_type: [sigmoid, sft]` in TRL 0.29.1);
+  2. pairs at a scale where one epoch is many steps.
+
+**The checkpoint rule picked wrong, and that is a lesson.** It read the DPO loss, which kept
+falling while val accuracy sat at 0.68 and `rewards/chosen` went negative. For DPO the selector
+should be `rewards/chosen` ≥ 0 or val accuracy, never the loss. This is the first item of the
+README's "what I would do differently".
+
+**The judge section is the other real result,** and every number is kept:
+- recall 0.28 / 0.09 against the full-passage reads;
+- ~0.5 points of position bias across four list slots;
+- self-preference: the student scored 0.8-2.1 points under Large 3's own answers;
+- the pairwise judge agreeing with itself across orders on 43-54% of prompts, a coin.
+
+It is the strongest evidence in the repo for why the chain ends with verifiers only.
+
+**Two small corrections:**
+- **Serving:** sft-from-cpt's 297 tok/s at 8 concurrent requests was the single-sample outlier
+  flagged in Stage 3. `dpo`, which is SFT within noise, measures 496, which confirms it. It is not
+  a DPO gain.
+- **Composition sits next to the pair count:** 458 of the 506 pairs are closed-book, so this was
+  DPO on seen facts, and seen qa_acc didn't move beyond the noise even there.
+
+**The chain:** `stage4-final = dpo`, as registered. It is the SFT checkpoint within noise, so
+GRPO starts from a policy that is effectively the SFT checkpoint. Stage 5 becomes the clean
+comparison: the same verifier reward, offline pairs against on-policy groups.
