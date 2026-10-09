@@ -107,6 +107,7 @@ def main() -> None:
     ap.add_argument("--tokenizer-mode", default="mistral")
     ap.add_argument("--config-format", default="hf", choices=("hf", "auto"))
     ap.add_argument("--max-model-len", type=int, default=8192)
+    ap.add_argument("--kv-cache-dtype", default="auto", choices=("auto", "fp8"))
     args = ap.parse_args()
     jobs = [j for j in args.jobs.split(",") if j]
     if unknown := set(jobs) - set(JOBS):
@@ -120,6 +121,7 @@ def main() -> None:
         args.max_model_len,
         args.tokenizer_mode,
         args.config_format,
+        args.kv_cache_dtype,
         **(POOL_ENGINE if pool_sized else {}),
     )
     out_dir = pathlib.Path(args.results_dir) / "runs" / args.run_name / "samples"

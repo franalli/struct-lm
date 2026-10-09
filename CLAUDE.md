@@ -266,6 +266,47 @@ $M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/<row> 
 - **Rollouts:** `results/runs/<run>/rollouts.jsonl`, one row per completion; its `format` field is
   the gate's verdict, the task's format is in `data/grpo/tasks.jsonl`.
 
+### Stage 6: serving (quantize, gate and bench on Modal; bench sets, scoring and report on the Mac)
+
+Pre-registration (gate lines and floors, served-path checks, bench rules) and the corrections to the
+pasted plan: `notes/decisions.md` (2026-10-09, Stage 6). Deployment reference: `DEPLOY.md`. Served:
+`checkpoints/dpo-strict` (stage5-final) as bf16, `-fp8` (FP8_DYNAMIC), `-fp8` + `--kv-cache-dtype fp8`
+(fp8kv) and `-w4a16` (GPTQ, group 128). Stage6-final is `dpo-strict` served by load: bf16 up to the
+measured 16 req/s, FP8 near saturation or when the KV cache binds; fp8kv and w4a16 failed the gate.
+Not run (Modal spend limit, 2026-10-09): the fp8kv / w4a16 / n-gram bench rows and fp8kv's GSM8K.
+
+```bash
+.venv/bin/python serve/bench_data.py      # serve/bench/*.jsonl (gitignored) + serve/bench_manifest.json (committed)
+$M run serve/modal_serve.py --action quantize --scheme fp8                 # -> /vol/checkpoints/dpo-strict-fp8, ~10 min
+$M run --detach serve/modal_serve.py --action quantize --scheme w4a16      # GPTQ on 512 SFT records, ~45 min
+$M run serve/modal_serve.py --action gate --variant bf16                   # vllm_ppl, BOS probe, GSM8K (BOS) rerun
+$M run --detach serve/modal_serve.py --action gate --variant fp8           # kpi, eos, ppl, gsm8k; also fp8kv, w4a16
+$M run serve/modal_serve.py --action bench --variants bf16 --check-only    # template ids, 20-prompt smoke, 24-request bench
+$M run --detach serve/modal_serve.py --action bench --variants bf16,fp8,fp8kv,w4a16 --spec   # one H100!, ~3 h
+# pull: bench, gate GSM8K, served checks; the variants' generations; perplexities; quantized configs
+$M volume get --force struct-lm results/serve results/
+for r in dpo-strict-fp8 dpo-strict-fp8kv dpo-strict-w4a16; do $M volume get --force struct-lm results/runs/$r results/runs/; done
+$M volume get --force struct-lm results/vllm_ppl results/
+for v in fp8 w4a16; do for f in config.json quantize_meta.json; do
+  $M volume get --force struct-lm checkpoints/dpo-strict-$v/$f results/serve/quantize/$v/; done; done
+set -a; . ./.env; set +a
+.venv/bin/python eval/run_eval.py --run-name dpo-strict-fp8 --rescore --chat --model /vol/checkpoints/dpo-strict-fp8
+.venv/bin/python eval/qa_strict.py && .venv/bin/python -m pytest tests/test_serve.py tests/test_template.py
+.venv/bin/python train/report.py          # the Stage 6 tables, serve_latency.png, serve_load.png, README blocks
+```
+
+- **The bench runs on `gpu="H100!"`** (a plain "H100" may run on an H200) and aborts on any other
+  device; every result records GPU, driver, CUDA, vLLM and torch. All variants share one container.
+- **Gate GSM8K goes to `results/serve/gate/lm_eval/`**, never `results/lm_eval/`: it runs with
+  `add_bos_token=True` through `eval/gsm8k_gate.py` (lm-eval's CLI can't pass it under
+  `tokenizer_mode=mistral`), and the table's rows keep the frozen flags, which send no BOS.
+- **`VLLM_SERVER_DEV_MODE=1` is the bench container's only** (it exposes `/reset_prefix_cache`);
+  `DEPLOY.md`'s commands never set it. `vllm bench serve` always runs with `--skip-chat-template`
+  (the server templates; client-side templating would send `[INST]` as text) and `--no-oversample`.
+- **Quantized checkpoints come from `serve/quantize.py` only:** the full Mistral3 class, `lm_head` /
+  tower / projector ignored, merge.py's post-save steps (YaRN key, tokenizer files, untied lm_head).
+  Its image pins llmcompressor 0.14.0 (compressed-tensors 0.19); vLLM 0.29 reads the result with 0.17.
+
 ## Decisions (rules to keep)
 
 1. **Copyright:** only public-domain US federal documents. ASCE 7, the AISC manual and the 2025
@@ -366,6 +407,6 @@ $M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/<row> 
   Stage 3.
 - PEFT's merge/unmerge for each GRPO weight sync edits the bf16 base in place (one ulp,
   `base_drift_max` in the summary); the merged checkpoint uses the untouched base from disk.
-- Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is unverified: check
-  modal.com/pricing before quoting dollars.
+- Modal's H100 price in `train/report.py` (`--usd-per-gpu-hour`, default 3.95) is the H100 SXM5 list
+  price ($0.001097/s), checked 2026-10-09: recheck modal.com/pricing before quoting new dollars.
 - `results/lm_eval/_invalid/` holds an excluded chat-template lm-eval run (see its README).

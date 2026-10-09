@@ -41,8 +41,9 @@ serve = [
     "vllm>=0.29",
     "openai>=1.60",
 ]
-# AWQ (serve/quantize.sh). llmcompressor pins compressed-tensors versions that vLLM 0.29
-# rejects, so it lives in its own env: `uv sync --extra quantize`, then serve from `--extra serve`.
+# Stage 6's FP8 / GPTQ W4A16 checkpoints (serve/quantize.py; run on Modal by serve/modal_serve.py,
+# whose image pins llmcompressor 0.14.0). llmcompressor pins compressed-tensors 0.19, vLLM 0.29 pins
+# 0.17, so it lives in its own env: `uv sync --extra quantize`, then serve from `--extra serve`.
 quantize = ["llmcompressor>=0.14"]
 dev = [
     "ruff>=0.9",

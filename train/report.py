@@ -1231,7 +1231,7 @@ def stage3_md(runs: dict, usd: float) -> str:
         "\n\nB4 (pre-registered, amended before training): epoch 2 unless the closed-book or the "
         "definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss "
         "is 83% replay tokens, so it is shown, not used. $ at "
-        f"{usd} per GPU-hour (assumed).\n"
+        f"{usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if deltas := sft_delta_table():
         md += (
@@ -1551,7 +1551,7 @@ def stage4_md(runs: dict, usd: float) -> str:
     md += (
         "\n\nThe checkpoint rule (pre-registered): the final step unless the dpo_val loss at the "
         "end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). "
-        f"dpo_val values at the last evaluation. $ at {usd} per GPU-hour (assumed).\n"
+        f"dpo_val values at the last evaluation. $ at {usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if dt := dpo_delta_table():
         md += (
@@ -1923,7 +1923,7 @@ def stage5_md(runs: dict, usd: float) -> str:
     md += (
         "\n\nThe checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or "
         "before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 "
-        f"samples at T 1.0. $ at {usd} per GPU-hour (assumed).\n"
+        f"samples at T 1.0. $ at {usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if dt := grpo_delta_table():
         md += (
@@ -1961,6 +1961,409 @@ def stage5_md(runs: dict, usd: float) -> str:
     return md
 
 
+# ------------------------------------------------------------------------------------- Stage 6 ---
+SERVE = Path("results/serve")
+S6_RUN = {  # variant -> the run its gate generations are filed under (serve/modal_serve.GATE_RUN)
+    "bf16": "dpo-strict",
+    "fp8": "dpo-strict-fp8",
+    "fp8kv": "dpo-strict-fp8kv",
+    "w4a16": "dpo-strict-w4a16",
+}
+S6_LABEL = {"bf16": "bf16", "fp8": "FP8", "fp8kv": "FP8 + FP8 KV", "w4a16": "INT4 W4A16"}
+S6_COLORS = {"bf16": INK, "fp8": "#2a78d6", "fp8kv": "#8a5cd6", "w4a16": "#d6772a"}
+# Pre-registered (notes/decisions.md, 2026-10-09, Stage 6): a variant ships if every line's
+# |variant - bf16| is within the Stage 3 floor (report.noise on the sft-from-cpt pair)
+S6_GATE = [  # (label, key, "rate" in points or "lp" in nats, floor)
+    ("qa_strict unseen", "qa_strict_unseen", "rate", 2.6),
+    ("qa_strict seen", "qa_strict_seen", "rate", 3.5),
+    ("gold_lp answer tokens, unseen (nats)", "gold_lp_ans_unseen", "lp", 0.210),
+    ("gold_lp answer tokens, seen (nats)", "gold_lp_ans_seen", "lp", 0.173),
+    ("gold_lp end token, unseen (nats)", "gold_lp_end_unseen", "lp", 0.048),
+    ("gold_lp end token, seen (nats)", "gold_lp_end_seen", "lp", 0.074),
+    ("grounded_acc", "grounded_acc", "rate", 2.8),
+    ("cite_valid", "cite_valid", "rate", 1.85),
+    ("halluc_rate", "halluc_rate", "rate", 3.9),
+    ("false_abstain", "false_abstain", "rate", 0.9),
+    ("GSM8K (all 1,319, add_bos_token)", "gsm8k_gate", "rate", 2.2),
+]
+S6_REPORTED = [("qa_strict identifiers (reported)", "qa_strict_ident", "rate", 5.0)]
+S6_EOS_PASS = 0.95
+# decode bytes per token / 3.35 TB/s at concurrency 1 (7.42B linear + 0.54B untied lm_head params)
+S6_ITL_FLOOR_MS = {"bf16": 4.75, "fp8": 2.5, "fp8kv": 2.5, "w4a16": 1.5}
+# Step 0's estimate of concurrent 8,192-token sequences at --gpu-memory-utilization 0.90
+S6_EST_CONCURRENCY = {"bf16": 44, "fp8": 50, "fp8kv": 100, "w4a16": 53}
+# The Mistral Small 4 announcement's API price, $ per million (input, output) tokens, and its
+# minimum self-hosting hardware (4x HGX H100; 2x H200 or 1x DGX B200), checked 2026-10-09
+SMALL4_USD_PER_MTOK = (0.15, 0.60)
+SMALL4_MIN_H100 = 4
+
+
+def s6_metrics(variant: str) -> dict:
+    """The gate's lines for one variant: the KPI metrics (load_metrics, scored on the Mac), the
+    gate's GSM8K run, the eos job's </s> rate and vLLM's val-slice perplexity."""
+    run = S6_RUN[variant]
+    m = load_metrics(run) or {}
+    files = sorted((SERVE / "gate/lm_eval" / run).glob("**/results*.json"))
+    if files:
+        res = json.loads(files[-1].read_text())["results"]["gsm8k"]
+        m["gsm8k_gate"] = res["exact_match,strict-match"]
+    eos = RUNS / run / "samples/eos.jsonl"
+    if eos.exists():
+        s = [x for r in map(json.loads, eos.read_text().splitlines()) for x in r["samples"]]
+        m["eos_rate"] = statistics.fmean(
+            x["finish_reason"] == "stop" and x["token_ids"][-1:] == [2] for x in s
+        )
+    if (ppl := Path("results/vllm_ppl") / f"{run}-hf.json").exists():
+        m["vllm_ppl"] = json.loads(ppl.read_text())["ppl_val_slice"]
+    return m
+
+
+def s6_gate() -> tuple[str, dict]:
+    """The gate table and each variant's verdict ("ships", "fails", or "incomplete")."""
+    m = {v: s6_metrics(v) for v in S6_RUN}
+    ref = m["bf16"]
+    variants = [v for v in S6_RUN if v != "bf16" and m[v]]
+    if not variants:
+        return "", {}
+    head = ["line", "bf16", *(f"{S6_LABEL[v]} − bf16" for v in variants), "floor"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    verdict = dict.fromkeys(variants, "ships")
+    for label, key, kind, floor in S6_GATE + S6_REPORTED:
+        gated = (label, key, kind, floor) in S6_GATE
+        scale, fmt = (100, "{:+.1f}") if kind == "rate" else (1, "{:+.3f}")
+        cells = [label, "" if ref.get(key) is None else f"{ref[key]:.3f}"]
+        for v in variants:
+            if ref.get(key) is None or m[v].get(key) is None:
+                cells.append("")
+                if gated:
+                    verdict[v] = "incomplete" if verdict[v] == "ships" else verdict[v]
+                continue
+            d = (m[v][key] - ref[key]) * scale
+            out = abs(d) > floor
+            cells.append(f"**{fmt.format(d)}**" if out else fmt.format(d))
+            if out and gated:
+                verdict[v] = "fails"
+        cells.append(f"{floor:g} pt" if kind == "rate" else f"{floor:.3f}")
+        lines.append("| " + " | ".join(cells) + " |")
+    cells = [
+        "answers ending on </s> (eos job)",
+        "" if "eos_rate" not in ref else f"{ref['eos_rate']:.2f}",
+    ]
+    for v in variants:
+        e = m[v].get("eos_rate")
+        cells.append("" if e is None else f"{e:.2f}" if e >= S6_EOS_PASS else f"**{e:.2f}**")
+        if e is None:
+            verdict[v] = "incomplete" if verdict[v] == "ships" else verdict[v]
+        elif e < S6_EOS_PASS:
+            verdict[v] = "fails"
+    lines.append("| " + " | ".join([*cells, f">= {S6_EOS_PASS}"]) + " |")
+    cells = [
+        "vLLM val-slice perplexity (reported)",
+        "" if "vllm_ppl" not in ref else f"{ref['vllm_ppl']:.3f}",
+    ]
+    for v in variants:
+        p = m[v].get("vllm_ppl")
+        cells.append(
+            "" if p is None or "vllm_ppl" not in ref else f"{(p / ref['vllm_ppl'] - 1):+.2%}"
+        )
+    lines.append("| " + " | ".join([*cells, ""]) + " |")
+    lines.append(
+        "| " + " | ".join(["**verdict**", "", *(f"**{verdict[v]}**" for v in variants), ""]) + " |"
+    )
+    return "\n".join(lines), verdict
+
+
+def s6_reps(variant: str, name: str) -> list[dict]:
+    """The repeated runs of one bench config, each with its prefix-cache hit rate lifted out."""
+    reps = [
+        json.loads(f.read_text())
+        for f in sorted((SERVE / "bench" / variant).glob(f"{name}-rep*.json"))
+    ]
+    for r in reps:
+        r["hit_rate"] = (r.get("prefix_cache") or {}).get("hit_rate")
+    return reps
+
+
+def s6_mean(reps: list[dict], key: str) -> float | None:
+    vals = [r[key] for r in reps if r.get(key) is not None]
+    return statistics.fmean(vals) if vals else None
+
+
+def s6_spread(reps: list[dict], key: str = "request_throughput") -> float | None:
+    """(max - min) / mean of a config's repeated runs: over 20% is the pre-registered rerun flag."""
+    vals = [r[key] for r in reps if r.get(key)]
+    return (max(vals) - min(vals)) / statistics.fmean(vals) if len(vals) > 1 else None
+
+
+def s6_variants() -> list[str]:
+    return [v for v in S6_RUN if (SERVE / "bench" / v).is_dir()]
+
+
+def f1(x: float | None, fmt: str = "{:.1f}") -> str:
+    return "" if x is None else fmt.format(x)
+
+
+def s6_latency_table() -> str:
+    head = ["variant", "concurrency", "TTFT p50 / p99 (ms)", "ITL p50 / p99 (ms)",
+            "E2EL p50 / p99 (ms)", "req/s", "output tok/s", "goodput share", "run pair spread"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for v in s6_variants():
+        for c in (1, 8, 32, 64):
+            reps = s6_reps(v, f"c{c}")
+            if not reps:
+                continue
+            itl50 = s6_mean(reps, "median_itl_ms")
+            flag = (
+                " (under the H100 floor)" if c == 1 and itl50 and itl50 < S6_ITL_FLOOR_MS[v] else ""
+            )
+            sp = s6_spread(reps)
+            lines.append("| " + " | ".join([
+                S6_LABEL[v], str(c),
+                f"{f1(s6_mean(reps, 'median_ttft_ms'))} / {f1(s6_mean(reps, 'p99_ttft_ms'))}",
+                f"{f1(itl50, '{:.2f}')}{flag} / {f1(s6_mean(reps, 'p99_itl_ms'), '{:.2f}')}",
+                f"{f1(s6_mean(reps, 'median_e2el_ms'), '{:,.0f}')} / {f1(s6_mean(reps, 'p99_e2el_ms'), '{:,.0f}')}",
+                f1(s6_mean(reps, "request_throughput"), "{:.2f}"),
+                f1(s6_mean(reps, "output_throughput"), "{:,.0f}"),
+                f1(s6_mean(reps, "goodput_share"), "{:.0%}"),
+                "" if sp is None else f"{sp:.0%}" + (" (rerun)" if sp > 0.2 else ""),
+            ]) + " |")  # fmt: skip
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
+def s6_load_table() -> str:
+    head = ["variant", "offered req/s", "achieved req/s", "TTFT p50 / p99 (ms)", "E2EL p99 (ms)",
+            "goodput share"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for v in s6_variants():
+        for r in (1, 4, 16):
+            reps = s6_reps(v, f"r{r}")
+            if not reps:
+                continue
+            lines.append("| " + " | ".join([
+                S6_LABEL[v], str(r), f1(s6_mean(reps, "request_throughput"), "{:.2f}"),
+                f"{f1(s6_mean(reps, 'median_ttft_ms'))} / {f1(s6_mean(reps, 'p99_ttft_ms'))}",
+                f1(s6_mean(reps, "p99_e2el_ms"), "{:,.0f}"),
+                f1(s6_mean(reps, "goodput_share"), "{:.0%}"),
+            ]) + " |")  # fmt: skip
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
+def s6_pair_table(rows: list[tuple[str, str, str]], cols: list[tuple[str, str, str]]) -> str:
+    """rows: (label, variant, run name); cols: (header, key, format), means over the repeats."""
+    lines = [
+        "| " + " | ".join(["run", *(c[0] for c in cols)]) + " |",
+        "|" + "---|" * (len(cols) + 1),
+    ]
+    for label, v, name in rows:
+        reps = s6_reps(v, name)
+        if reps:
+            cells = [f1(s6_mean(reps, k), f) for _, k, f in cols]
+            lines.append("| " + " | ".join([label, *cells]) + " |")
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
+def s6_prefix_table() -> str:
+    return s6_pair_table(
+        [("grounded, passages as evaluated (none shared)", "fp8", "grounded-unique-c8"),
+         ("grounded, 4 questions per shared context (rag)", "fp8", "grounded-rag-c8")],
+        [("TTFT p50 (ms)", "median_ttft_ms", "{:.1f}"), ("TTFT p99 (ms)", "p99_ttft_ms", "{:.1f}"),
+         ("prefix-cache hit rate", "hit_rate", "{:.0%}"), ("E2EL p50 (ms)", "median_e2el_ms", "{:,.0f}")],
+    )  # fmt: skip
+
+
+def s6_spec_table() -> str:
+    if not (SERVE / "bench" / "fp8-ngram").is_dir():  # the FP8 baselines alone compare nothing
+        return ""
+    rows = []
+    for d, label in (("grounded_unique", "grounded"), ("closedbook", "closed-book")):
+        for c in (1, 8):
+            base = "grounded-unique" if d == "grounded_unique" else "closedbook"
+            rows += [(f"{label}, c={c}, FP8", "fp8", f"{base}-c{c}"),
+                     (f"{label}, c={c}, FP8 + n-gram", "fp8-ngram", f"{d}-c{c}")]  # fmt: skip
+    return s6_pair_table(
+        rows,
+        [("ITL p50 (ms)", "median_itl_ms", "{:.2f}"), ("TPOT p50 (ms)", "median_tpot_ms", "{:.2f}"),
+         ("E2EL p50 (ms)", "median_e2el_ms", "{:,.0f}"), ("output tok/s", "output_throughput", "{:,.0f}")],
+    )  # fmt: skip
+
+
+def s6_memory_table() -> str:
+    head = ["variant", "GPU", "weights (vLLM, GiB)", "KV cache (GiB)", "KV cache tokens",
+            "8,192-token sequences: vLLM / Step 0 estimate"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for v in s6_variants():
+        f = SERVE / "bench" / v / "server.json"
+        if not f.exists():
+            continue
+        s = json.loads(f.read_text())
+        srv = s["server"]
+        lines.append("| " + " | ".join([
+            S6_LABEL[v], f"{s['gpu']} (driver {s['driver']}, vLLM {s['vllm']})",
+            f1(srv.get("weights_gib"), "{:.2f}"), f1(srv.get("kv_cache_gib"), "{:.2f}"),
+            f1(srv.get("kv_cache_tokens"), "{:,.0f}"),
+            f"{f1(srv.get('max_concurrency_8192'), '{:.1f}')} / {S6_EST_CONCURRENCY[v]}",
+        ]) + " |")  # fmt: skip
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
+def s6_cost_table(usd: float, verdict: dict) -> str:
+    """$ per 1,000 requests at each variant's goodput-maximising concurrency, against the Mistral
+    API at Small 4's listed prices for the same tokens, and the sustained load at which one H100
+    costs what the API would."""
+    head = ["variant", "gate", "best concurrency", "goodput (req/s)", "$ / 1k requests (1 H100)",
+            "API $ / 1k requests (Small 4 prices)", "break-even sustained req/s"]  # fmt: skip
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    p_in, p_out = SMALL4_USD_PER_MTOK
+    for v in s6_variants():
+        best = None
+        for c in (1, 8, 32, 64):
+            reps = s6_reps(v, f"c{c}")
+            g = s6_mean(reps, "request_goodput")
+            if g and (best is None or g > best[1]):
+                best = (c, g, reps)
+        if best is None:
+            continue
+        c, g, reps = best
+        n_in = s6_mean(reps, "total_input_tokens") / s6_mean(reps, "completed")
+        n_out = s6_mean(reps, "total_output_tokens") / s6_mean(reps, "completed")
+        api_per_req = (n_in * p_in + n_out * p_out) / 1e6
+        lines.append("| " + " | ".join([
+            S6_LABEL[v], "reference" if v == "bf16" else verdict.get(v, "not run"), str(c),
+            f"{g:.1f}", f"{usd / (g * 3600) * 1000:.4f}", f"{api_per_req * 1000:.4f}",
+            f"{usd / 3600 / api_per_req:.1f}",
+        ]) + " |")  # fmt: skip
+    if len(lines) == 2:
+        return ""
+    return "\n".join(lines) + (
+        f"\n\nOne H100 at ${usd}/h (Modal's H100 SXM5 list price, $0.001097/s, checked "
+        f"2026-10-09); Small 4's API at ${p_in} / ${p_out} per million input / output tokens and its "
+        f"self-hosting minimum of {SMALL4_MIN_H100} H100s (${SMALL4_MIN_H100 * usd:.2f}/h before any "
+        "request), both from Mistral's Small 4 announcement. Tokens per "
+        "request are the bench mix's measured means. The break-even is the sustained load above "
+        "which the GPU is cheaper than the API; below it, an idle GPU costs the same per hour."
+    )
+
+
+def plot_serve(out_latency: Path, out_load: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker
+
+    vs = s6_variants()
+    if not vs:
+        return
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+    fig.patch.set_facecolor(SURFACE)
+    for ax, key, title, ylabel in (
+        (axes[0], "ttft_ms", "Time to first token vs concurrency", "TTFT (ms, log)"),
+        (axes[1], "itl_ms", "Inter-token latency vs concurrency", "ITL (ms, log)"),
+    ):
+        style(ax, title, "concurrent requests", ylabel)
+        for v in vs:
+            cs = [c for c in (1, 8, 32, 64) if s6_reps(v, f"c{c}")]
+            if not cs:
+                continue
+            p50 = [s6_mean(s6_reps(v, f"c{c}"), f"median_{key}") for c in cs]
+            p99 = [s6_mean(s6_reps(v, f"c{c}"), f"p99_{key}") for c in cs]
+            ax.plot(cs, p50, "-o", color=S6_COLORS[v], lw=1.8, ms=4, label=f"{S6_LABEL[v]} p50")
+            ax.plot(
+                cs, p99, "--", color=S6_COLORS[v], lw=1.0, alpha=0.7, label=f"{S6_LABEL[v]} p99"
+            )
+        ax.set_xscale("log", base=2)
+        ax.set_xticks([1, 8, 32, 64], ["1", "8", "32", "64"])
+    for ax in axes:
+        ax.set_yscale("log")
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda y, _: f"{y:g}"))
+        ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    axes[1].legend(fontsize=8, frameon=False, ncol=2)
+    out_latency.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out_latency, facecolor=SURFACE)
+    plt.close(fig)
+    print(f"-> {out_latency}")
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+    fig.patch.set_facecolor(SURFACE)
+    style(
+        axes[0], "Throughput vs offered load (Poisson)", "offered requests / s", "output tokens / s"
+    )
+    style(axes[1], "Tail latency vs offered load", "offered requests / s", "TTFT p99 (ms)")
+    for v in vs:
+        rs = [r for r in (1, 4, 16) if s6_reps(v, f"r{r}")]
+        if not rs:
+            continue
+        tput = [s6_mean(s6_reps(v, f"r{r}"), "output_throughput") for r in rs]
+        p99 = [s6_mean(s6_reps(v, f"r{r}"), "p99_ttft_ms") for r in rs]
+        axes[0].plot(rs, tput, "-o", color=S6_COLORS[v], lw=1.8, ms=4, label=S6_LABEL[v])
+        axes[1].plot(rs, p99, "-o", color=S6_COLORS[v], lw=1.8, ms=4, label=S6_LABEL[v])
+    for ax in axes:
+        ax.set_xscale("log", base=2)
+        ax.set_xticks([1, 4, 16], ["1", "4", "16"])
+    axes[1].set_ylim(bottom=0)
+    axes[0].legend(fontsize=8, frameon=False)
+    fig.tight_layout()
+    fig.savefig(out_load, facecolor=SURFACE)
+    plt.close(fig)
+    print(f"-> {out_load}")
+
+
+def s6_deploy_blocks(usd: float) -> dict[str, str]:
+    """DEPLOY.md's generated blocks: the same tables as the README's Stage 6 section."""
+    gate, verdict = s6_gate()
+    rows = [
+        f"| {S6_LABEL[v]} | {'reference' if v == 'bf16' else verdict.get(v, 'not run')} |"
+        for v in S6_RUN
+        if v == "bf16" or v in verdict
+    ]
+    variants = "| variant | quality gate |\n|---|---|\n" + "\n".join(rows) if verdict else ""
+    blocks = {
+        "deploy-variants": variants,
+        "deploy-gate": gate,
+        "deploy-memory": s6_memory_table(),
+        "deploy-latency": s6_latency_table(),
+        "deploy-cost": s6_cost_table(usd, verdict),
+    }
+    return {k: v for k, v in blocks.items() if v}
+
+
+def stage6_md(usd: float) -> str:
+    gate, verdict = s6_gate()
+    md = ""
+    if gate:
+        md += (
+            "## Quality gate (pre-registered): change against bf16, next to the Stage 3 floor\n\n"
+            + gate
+            + "\n\n"
+            "A variant ships if every gated line is within its floor (bold: beyond it) and the eos "
+            "job ends >= 95% of answers on </s> (notes/decisions.md, 2026-10-09). The floor is the "
+            "sft-from-cpt seed gap or the SE, whichever is larger: a cost under it is invisible to "
+            "every other comparison here, which is what ships means, not that it costs nothing. "
+            "GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under "
+            "the same flags), not the table's frozen-flag row.\n"
+        )
+    sections = [
+        ("Serving memory (vLLM's own accounting at start-up)", s6_memory_table(), ""),
+        ("Latency and throughput vs concurrency (`unique`: 360 eval requests, 60 / 30 / 10)",
+         s6_latency_table(),
+         ("Means of two runs per config, prefix cache reset before each; goodput share = requests "
+          "with TTFT <= 500 ms and TPOT <= 25 ms. ITL at concurrency 1 under the decode floor "
+          "(weight bytes / 3.35 TB/s: bf16 4.75, FP8 2.5, INT4 1.5 ms) would mean the run wasn't "
+          "on an H100.")),
+        ("Latency under load (Poisson arrivals, `unique`)", s6_load_table(), ""),
+        ("Prefix caching: shared retrieval context (FP8, concurrency 8)", s6_prefix_table(),
+         ("Same 108 questions in the same order; rag prompts are ~9% longer (gold passages run "
+          "long), which counts against rag. TTFT is the comparison; output lengths differ.")),
+        ("n-gram speculative decoding (FP8)", s6_spec_table(), ""),
+        ("Cost", s6_cost_table(usd, verdict), ""),
+    ]  # fmt: skip
+    for title, body, note in sections:
+        if body:
+            md += f"\n## {title}\n\n{body}\n" + (f"\n{note}\n" if note else "")
+    return md
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
@@ -1985,8 +2388,8 @@ def main() -> None:
     if cmp := scaling(runs, args.scaling_run, args.scaling_ref):
         md += "\n\n" + cmp
     md += (
-        f"\n\n$ at {args.usd_per_gpu_hour} per GPU-hour (Modal's H100 list price as assumed, not "
-        "checked against modal.com/pricing); wall time includes tokenising and model load.\n"
+        f"\n\n$ at {args.usd_per_gpu_hour} per GPU-hour (Modal's H100 SXM5 list price, checked "
+        "2026-10-09); wall time includes tokenising and model load.\n"
     )
     ppl = {
         f.stem: json.loads(f.read_text())
@@ -2008,14 +2411,16 @@ def main() -> None:
     md3 = stage3_md(sft_runs, args.usd_per_gpu_hour) if sft_runs else ""
     md4 = stage4_md(dpo_runs, args.usd_per_gpu_hour) if dpo_runs else ""
     md5 = stage5_md(grpo_runs, args.usd_per_gpu_hour) if grpo_runs else ""
+    md6 = stage6_md(args.usd_per_gpu_hour)
     Path("results/train_runs.md").write_text(
         "# Stage 2: CPT\n\n"
         + md
         + ("\n# Stage 3: SFT\n\n" + md3 if md3 else "")
         + ("\n# Stage 4: DPO\n\n" + md4 if md4 else "")
         + ("\n# Stage 5: GRPO\n\n" + md5 if md5 else "")
+        + ("\n# Stage 6: serving\n\n" + md6 if md6 else "")
     )
-    print(md + md3 + md4 + md5)
+    print(md + md3 + md4 + md5 + md6)
     if args.readme:
         # the README nests these under "#### Stage N": their own headings go two levels down
         update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
@@ -2025,6 +2430,11 @@ def main() -> None:
             update_readme(Path(args.readme), "stage4-tables", re.sub(r"(?m)^## ", "##### ", md4))
         if md5:
             update_readme(Path(args.readme), "stage5-tables", re.sub(r"(?m)^## ", "##### ", md5))
+        if md6:
+            update_readme(Path(args.readme), "stage6-tables", re.sub(r"(?m)^## ", "##### ", md6))
+            if Path("DEPLOY.md").exists():
+                for name, block in s6_deploy_blocks(args.usd_per_gpu_hour).items():
+                    update_readme(Path("DEPLOY.md"), name, block)
         update_readme(Path(args.readme), "results-table", results_table())
         update_readme(Path(args.readme), "serving-table", serving_table())
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
@@ -2039,6 +2449,7 @@ def main() -> None:
     if grpo_runs:
         plot_grpo(grpo_runs, Path("results/curves/grpo.png"))
         plot_passk(Path("results/curves/passk.png"))
+    plot_serve(Path("results/curves/serve_latency.png"), Path("results/curves/serve_load.png"))
 
 
 if __name__ == "__main__":

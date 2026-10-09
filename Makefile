@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data sft-data dpo-data dpo-pairs dpo-pairs-strict grpo-data train eval serve all
+.PHONY: data sft-data dpo-data dpo-pairs dpo-pairs-strict grpo-data train eval serve bench-data all
 
 # --- data -------------------------------------------------------------------
 # Stage 1 corpus: data/sources.csv -> data/processed/{docs_raw,docs,train,val,replay,general_val}.jsonl
@@ -61,9 +61,12 @@ eval:
 	bash eval/run_lm_eval.sh $(MODEL) $(RUN)
 
 # --- serve ------------------------------------------------------------------
+# Stage 6: quantized checkpoints are built on Modal (serve/modal_serve.py --action quantize; DEPLOY.md)
 serve:
-	bash serve/quantize.sh $(MODEL) checkpoints/awq
-	bash serve/serve_vllm.sh checkpoints/awq
+	bash serve/serve_vllm.sh $(MODEL)
+
+bench-data:
+	$(PY) serve/bench_data.py
 
 bench:
 	$(PY) serve/bench_latency.py --model struct-lm --concurrency 1 8 32

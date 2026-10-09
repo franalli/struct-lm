@@ -153,3 +153,37 @@ def test_vllm_renders_the_training_prompt_ids(sd, train):
         enc = sd.encode(by_id[row["id"]], BASE)
         n_prompt = enc["completion_mask"].index(1)
         assert row["prompt_token_ids"] == enc["input_ids"][:n_prompt], row["id"]
+
+
+SERVED = sorted((REPO / "results/serve").glob("*/served_check*.jsonl"))
+# Smoke divergences beyond the pre-registered 0.1-nat near-tie, recorded rather than re-thresholded
+# (notes/decisions.md, Stage 6 outcome): (file, item) -> what happened
+KNOWN = {
+    ("served_check_bench.jsonl", "gr-0532"): "the bench's bf16 server start: first divergence at "
+    "0.125 nats (the eval's token second); identical in the check-only start",
+}
+
+
+@HAVE
+@pytest.mark.skipif(not SERVED, reason="no Stage 6 served checks pulled")
+def test_served_chat_renders_the_training_prompt_ids(sd, train, special):
+    """Stage 6 (serve/served_check.py): /v1/chat/completions on serve_vllm.sh builds the trainer's
+    prompt ids for every served variant (one BOS, one [INST], no system prompt) and the answer ends
+    on </s>; the bf16 smoke matches the eval's saved outputs, or diverges only at a near-tie."""
+    by_id = {r["eid"]: r for r in sd.template_records(train)}
+    for path in SERVED:
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        template = [r for r in rows if r["check"] == "template"]
+        assert {r["id"] for r in template} == set(by_id), path
+        for r in template:
+            enc = sd.encode(by_id[r["id"]], BASE)
+            ids = r["prompt_token_ids"]
+            assert ids == enc["input_ids"][: enc["completion_mask"].index(1)], (path, r["id"])
+            assert ids.count(special["<s>"]) == 1 and ids.count(special["[INST]"]) == 1
+            assert special["[SYSTEM_PROMPT]"] not in ids
+            assert r["finish_reason"] == "stop" and r["stop_reason"] in (None, special["</s>"])
+            assert r["token_ids"][-1] == special["</s>"], (path, r["id"])
+        for r in (r for r in rows if r["check"] == "smoke"):
+            if (path.name, r["id"]) in KNOWN:
+                continue
+            assert r["identical"] or r["near_tie"], (path, r["task"], r["id"], r.get("divergence"))

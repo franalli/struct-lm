@@ -95,6 +95,7 @@ def kpi_eval(
     tasks: str = "",
     config_format: str = "hf",
     gold_lp_only: bool = False,
+    kv_cache_dtype: str = "auto",
 ) -> None:
     """The domain KPI eval: run_eval.py with container paths. Arguments map 1:1 to its flags.
     `tasks` (comma-separated, "" = all) regenerates only those tasks; the run's other saved
@@ -132,6 +133,7 @@ def kpi_eval(
     cmd += ["--config-format", config_format]
     if gold_lp_only:
         cmd.append("--gold-lp-only")
+    cmd += ["--kv-cache-dtype", kv_cache_dtype]
     subprocess.run(cmd, check=True, cwd="/root")  # check=True: a failed eval fails the Modal call
     vol.commit()  # persist results; without this, writes to /vol are lost when the container exits
 
@@ -246,7 +248,14 @@ def memorization(model: str, run_name: str, config_format: str = "hf") -> None:
 
 
 @app.function(**COMMON)
-def sample(model: str, run_name: str, jobs: str, chat: bool, config_format: str = "hf") -> None:
+def sample(
+    model: str,
+    run_name: str,
+    jobs: str,
+    chat: bool,
+    config_format: str = "hf",
+    kv_cache_dtype: str = "auto",
+) -> None:
     """eval/sample.py: sampled generations (template / eos / diversity jobs) through the KPI eval's
     engine, written to /vol/results/runs/<run_name>/samples/<job>.jsonl. cwd=/vol, where the Stage 4
     prompt pool (data/dpo/prompts.jsonl, the eos job) is uploaded with `modal volume put`.
@@ -266,6 +275,8 @@ def sample(model: str, run_name: str, jobs: str, chat: bool, config_format: str 
         "/vol/results",
         "--config-format",
         config_format,
+        "--kv-cache-dtype",
+        kv_cache_dtype,
     ]
     subprocess.run(cmd + (["--chat"] if chat else []), check=True, cwd="/vol")
     vol.commit()
@@ -288,6 +299,7 @@ def main(
     config_format: str = "hf",  # KPI only: "auto" to extend Stage 0's native-path hub runs
     gold_lp_only: bool = False,  # KPI only: recompute gold_lp in the saved generations, no generation
     sample_jobs: str = "diversity",  # sample only: eval/sample.py jobs (template, eos, diversity)
+    kv_cache_dtype: str = "auto",  # KPI and sample: "fp8" for Stage 6's FP8-KV variant only
 ) -> None:
     """Runs locally. Modal turns each parameter into a CLI flag (run_name -> --run-name,
     bools -> --chat / --no-chat). `which` picks "lm", "kpi", "both" (lm then kpi),
@@ -319,8 +331,9 @@ def main(
             tasks,
             config_format,
             gold_lp_only,
+            kv_cache_dtype,
         )
     if which == "latency":
         latency.remote(model, run_name, tokenizer_mode)
     if which == "sample":
-        sample.remote(model, run_name, sample_jobs, chat, config_format)
+        sample.remote(model, run_name, sample_jobs, chat, config_format, kv_cache_dtype)

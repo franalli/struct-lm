@@ -157,6 +157,7 @@ def generate(
     max_model_len: int,
     tokenizer_mode: str,
     config_format: str = "hf",
+    kv_cache_dtype: str = "auto",
 ) -> None:
     """Fill it["output"] for every item with vLLM, greedy, one batch per task.
 
@@ -172,7 +173,7 @@ def generate(
     for it in items:
         it["prompt_final"] = it["prompt"]
 
-    llm = make_llm(model, tp, max_model_len, tokenizer_mode, config_format)
+    llm = make_llm(model, tp, max_model_len, tokenizer_mode, config_format, kv_cache_dtype)
     for task in TASKS:
         batch = [it for it in items if it["task"] == task]
         if not batch:
@@ -201,9 +202,18 @@ GOLD_FIELDS = ("gold_lp", "gold_tokens", "gold_lp_tokens", "gold_lp_end")
 
 
 def make_llm(
-    model: str, tp: int, max_model_len: int, tokenizer_mode: str, config_format: str, **engine
+    model: str,
+    tp: int,
+    max_model_len: int,
+    tokenizer_mode: str,
+    config_format: str,
+    kv_cache_dtype: str = "auto",
+    **engine,
 ):
-    """engine: extra vLLM engine arguments (eval/sample.py's pool-sized jobs only)."""
+    """engine: extra vLLM engine arguments (eval/sample.py's pool-sized jobs only).
+    kv_cache_dtype: "fp8" for Stage 6's FP8-KV serving variant, which changes attention numerics
+    and so is quality-gated like a weight format; "auto" (the model's dtype) everywhere else.
+    Quantized checkpoints (compressed-tensors) need no flag: vLLM reads their config."""
     from vllm import LLM
 
     return LLM(
@@ -222,6 +232,7 @@ def make_llm(
         max_model_len=max_model_len,  # 8192 default: grounded prompts carry 4 passages of <=512 tokens
         gpu_memory_utilization=0.9,
         seed=0,
+        kv_cache_dtype=kv_cache_dtype,
         **engine,
     )
 
@@ -503,6 +514,7 @@ def write_provenance(run_dir: pathlib.Path, new: dict[str, list[dict]], args) ->
             "model": args.model,
             "chat": args.chat,
             "config_format": args.config_format,
+            "kv_cache_dtype": args.kv_cache_dtype,
             "vllm": vllm.__version__,
             "n": len(rows),
             "prompts_sha256": hashlib.sha256(
@@ -561,6 +573,12 @@ def main() -> None:
         help="vLLM config format; auto only to extend Stage 0's native-path hub runs",
     )
     ap.add_argument(
+        "--kv-cache-dtype",
+        default="auto",
+        choices=("auto", "fp8"),
+        help="vLLM KV cache dtype; fp8 only for Stage 6's FP8-KV variant",
+    )
+    ap.add_argument(
         "--gold-lp-only",
         action="store_true",
         help="recompute gold_lp for the saved domain_qa rows (no generation) and stop",
@@ -591,7 +609,12 @@ def main() -> None:
         rows = load_jsonl(gen_path)
         qa = [it for it in build_items(pathlib.Path(args.tasks_dir), None, ["domain_qa"])]
         llm = make_llm(
-            args.model, args.tp, args.max_model_len, args.tokenizer_mode, args.config_format
+            args.model,
+            args.tp,
+            args.max_model_len,
+            args.tokenizer_mode,
+            args.config_format,
+            args.kv_cache_dtype,
         )
         gold_logprobs(llm, qa, args.model, args.chat)
         by_id = {it["id"]: it for it in qa}
@@ -654,6 +677,7 @@ def main() -> None:
             args.max_model_len,
             args.tokenizer_mode,
             args.config_format,
+            args.kv_cache_dtype,
         )
         # Save before scoring: GPU time is the expensive part, so a judge or scoring failure
         # never costs a regeneration (fix it and --rescore). Tasks not regenerated keep their

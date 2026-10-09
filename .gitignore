@@ -11,6 +11,9 @@ data/packed/
 # memorisation probe: post-cutoff PDFs (re-fetched from eval/exposure_sources.csv) and docs.jsonl
 data/exposure/
 
+# Stage 6 bench request sets: rebuilt by serve/bench_data.py, pinned by serve/bench_manifest.json
+serve/bench/
+
 # Training artifacts
 checkpoints/
 outputs/

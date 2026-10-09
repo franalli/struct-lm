@@ -1,0 +1,89 @@
+{
+  "tokenizer": "mistralai/Ministral-3-8B-Base-2512",
+  "files": {
+    "unique": {
+      "sha256": "ca8920a913a396db754ff1ef8ec35f0c5f1fa8b353f704b446482c72b9e33d94",
+      "requests": 360,
+      "tasks": {
+        "adversarial": {
+          "n": 36,
+          "prompt_tokens": {
+            "min": 587,
+            "median": 1167.0,
+            "p90": 1361,
+            "max": 1586
+          },
+          "output_cap": 200
+        },
+        "domain_qa": {
+          "n": 216,
+          "prompt_tokens": {
+            "min": 188,
+            "median": 206.0,
+            "p90": 214,
+            "max": 225
+          },
+          "output_cap": 64
+        },
+        "grounded": {
+          "n": 108,
+          "prompt_tokens": {
+            "min": 1039,
+            "median": 1688.0,
+            "p90": 1884,
+            "max": 2094
+          },
+          "output_cap": 300
+        }
+      }
+    },
+    "grounded_unique": {
+      "sha256": "2b795493b0dde0bf14fdf59b176a5f211a087f683fb637b8d10074dbf6c3a6cb",
+      "requests": 108,
+      "tasks": {
+        "grounded": {
+          "n": 108,
+          "prompt_tokens": {
+            "min": 1039,
+            "median": 1688.0,
+            "p90": 1884,
+            "max": 2094
+          },
+          "output_cap": 300
+        }
+      }
+    },
+    "grounded_rag": {
+      "sha256": "214d725ec92dc13fa89c610041c3ea622466d289a58f910d3f12b2df36359822",
+      "requests": 108,
+      "tasks": {
+        "grounded": {
+          "n": 108,
+          "prompt_tokens": {
+            "min": 1598,
+            "median": 1842.5,
+            "p90": 2017,
+            "max": 2043
+          },
+          "output_cap": 300
+        }
+      }
+    },
+    "closedbook": {
+      "sha256": "999ea0d8b86acf31d7e198babccc1dbb76e60b6a3a78a62681af488ef50b4b9f",
+      "requests": 216,
+      "tasks": {
+        "domain_qa": {
+          "n": 216,
+          "prompt_tokens": {
+            "min": 188,
+            "median": 206.0,
+            "p90": 214,
+            "max": 225
+          },
+          "output_cap": 64
+        }
+      }
+    }
+  }
+}

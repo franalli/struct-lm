@@ -44,6 +44,7 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--config-format", default="hf", choices=("auto", "hf", "mistral"))
     ap.add_argument("--no-yarn-scale", action="store_true")
+    ap.add_argument("--kv-cache-dtype", default="auto", choices=("auto", "fp8"))
     ap.add_argument("--data-dir", default="data/processed")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
@@ -63,6 +64,7 @@ def main() -> None:
         max_model_len=8192,
         gpu_memory_utilization=0.9,
         seed=0,
+        kv_cache_dtype=args.kv_cache_dtype,  # fp8: Stage 6's FP8-KV variant
     )
     outs = llm.generate(
         [TokensPrompt(prompt_token_ids=w.tolist()) for w in windows],
@@ -77,6 +79,7 @@ def main() -> None:
         "model": args.model,
         "config_format": args.config_format,
         "no_yarn_scale": args.no_yarn_scale,
+        "kv_cache_dtype": args.kv_cache_dtype,
         "windows": len(windows),
         "tokens": n,
         "nats": round(nll / n, 5),
