@@ -4407,3 +4407,85 @@ headline change was decomposed, each with an item-bootstrap 95% CI.
      so rather than implying it lowered anything.
 3. **The summary's strict-checker table gains the identifiers column** (3.1% against 20.3%;
    identifiers don't change under the strict rule).
+
+## 2026-10-09: Stage 6 pre-registration: serving stage5-final (dpo-strict) in three precisions, the quality gate and the bench rules (user plan; written before any quantized checkpoint exists)
+
+**What is served:** `checkpoints/dpo-strict` (merge_check digest `e686ca7bf11e…`, `model.safetensors`
+`8dac94c4…`), on vLLM 0.29.0 (the eval image's pins), through `serve/serve_vllm.sh`: HF config with
+`"apply_yarn_scaling": false`, `tokenizer_mode=mistral`, `{"image": 0}`, `--max-model-len 8192`,
+`--max-num-seqs 64`, prefix caching on. The variants:
+
+| variant | how | checkpoint |
+|---|---|---|
+| bf16 | the reference | `checkpoints/dpo-strict` |
+| fp8 | llm-compressor `FP8_DYNAMIC` (W8A8, no calibration data) | `checkpoints/dpo-strict-fp8` |
+| fp8kv | fp8 + `--kv-cache-dtype fp8` (gated as its own variant: it changes attention numerics) | same |
+| w4a16 | GPTQ `W4A16` (group 128, symmetric), 512 SFT train records (no replay) as trained, <= 2,048 tokens | `checkpoints/dpo-strict-w4a16` |
+
+Both recipes ignore `lm_head`, the Pixtral tower and the projector (rule 10's scope; llm-compressor's
+own mistral3 example ignores the same three), and `serve/quantize.py` re-applies merge.py's
+post-save steps (tokenizer files copied, the YaRN key, untied lm_head, weight names checked).
+
+**The gate (decided now, read after):** a variant ships if, on every line, |variant − bf16| is
+within the Stage 3 floor (`report.noise` on the sft-from-cpt seed pair: max(seed gap, SE)):
+
+| line | bf16 (dpo-strict) | floor |
+|---|---|---|
+| qa_strict unseen / seen | 0.110 / 0.305 | 2.6 / 3.5 pt |
+| gold_lp answer tokens unseen / seen | −6.274 / −4.811 | 0.210 / 0.173 nats |
+| gold_lp end token unseen / seen | −0.421 / −0.319 | 0.048 / 0.074 nats |
+| grounded_acc | 0.926 | 2.8 pt |
+| cite_valid | 1.000 | 1.85 pt (computed now: Stage 3 has no row for it) |
+| halluc_rate / false_abstain | 0.040 / 0.000 | 3.9 / 0.9 pt |
+| GSM8K, 5-shot, all 1,319, `add_bos_token=True` | bf16 rerun under the same flags | 2.2 pt |
+| stop: `eos` job, answers ending on `</s>` | 64/64 | >= 0.95 (EOS_PASS) |
+
+- **GSM8K:** run into `results/serve/gate/lm_eval/`, never `results/lm_eval/` (the table's rows keep
+  their frozen flags). Before it, `eval/bos_probe.py` shows the ids lm-eval sends: exactly one
+  leading BOS with the flag, or the line doesn't run. User decision: all 1,319 items, not 250
+  (SE ~2.5 pt at 250 exceeds the 2.2 floor).
+- **The stop line** is the `eos` sample job, not the KPI rows' `finish_reason`, which counts stop
+  strings as "stop".
+- **Reported, not gated:** vLLM perplexity on the val slice (bf16 must reproduce `ppl_val_slice`
+  6.8945: the YaRN path check; a missing YaRN key reads +4.8%), mean output tokens, qa_strict on
+  identifiers (floor 5.0 pt), the paired bootstrap CI on each gold_lp part.
+- **INT4 outcomes:** failing only on identifiers -> a benchmark row "fails quality gate on
+  identifiers", not in DEPLOY.md; failing more broadly -> "fails quality gate". FP8-KV that fails
+  stays a benchmark row.
+- **What the floor means:** it is the seed gap. A quantization cost under it is invisible to every
+  comparison in the write-up, which is the sense of "ships" here, not "costs nothing".
+
+**Served-path checks (`serve/served_check.py`, `tests/test_template.py`):** for every variant, the 5
+template prompts through `/v1/chat/completions` give the trainer's prompt ids (one BOS, one
+`[INST]`, no system prompt) and end on `</s>`. For bf16, 20 eval items (5 per task) answered
+greedily with the eval's per-task settings match the saved outputs, or diverge first at a near-tie
+(the eval's token in the server's top 2, within 0.1 nats). Batch shape changes kernels, so
+byte-identity is not required.
+
+**The bench (`serve/modal_serve.py::bench`), fixed now:**
+- `gpu="H100!"` (Modal otherwise may run an H100 request on an H200), and a runtime check that
+  aborts on anything but an H100; GPU, driver, CUDA, vLLM and torch in every result. All variants
+  in one container, the server restarted per variant.
+- Request sets from the eval (`serve/bench_data.py`, pinned by `serve/bench_manifest.json`; user
+  decision): 360 = 216 closed-book / 108 grounded / 36 abstain, the task's eval cap as max tokens,
+  natural EOS stop, greedy. `rag`: the 108 grounded questions in 27 groups of 4 sharing their 4 gold
+  passages (question last, each question answerable), against the same questions as evaluated;
+  TTFT only.
+- Concurrency 1 / 8 / 32 / 64 and Poisson 1 / 4 / 16 req/s; every run twice. The prefix cache is
+  reset before each run (dev mode in the bench container only), the warm-up runs before the reset
+  (vLLM's own warm-up repeats the set's first prompt), and each run's /metrics hit rate is recorded.
+  Two runs of one config more than 20% apart in throughput: rerun and report the pair.
+- Goodput: TTFT <= 500 ms and TPOT <= 25 ms, as the share of requests meeting both.
+- Plausibility floor at concurrency 1: decode bytes per token over 3.35 TB/s = 4.75 ms (bf16: 7.42B
+  linear + 0.54B untied lm_head params at 2 bytes), 2.5 ms (FP8), 1.5 ms (INT4; lm_head stays bf16).
+  A bf16 ITL under 4.75 ms didn't run on an H100.
+- The Stage 2-5 latency columns become "single samples, GPU not recorded"; their one kept claim is
+  that SFT fixed stopping. Stage 6's table is the only serving table the README quotes.
+
+**Corrections to the plan as pasted, from the sources and the repo:**
+- vLLM's online FP8 fallback is `--quantization fp8`, not `fp8_per_tensor`.
+- Grounded prompts are 1,039–2,094 tokens (median 1,688), not 2–4k. Closed-book answers have a
+  median of 4 tokens, not ~25.
+- Weights are ~17.8 / ~10.4 / ~6.8 GB, not 17 / 9 / 5: embeddings, lm_head and the tower stay bf16.
+- vLLM 0.29 pins compressed-tensors 0.17.0, while llmcompressor 0.14.0 writes with 0.19.0. The first
+  GPU job loads the FP8 save in vLLM 0.29 before anything else is trusted.
