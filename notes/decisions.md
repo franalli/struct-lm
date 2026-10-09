@@ -4220,3 +4220,54 @@ pair's gap); 1 df):
 **For a rerun:**
 - a brake in the objective (μ > 1 so the clip acts, a small KL or entropy term, or a lower LR);
 - compute tasks, where a skill can improve rather than recall be reweighted.
+
+## 2026-10-09: Stage 5 write-up sharpened; stage5-final = dpo-strict confirmed (user decisions)
+
+**stage5-final stays dpo-strict (user decision):**
+- The rule says so and the numbers back it.
+- GRPO's only gain is sampled accuracy at T 0.7, which serving does not use. It was bought with a
+  calibration loss on every fact, and a larger one on unseen facts.
+- **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not, and the
+  pre-registered rules rejected both.
+
+**Why the clip never acted** (the mechanism, as written in the README):
+- Magistral's brake clips the ratio between the trainer's policy and its generators', and that
+  ratio leaves 1 because its generators run asynchronously on stale weights.
+- In the synchronous colocated loop, with one update per generation batch, the generator is the
+  policy. The ratio is identically 1 up to vLLM numerics (`clip_ratio/high_mean` 0 at every step),
+  so ε_high was inert by construction.
+- β was 0, so only the LR and the stop rule bounded each step's change.
+- The repo imported the hyperparameters without the system that makes them act.
+- **Next steps, first:** μ = 2 with ε_high 0.28. Then β = 0.05 (Tülu 3 under PPO) or an off-policy
+  lag.
+
+**The cost's mechanism:**
+- Sharpening moves mass onto the answer the model already ranks first. Greedy accuracy can't move,
+  since the argmax doesn't change; sampled pass@1 rises; pass@8 trends down.
+- When the top answer is wrong, the gold loses mass. On unseen items dpo-strict's top answer is
+  wrong 87% of the time (`qa_unseen` 0.129), so the unseen gold log-probability falls hardest
+  (−1.33 nats).
+- Reference: DeepSeekMath §5.2.2.
+
+**Hallucination 3 → 1 is labelled noise:** the SFT twins sit at 4 and 1 and the DPO twins at 1 and
+2, as in Stage 4.
+
+**The two-algorithm table now carries pass@k (paired per item, strict scorer).** Against
+sft-from-cpt:
+
+| | seen pass@1 | seen pass@8 |
+|---|---|---|
+| dpo-strict | +3.5 pt [+1.2, +6.0] | −3.0 (inside the noise) |
+| grpo | +6.6 [+3.6, +9.8] | −6.6 [−12.3, −0.9] |
+
+- So DPO moved sampled accuracy too, not "nothing". Both sharpened, GRPO about twice as much, and
+  only GRPO's coverage loss clears.
+- Both cost gold log-probability: DPO −0.01 seen / −0.27 unseen, GRPO −0.68 / −1.60.
+- sft-from-cpt's twin was not sampled, so these floors use the DPO and GRPO pairs' gaps, and the
+  table says so.
+
+**Win rate:** not run for the GRPO rows. The judge failed its benchmark and its two orders agreed at
+coin-flip. One line in the README; the column stays empty.
+
+**The verifier section** keeps all three holes, with how each was found. The year hole carries its
+quoted task and completions: "1988" to "2020" all rewarded for gold 2010 in steps 30-49 of `grpo`.

@@ -239,6 +239,10 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 | GSM8K | guard | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
 | grounded_acc (judge) | reported | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
 | cite_supported (judge) | reported | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
+| pass@1 seen (sampled) | reported | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
+| pass@8 seen | reported | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
+| pass@1 unseen (sampled) | reported | 0.105 | 0.119 | 0.112 | +1.0 pt [-0.1, +2.2] | 0.6 pt | no |
+| pass@8 unseen | reported | 0.297 | 0.258 | 0.271 | -3.2 pt [-7.7, +1.0] | 2.6 pt | no |
 
 Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
 
@@ -255,8 +259,12 @@ Rows marked primary are the pre-registered read (2026-10-09); guards must stay w
 | cite_valid | 1.000 | +0.0 pt | 1.8 pt | no | -0.9 pt | 1.8 pt | no |
 | MMLU | 0.766 | +0.1 pt | 0.4 pt | no | +0.1 pt | 0.4 pt | no |
 | GSM8K | 0.814 | -0.5 pt | 2.2 pt | no | -0.3 pt | 2.2 pt | no |
+| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | 0.4 pt | yes | +6.6 pt [+3.6, +9.8] | 0.2 pt | yes |
+| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | 2.4 pt | no | -6.6 pt [-12.3, -0.9] | 0.0 pt | yes |
+| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | 0.6 pt | no | +2.2 pt [+0.4, +4.0] | 0.6 pt | yes |
+| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | 2.6 pt | no | -4.5 pt [-9.7, +0.3] | 1.3 pt | no |
 
-dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap.
+dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge failed its benchmark and its two orders agreed at coin-flip.
 
 ## pass@k on the closed-book eval (strict scorer)
 

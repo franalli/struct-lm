@@ -1569,6 +1569,45 @@ def change_row(m, label, key, kind, extra, start, pair, start_pairs, sizes):
     return [note, unit.format(floor), "yes" if beyond else "no"], beyond
 
 
+PASSK_ROWS_READ = [  # (label, scorer metric, half): paired per item, strict scorer, 8 x T 0.7
+    ("pass@1 seen (sampled)", "pass@1", "seen"),
+    ("pass@8 seen", "pass@n", "seen"),
+    ("pass@1 unseen (sampled)", "pass@1", "unseen"),
+    ("pass@8 unseen", "pass@n", "unseen"),
+]
+
+
+def passk_items(run: str) -> dict | None:
+    f = PASSK / f"{run}.json"
+    return {p["id"]: p for p in json.loads(f.read_text())["per_item"]} if f.exists() else None
+
+
+def passk_change(start: str, runs, metric: str, half: str, gap_pairs=()) -> list[str] | None:
+    """[change with its paired 95% CI, floor, beyond] for one pass@k line: the mean of `runs`
+    minus `start` per item (strict scorer), item-bootstrapped; floor = the largest seed gap
+    available (the runs' own pair, and each pair in gap_pairs); beyond needs |change| > floor and
+    the CI excluding 0."""
+    s, rs = passk_items(start), [passk_items(r) for r in runs]
+    if s is None or any(r is None for r in rs):
+        return None
+    ids = sorted(i for i in s if s[i]["half"] == half)
+    val = lambda d, i: float(d[i]["strict"][metric])
+    diff = np.array([sum(val(r, i) for r in rs) / len(rs) - val(s, i) for i in ids])
+    boot = diff[np.random.default_rng(0).integers(0, len(diff), (10_000, len(diff)))].mean(1)
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    pairs = [tuple(runs)] if len(runs) == 2 else []
+    gaps = [abs(np.mean([val(a, i) - val(b, i) for i in ids]))
+            for a, b in ([tuple(passk_items(r) for r in pp) for pp in (*pairs, *gap_pairs)])
+            if a is not None and b is not None]  # fmt: skip
+    floor, change = max(gaps, default=0.0) * 100, diff.mean() * 100
+    beyond = abs(change) > floor and (lo > 0 or hi < 0)
+    return [
+        f"{change:+.1f} pt [{lo * 100:+.1f}, {hi * 100:+.1f}]",
+        f"{floor:.1f} pt",
+        "yes" if beyond else "no",
+    ]
+
+
 def grpo_delta_table() -> str:
     """Each GRPO run against the start (dpo-strict) and the mean change of the two seeds. Floor:
     max(the GRPO seed gap, the start's SE, the start's own seed gap). dpo-strict has no twin, so
@@ -1586,6 +1625,18 @@ def grpo_delta_table() -> str:
         vals = [m[r].get(key) for r in (GRPO_START, *GRPO_PAIR)]
         cells = [label, role, *("" if v is None else f"{v:.3f}" for v in vals), *row[0]]
         lines.append("| " + " | ".join(cells) + " |")
+    for label, metric, half in PASSK_ROWS_READ:
+        ch = passk_change(GRPO_START, GRPO_PAIR, metric, half, (DPO_PAIR,))
+        if ch is None:
+            continue
+        vals = [passk_items(r) for r in (GRPO_START, *GRPO_PAIR)]
+        means = [
+            np.mean([float(v[i]["strict"][metric]) for i in v if v[i]["half"] == half])
+            for v in vals
+        ]
+        lines.append(
+            "| " + " | ".join([label, "reported", *(f"{x:.3f}" for x in means), *ch]) + " |"
+        )
     return "\n".join(lines)
 
 
@@ -1610,6 +1661,14 @@ def two_algorithm_table() -> str:
         if d is None or g is None:
             continue
         lines.append("| " + " | ".join([label, f"{m[DPO_START][key]:.3f}", *d[0], *g[0]]) + " |")
+    for label, metric, half in PASSK_ROWS_READ:
+        d = passk_change(DPO_START, (GRPO_START,), metric, half, (DPO_PAIR,))
+        g = passk_change(DPO_START, GRPO_PAIR, metric, half)
+        if d is None or g is None:
+            continue
+        v = passk_items(DPO_START)
+        start = np.mean([float(v[i]["strict"][metric]) for i in v if v[i]["half"] == half])
+        lines.append("| " + " | ".join([label, f"{start:.3f}", *d, *g]) + " |")
     return "\n".join(lines)
 
 
@@ -1773,7 +1832,10 @@ def stage5_md(runs: dict, usd: float) -> str:
             f"\n## Same verifier, two algorithms: change against {DPO_START}\n\n" + ta + "\n\n"
             "dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict "
             "checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each "
-            f"floor also takes {DPO_START}'s own seed gap.\n"
+            f"floor also takes {DPO_START}'s own seed gap. pass@k lines: paired per item (8 samples "
+            "at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient "
+            f"dpo pair for dpo-strict); {DPO_START}'s twin was not sampled. Win rate: not run for "
+            "these rows: the judge failed its benchmark and its two orders agreed at coin-flip.\n"
         )
     if pk := passk_table():
         md += (

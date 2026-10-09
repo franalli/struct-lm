@@ -1288,12 +1288,16 @@ in one day:**
      tasks) and the `grpo_val` curves are scored with the fixed rule.
    - The hack audit gained a flag that doesn't use the checker: the raw separator count and the
      answer line's token length.
-3. **The relative tolerance on years was caught by the hack audit.**
-   - The audit reads the top-reward rollouts, and "1996" was rewarded for "2010": 2% of a year is
-     40 years.
-   - This one was learned, on the one bare-year task in the training window (10 of 16 late
-     rollouts rewarded for a wrong year).
-   - A year gold now needs the exact year. No eval item has one.
+3. **The relative tolerance on years was caught by the hack audit**, which reads the top-reward
+   rollouts. It is the cleanest reward-hacking example in the repo.
+   - **The task:** "When did AASHTO initially include language in its standards that permits cold
+     bending to create camber in rolled beams used for highway bridges? Reply with just the value
+     or name, no explanation." The gold is 2010.
+   - **What the reward accepted:** between steps 30 and 49, `grpo` was rewarded in full for
+     answering "1988", "1989", "1990", "1994", "1996", "2004", "2014" and "2020". 2% of a year is
+     40 years, so only "1941" and "1965" scored 0.
+   - **It was learned, on one task of 622:** 10 of 16 late rollouts were rewarded for a wrong year.
+   - **The fix:** a year gold now needs the exact year. No eval item has one.
 4. **All three are fixtures now** (`tests/test_qa_strict.py`).
 
 **The labels:** 79 of the 458 closed-book chosen labels are wrong under it. The final rule rejects
@@ -1487,9 +1491,14 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
     inside the noise. That is DeepSeekMath's sharpening signature;
   - the gold answer's log-probability fell 0.67 nats on seen facts and 1.33 on unseen, beyond the
     floor: the cost of that sharpening;
-  - hallucination fell from 3 to 1 of 76 in both seeds.
+  - hallucination 3 → 1 of 76 is noise: the SFT twins sit at 4 and 1, the DPO twins at 1 and 2.
 - **The expected +3 to +8 points on seen accuracy did not happen,** so `stage5-final` stays
   `dpo-strict`, as the rule requires.
+- **Serving is greedy, so GRPO's only gain is one serving doesn't use.** That gain is sampled
+  accuracy at T 0.7, and it cost calibration on every fact.
+- **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not, and the
+  pre-registered rules rejected both. The chain ends on `dpo-strict`, which is the SFT model within
+  noise.
 
 Group Relative Policy Optimization from `dpo-strict`, with a fresh LoRA, on tasks the start
 sometimes solves. The policy writes every completion, rules score it, and no judge or reference
@@ -1597,34 +1606,59 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
    per item):
    - Seen: pass@1 +3.1 points [+1.3, +5.0], pass@8 −3.6 [−8.1, +0.9], maj@8 +0.6.
    - Unseen: pass@1 +1.0 [−0.1, +2.2], pass@8 −3.2 [−7.7, +1.3].
-   - Sampled accuracy rose while coverage stayed within the noise and leaned down. The policy puts
-     more of its mass on the answer it already ranked first, which is why greedy accuracy, already
-     that answer, didn't move.
+   - Sampled accuracy rose while coverage stayed within the noise and leaned down.
+   - **The mechanism** (DeepSeekMath §5.2.2: RL sharpens the output distribution rather than
+     adding capability):
+     - sharpening moves mass onto the answer the model already ranks first;
+     - greedy accuracy cannot move, because the argmax doesn't change;
+     - sampled pass@1 rises, because sampling lands on the argmax more often;
+     - pass@8 trends down, because fewer distinct answers get drawn;
+     - when the top answer is wrong, the gold loses mass. On unseen items `dpo-strict`'s top
+       answer is wrong 87% of the time (`qa_unseen` 0.129), so the unseen gold log-probability
+       falls hardest.
 3. **Unseen:** strict accuracy −1.0 point (inside the noise). Gold-answer log-probability −1.33
-   nats [−1.61, −1.08]: a cost, named as one. Answers the policy doesn't put first lose
-   probability, the gold among them.
+   nats [−1.61, −1.08]: a cost, named as one, through the mechanism above.
 4. **Guards:**
    - MMLU (0.767 / 0.767) and GSM8K are within the noise.
-   - Hallucination is 1 of 76 in both seeds.
+   - Hallucination is 1 of 76 in both seeds. It carries no headline: the start sat at 3, the SFT
+     twins at 4 and 1 and the DPO twins at 1 and 2. A 2-item move is inside what reseeding does.
    - Length is −3% and 0%.
    - The hack audit read 1 and 0 of 50: the one is the year hole above.
    - `grpo-seed1` misses two absolute lines by one item each: false abstain 2 of 108 (line ≤ 1) and
      `cite_valid` 0.982 (line 1.000). Both are inside the noise floor and equal to
      `sft-from-cpt-seed1`'s own values.
    - `grpo` meets every line.
-5. **Same verifier, two algorithms** (against `sft-from-cpt`):
-   - Neither moved seen accuracy beyond the floor (`dpo-strict` +1.8, `grpo` +0.6).
-   - Offline pairs barely touched likelihood (seen gold_lp −0.01 nats).
-   - On-policy groups took 0.68 nats from it in 25 steps.
-   - DPO with 445 near-duplicate pairs did too little; GRPO on the same reward did the wrong thing
-     quickly.
-6. **Why it collapsed so fast:**
-   - The clip never acted: each batch gets one update (μ = 1), so the policy ratio is exactly 1 and
-     `clip_ratio/high_mean` read 0 at every step. The 0.28 clip-higher gets no credit.
-   - There was no KL term (β 0).
-   - Nothing in the objective pushed back on collapse; the stop rule was the only brake.
-   - The train reward rose on tasks it had already seen (about 1.3 visits each by step 52) while
-     `grpo_val` stayed flat: it fit the training set, and it didn't transfer to held-out tasks.
+5. **Same verifier, two algorithms** (against `sft-from-cpt`; the pass@k lines are in the table):
+   - **Greedy accuracy:** neither moved it beyond the floor (`dpo-strict` +1.8, `grpo` +0.6).
+   - **Sampled accuracy:** both sharpened, GRPO about twice as much.
+     - Seen pass@1: `dpo-strict` +3.5 points [+1.2, +6.0], `grpo` +6.6 [+3.6, +9.8].
+     - Seen pass@8: `dpo-strict` −3.0 (inside the noise), `grpo` −6.6 [−12.3, −0.9].
+   - **Likelihood:** both cost gold log-probability, GRPO far more.
+     - Seen: `dpo-strict` −0.01 nats, `grpo` −0.68.
+     - Unseen: `dpo-strict` −0.27, `grpo` −1.60.
+   - **The same reward in both forms:** offline pairs sharpened a little, on-policy groups sharpened
+     more and faster, and neither added a fact.
+   - **Win rate:** not run for these rows. The judge failed its benchmark and its two orders agreed
+     at coin-flip, so the column stays empty.
+6. **Why it collapsed so fast: the repo imported Magistral's hyperparameters without the system
+   that makes them act.**
+   - **Where the ratio comes from:** Magistral's brake is a clip on the ratio between the
+     trainer's policy and the generator's. That ratio departs from 1 because its generators run
+     asynchronously, on stale weights.
+   - **Here the ratio is always 1:** the colocated loop is synchronous, with one update per
+     generation batch (μ = 1). The generator is the policy, so the ratio is identically 1 up to
+     vLLM numerics.
+     - `clip_ratio/high_mean` read 0 at every step.
+     - ε_high 0.28 was inert by construction and gets no credit.
+   - **Nothing bounded each step's change:** β was also 0, so only the learning rate and the stop
+     rule limited it, and both runs collapsed inside 65 steps.
+   - **It fit the set without transfer:** the train reward rose on tasks it had already seen (about
+     1.3 visits each by step 52) while `grpo_val` stayed flat.
+   - **The recipe transfers only with its off-policy degree.** Any one of three fixes gives the
+     objective a brake:
+     - μ = 2, so the clip has a ratio to bind;
+     - β = 0.05 (Tülu 3's choice under PPO);
+     - an off-policy lag.
 
 ![pass@1 against pass@8 on the closed-book eval, seen and unseen, strict scorer](results/curves/passk.png)
 
@@ -1635,10 +1669,11 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
    - It stopped `grpo-seed1` at step 34 (0.14 against a 0.159 line) while the 10-step mean sat at
      57% of the start.
    - It is the fourth pre-registered threshold set on a point reading where a window was meant.
-2. **Put a brake in the objective, not only in a stop rule.**
-   - With one update per batch, clip-higher never binds, and β was 0.
-   - Several passes per batch (so the clip acts), a small KL or entropy term, or a lower learning
-     rate would each have pushed back on the collapse that ended both runs within 65 steps.
+2. **Import the system with the hyperparameters.**
+   - Magistral's ε_high acts on the gap its asynchronous generators open. In a synchronous loop
+     with one update per batch it is inert, and with β 0 nothing in the objective bounded a step.
+   - μ = 2 (the clip then has a ratio to bind), β = 0.05, or an off-policy lag would each have
+     braked the collapse that ended both runs within 65 steps.
 3. **Give RL something to improve, not only something to recall.**
    - Closed-book facts are either in the model or not, and on-policy sampling can only reweight
      what it already produces.
@@ -1675,6 +1710,10 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 | GSM8K | guard | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
 | grounded_acc (judge) | reported | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
 | cite_supported (judge) | reported | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
+| pass@1 seen (sampled) | reported | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
+| pass@8 seen | reported | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
+| pass@1 unseen (sampled) | reported | 0.105 | 0.119 | 0.112 | +1.0 pt [-0.1, +2.2] | 0.6 pt | no |
+| pass@8 unseen | reported | 0.297 | 0.258 | 0.271 | -3.2 pt [-7.7, +1.0] | 2.6 pt | no |
 
 Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
 
@@ -1691,8 +1730,12 @@ Rows marked primary are the pre-registered read (2026-10-09); guards must stay w
 | cite_valid | 1.000 | +0.0 pt | 1.8 pt | no | -0.9 pt | 1.8 pt | no |
 | MMLU | 0.766 | +0.1 pt | 0.4 pt | no | +0.1 pt | 0.4 pt | no |
 | GSM8K | 0.814 | -0.5 pt | 2.2 pt | no | -0.3 pt | 2.2 pt | no |
+| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | 0.4 pt | yes | +6.6 pt [+3.6, +9.8] | 0.2 pt | yes |
+| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | 2.4 pt | no | -6.6 pt [-12.3, -0.9] | 0.0 pt | yes |
+| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | 0.6 pt | no | +2.2 pt [+0.4, +4.0] | 0.6 pt | yes |
+| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | 2.6 pt | no | -4.5 pt [-9.7, +0.3] | 1.3 pt | no |
 
-dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap.
+dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge failed its benchmark and its two orders agreed at coin-flip.
 
 ##### pass@k on the closed-book eval (strict scorer)
 
@@ -1905,14 +1948,18 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - greedy accuracy unchanged;
   - sampled pass@1 +3.1 points on seen items, with pass@8 −3.6 (inside the noise);
   - gold-answer log-probability −0.67 nats seen and −1.33 unseen;
-  - hallucination 3 → 1 of 76.
+  - hallucination 3 → 1 of 76 is inside what reseeding does.
+- **Why it collapsed:** the colocated loop is synchronous with one update per batch, so
+  Magistral's clip-higher had no ratio to bind, and β was 0.
 - **Three verifier holes caught in one day:**
   - fragments, by auditing the checker's passes;
   - comma lists, by reading its code;
   - years within 2%, by the hack audit.
   - Only the last was learned, on one task.
-- **Going forward:** `stage5-final` stays `dpo-strict`, since nothing cleared the floor on the
-  primary line.
+- **Going forward:** `stage5-final` stays `dpo-strict`.
+  - CPT and SFT delivered; DPO and GRPO at this scale did not, and the pre-registered rules
+    rejected both.
+  - Stage 6 serves `dpo-strict`, the SFT model within noise.
 
 ### 5. Serving
 
@@ -1962,6 +2009,16 @@ tokens max; generated by `train/report.py` from `results/bench/`).
   latency at 1 and 32 concurrent requests._
 
 ### 6. What I'd do next
+
+**From Stage 5:**
+1. **μ = 2 with ε_high 0.28, first.** Two optimisation passes per generation batch give the
+   policy ratio room to leave 1, so the imported clip-higher does what it is for. Then β = 0.05,
+   or an off-policy lag, if that isn't enough.
+2. **Compute tasks:** a formula from a passage, sampled inputs and a Python-checked answer. This is
+   a skill on-policy RL can sharpen and that transfers to held-out items; closed-book recall can
+   only be reweighted.
+3. **Refilter the task set on the new policy and run a second round:** Magistral's curriculum in
+   miniature, once the objective has a brake.
 
 **From Stage 4:**
 1. **An NLL anchor on the chosen answer before any longer preference training:** RPO,
