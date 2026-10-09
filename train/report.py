@@ -571,7 +571,7 @@ def serving_table() -> str:
     Stop rate (requests ended by </s> before the 256-token cap) and mean output tokens at
     concurrency 1 exist from Stage 3's bench on; earlier rows leave them blank."""
     rows = []
-    for r in ["base-8b", "instruct-8b", "base-8b-hf", "cpt-8b", *SFT_COLORS]:
+    for r in ["base-8b", "instruct-8b", "base-8b-hf", "cpt-8b", *SFT_COLORS, "dpo"]:
         f = Path("results/bench") / f"{r}.json"
         if not f.exists():
             continue
@@ -1487,7 +1487,7 @@ def stage4_md(runs: dict, usd: float) -> str:
         gate="over every sft_val completion position (11,351; dpo_val's 665 are too few for the "
         "0.1% line, 2026-10-08 freeze) against an fp32 reference, the argmax flips the merge adds "
         "over the unmerged bf16 model's own (at most 0.1% of positions)",
-        diversity=(DPO_START, *runs),
+        diversity=(DPO_START,),  # the stage's own runs are added as names
     )
     if checks:
         md += "\n## Checks\n\n" + checks + "\n"
