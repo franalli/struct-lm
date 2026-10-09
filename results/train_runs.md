@@ -246,23 +246,21 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 
 Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
 
-## Same verifier, two algorithms: change against sft-from-cpt
+## Same verifier, two algorithms: each from its own start, and the chain's cumulative change from sft-from-cpt
 
-| metric | sft-from-cpt | dpo-strict change | floor | beyond | grpo change (mean of 2) | floor | beyond |
+| metric | sft-from-cpt | DPO from its own start (sft-from-cpt) | beyond (floor) | GRPO from its own start (dpo-strict) | beyond (floor) | cumulative from sft-from-cpt (grpo) | beyond (floor) |
 |---|---|---|---|---|---|---|---|
-| qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | 3.6 pt | no | +0.6 pt | 3.5 pt | no |
-| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | 0.247 | no | -0.681 [-0.938, -0.436] | 0.247 | yes |
-| qa_strict unseen | 0.116 | -0.6 pt | 2.6 pt | no | -1.6 pt | 2.6 pt | no |
-| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | 0.258 | yes | -1.603 [-1.975, -1.256] | 0.258 | yes |
-| halluc_rate (lower is better) | 0.053 | -1.3 pt | 3.9 pt | no | -3.9 pt | 3.9 pt | no |
-| false_abstain (lower is better) | 0.000 | +0.0 pt | 0.9 pt | no | +0.9 pt | 1.8 pt | no |
-| cite_valid | 1.000 | +0.0 pt | 1.8 pt | no | -0.9 pt | 1.8 pt | no |
-| MMLU | 0.766 | +0.1 pt | 0.4 pt | no | +0.1 pt | 0.4 pt | no |
-| GSM8K | 0.814 | -0.5 pt | 2.2 pt | no | -0.3 pt | 2.2 pt | no |
-| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | 0.4 pt | yes | +6.6 pt [+3.6, +9.8] | 0.2 pt | yes |
-| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | 2.4 pt | no | -6.6 pt [-12.3, -0.9] | 0.0 pt | yes |
-| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | 0.6 pt | no | +2.2 pt [+0.4, +4.0] | 0.6 pt | yes |
-| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | 2.6 pt | no | -4.5 pt [-9.7, +0.3] | 1.3 pt | no |
+| qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
+| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
+| qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
+| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
+| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
+| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
+| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |
+| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | yes (0.4 pt) | +3.1 pt [+1.3, +5.0] | yes (0.4 pt) | +6.6 pt [+3.6, +9.8] | yes (0.2 pt) |
+| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | no (2.4 pt) | -3.6 pt [-8.1, +0.9] | no (2.4 pt) | -6.6 pt [-12.3, -0.9] | yes (0.0 pt) |
+| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | no (0.6 pt) | +1.0 pt [-0.1, +2.2] | no (0.6 pt) | +2.2 pt [+0.4, +4.0] | yes (0.6 pt) |
+| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | no (2.6 pt) | -3.2 pt [-7.7, +1.0] | no (2.6 pt) | -4.5 pt [-9.7, +0.3] | no (1.3 pt) |
 
 dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge failed its benchmark and its two orders agreed at coin-flip.
 

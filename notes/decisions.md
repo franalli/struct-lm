@@ -4271,3 +4271,43 @@ coin-flip. One line in the README; the column stays empty.
 
 **The verifier section** keeps all three holes, with how each was found. The year hole carries its
 quoted task and completions: "1988" to "2020" all rewarded for gold 2010 in steps 30-49 of `grpo`.
+
+## 2026-10-09: The same-reward comparison measured from each algorithm's own start (correction, user review)
+
+**The correction:** "GRPO sharpened about twice as much" (this morning's write-up and the entry
+above) double-counted. GRPO started from dpo-strict, so its +6.6 points against SFT contains DPO's
++3.5.
+
+**Each algorithm from its own start:**
+
+| | seen pass@1 | seen pass@8 | seen gold_lp | unseen gold_lp |
+|---|---|---|---|---|
+| DPO (from SFT) | +3.5 [+1.2, +6.0] | −3.0, inside the noise | −0.01 | −0.27 |
+| GRPO (from DPO) | +3.1 [+1.3, +5.0] | −3.6 [−8.1, +0.9] | −0.67 | −1.33 |
+
+- Cumulative from SFT: seen pass@1 +6.6 [+3.6, +9.8], pass@8 −6.6 [−12.3, −0.9].
+- Unseen pass@1: +1.1 (DPO), +1.0 (GRPO), +2.2 cumulative.
+- The report's two-algorithm table now has three column groups: DPO from its own start, GRPO from
+  its own start, and the chain cumulative from SFT.
+
+**The sentence that replaces it:**
+- From their own starts the two algorithms sharpened sampled accuracy by the same amount, about 3
+  points.
+- What separates them is the price: DPO paid almost nothing in gold log-probability on seen facts
+  and 0.27 nats on unseen; GRPO paid 0.67 and 1.33.
+- At this scale offline DPO was the gentler optimiser, and GRPO's extra cost is what running without
+  a brake in the objective looks like.
+
+**Stage 4's first line, amended post hoc and labelled as such:**
+- "Indistinguishable from SFT on every line" was true of the pre-registered lines (greedy accuracy,
+  gold log-probability, the guards).
+- Sampled accuracy was not measured in Stage 4. Measured now as a reported line added after the
+  fact, it moved: seen pass@1 +3.1 [+1.0, +5.5] for the as-run dpo/dpo-seed1 pair, +3.5 for
+  dpo-strict, with pass@8 flat (−3.0, inside the noise).
+
+**The chain sentence stands:** CPT and SFT delivered; DPO and GRPO did not clear the floor on the
+primary lines, and the rules rejected both. It gains a half-sentence: both sharpened sampled
+accuracy by about 3 points, DPO at near-zero calibration cost.
+
+**The floor note stays:** sft-from-cpt's twin was never sampled, so the pass@k floors come from the
+DPO and GRPO pairs.

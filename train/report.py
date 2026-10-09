@@ -1641,34 +1641,58 @@ def grpo_delta_table() -> str:
 
 
 def two_algorithm_table() -> str:
-    """Same verifier, two algorithms: dpo-strict (offline pairs, one run) and grpo (on-policy
-    groups, two seeds) against the SFT start, each with its floor (its own seed gap where it has
-    a twin, the start's SE and the start's seed gap; dpo-strict borrows the lenient DPO pair's)."""
+    """Same verifier, two algorithms, each measured from its own start, and the chain's cumulative
+    change: DPO (dpo-strict, offline pairs, one run) from sft-from-cpt; GRPO (two seeds, on-policy
+    groups) from dpo-strict, where it started; GRPO from sft-from-cpt (the chain). Each cell is the
+    change and whether it clears its floor (shown): the run's own seed gap where it has a twin, the
+    start's SE and the start's seed gap (dpo-strict borrows the lenient DPO pair's). pass@k lines are
+    paired per item; sft-from-cpt's twin was not sampled, so their floors are the DPO and GRPO pairs'."""
     m = metrics_with_strict((DPO_START, *SFT_SEED_PAIR, GRPO_START, *DPO_PAIR, *GRPO_PAIR))
     if not all(r in m for r in (DPO_START, GRPO_START, *GRPO_PAIR)):
         return ""
     sizes = half_sizes()
-    head = ["metric", DPO_START, "dpo-strict change", "floor", "beyond", "grpo change (mean of 2)",
-            "floor", "beyond"]  # fmt: skip
+    groups = [  # (start, runs, start's seed pairs for the floor)
+        (DPO_START, (GRPO_START,), (SFT_SEED_PAIR, DPO_PAIR)),
+        (GRPO_START, GRPO_PAIR, (DPO_PAIR,)),
+        (DPO_START, GRPO_PAIR, (SFT_SEED_PAIR,)),
+    ]
+    head = ["metric", DPO_START, "DPO from its own start (sft-from-cpt)", "beyond (floor)",
+            "GRPO from its own start (dpo-strict)", "beyond (floor)",
+            "cumulative from sft-from-cpt (grpo)", "beyond (floor)"]  # fmt: skip
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-    for label, key, kind, extra, role in GRPO_ROWS:
-        if role == "reported" and key not in ("qa_strict_unseen", "gold_lp_unseen"):
+    keep = (
+        "qa_strict_seen",
+        "qa_strict_unseen",
+        "gold_lp_seen",
+        "gold_lp_unseen",
+        "halluc_rate",
+        "mmlu",
+        "gsm8k",
+    )
+    for label, key, kind, extra, _ in GRPO_ROWS:
+        if key not in keep:
             continue
-        d = change_row(
-            m, label, key, kind, extra, DPO_START, (GRPO_START,), (SFT_SEED_PAIR, DPO_PAIR), sizes
-        )
-        g = change_row(m, label, key, kind, extra, DPO_START, GRPO_PAIR, (SFT_SEED_PAIR,), sizes)
-        if d is None or g is None:
-            continue
-        lines.append("| " + " | ".join([label, f"{m[DPO_START][key]:.3f}", *d[0], *g[0]]) + " |")
+        cells = []
+        for start, runs, pairs in groups:
+            row = change_row(m, label, key, kind, extra, start, runs, pairs, sizes)
+            if row is None:
+                break
+            cells += [row[0][0], f"{row[0][2]} ({row[0][1]})"]
+        else:
+            lines.append("| " + " | ".join([label, f"{m[DPO_START][key]:.3f}", *cells]) + " |")
     for label, metric, half in PASSK_ROWS_READ:
-        d = passk_change(DPO_START, (GRPO_START,), metric, half, (DPO_PAIR,))
-        g = passk_change(DPO_START, GRPO_PAIR, metric, half)
-        if d is None or g is None:
-            continue
-        v = passk_items(DPO_START)
-        start = np.mean([float(v[i]["strict"][metric]) for i in v if v[i]["half"] == half])
-        lines.append("| " + " | ".join([label, f"{start:.3f}", *d, *g]) + " |")
+        cells = []
+        for start, runs, pairs in groups:
+            ch = passk_change(
+                start, runs, metric, half, tuple(pp for pp in pairs if pp != SFT_SEED_PAIR)
+            )
+            if ch is None:
+                break
+            cells += [ch[0], f"{ch[2]} ({ch[1]})"]
+        else:
+            v = passk_items(DPO_START)
+            st = np.mean([float(v[i]["strict"][metric]) for i in v if v[i]["half"] == half])
+            lines.append("| " + " | ".join([label, f"{st:.3f}", *cells]) + " |")
     return "\n".join(lines)
 
 
@@ -1829,7 +1853,8 @@ def stage5_md(runs: dict, usd: float) -> str:
         )
     if ta := two_algorithm_table():
         md += (
-            f"\n## Same verifier, two algorithms: change against {DPO_START}\n\n" + ta + "\n\n"
+            "\n## Same verifier, two algorithms: each from its own start, and the chain's cumulative "
+            f"change from {DPO_START}\n\n" + ta + "\n\n"
             "dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict "
             "checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each "
             f"floor also takes {DPO_START}'s own seed gap. pass@k lines: paired per item (8 samples "

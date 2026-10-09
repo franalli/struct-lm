@@ -1051,6 +1051,16 @@ on every pre-registered line; two epochs fit the pairs and displaced the chosen 
 stage's two findings are that displacement curve, measured end to end with no judge noise to
 blame, and the judge's failure, which is why every pair carries a verifier or rule label.
 
+**Amended 2026-10-09, post hoc and labelled: sampled accuracy moved.**
+- The pre-registered lines were greedy accuracy, gold log-probability and the guards, and they are
+  unchanged.
+- Sampled accuracy (pass@k, 8 samples at T 0.7) was not measured in Stage 4. Measured in Stage 5
+  as a reported line added after the fact, it moved:
+  - seen pass@1 +3.1 points [+1.0, +5.5] for `dpo` and `dpo-seed1`, and +3.5 [+1.2, +6.0] for
+    `dpo-strict`;
+  - pass@8 flat (−3.0, inside the noise).
+- DPO sharpened sampled accuracy at almost no cost to the gold answer's log-probability.
+
 **Amended 2026-10-09: 79 of the 458 closed-book chosen labels were wrong.** The audit was made when
 the closed-book verifier was about to become Stage 5's reward. Retrained on strict labels
 (`dpo-strict`, 445 pairs), DPO is still indistinguishable from SFT on seen accuracy and
@@ -1496,9 +1506,10 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
   `dpo-strict`, as the rule requires.
 - **Serving is greedy, so GRPO's only gain is one serving doesn't use.** That gain is sampled
   accuracy at T 0.7, and it cost calibration on every fact.
-- **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not, and the
-  pre-registered rules rejected both. The chain ends on `dpo-strict`, which is the SFT model within
-  noise.
+- **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not clear the
+  floor on the primary lines, and the pre-registered rules rejected both.
+  - Both sharpened sampled accuracy by about 3 points; DPO did so at near-zero calibration cost.
+  - The chain ends on `dpo-strict`, which is the SFT model within noise.
 
 Group Relative Policy Optimization from `dpo-strict`, with a fresh LoRA, on tasks the start
 sometimes solves. The policy writes every completion, rules score it, and no judge or reference
@@ -1628,16 +1639,22 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
      `cite_valid` 0.982 (line 1.000). Both are inside the noise floor and equal to
      `sft-from-cpt-seed1`'s own values.
    - `grpo` meets every line.
-5. **Same verifier, two algorithms** (against `sft-from-cpt`; the pass@k lines are in the table):
-   - **Greedy accuracy:** neither moved it beyond the floor (`dpo-strict` +1.8, `grpo` +0.6).
-   - **Sampled accuracy:** both sharpened, GRPO about twice as much.
-     - Seen pass@1: `dpo-strict` +3.5 points [+1.2, +6.0], `grpo` +6.6 [+3.6, +9.8].
-     - Seen pass@8: `dpo-strict` −3.0 (inside the noise), `grpo` −6.6 [−12.3, −0.9].
-   - **Likelihood:** both cost gold log-probability, GRPO far more.
-     - Seen: `dpo-strict` −0.01 nats, `grpo` −0.68.
-     - Unseen: `dpo-strict` −0.27, `grpo` −1.60.
-   - **The same reward in both forms:** offline pairs sharpened a little, on-policy groups sharpened
-     more and faster, and neither added a fact.
+5. **Same verifier, two algorithms**, each measured from its own start:
+
+   | | seen pass@1 | seen pass@8 | seen gold_lp | unseen gold_lp |
+   |---|---|---|---|---|
+   | DPO (from SFT) | +3.5 [+1.2, +6.0] | −3.0, inside the noise | −0.01 | −0.27 |
+   | GRPO (from DPO) | +3.1 [+1.3, +5.0] | −3.6 [−8.1, +0.9] | −0.67 | −1.33 |
+
+   The full table, with the unseen pass@k lines and the chain's cumulative change from SFT, is
+   below the figures.
+   - **Same gain, different price.** From their own starts, the two algorithms sharpened sampled
+     accuracy by the same amount, about 3 points. What separates them is the gold log-probability:
+     DPO paid almost nothing on seen facts and 0.27 nats on unseen; GRPO paid 0.67 and 1.33.
+   - **At this scale offline DPO was the gentler optimiser.** GRPO's extra cost is what running
+     without a brake in the objective looks like (item 6).
+   - **Cumulative from SFT:** the chain reaches +6.6 points on seen pass@1 [+3.6, +9.8] with pass@8
+     at −6.6 [−12.3, −0.9]. Greedy accuracy moved in neither stage, and neither added a fact.
    - **Win rate:** not run for these rows. The judge failed its benchmark and its two orders agreed
      at coin-flip, so the column stays empty.
 6. **Why it collapsed so fast: the repo imported Magistral's hyperparameters without the system
@@ -1717,23 +1734,21 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 
 Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
 
-##### Same verifier, two algorithms: change against sft-from-cpt
+##### Same verifier, two algorithms: each from its own start, and the chain's cumulative change from sft-from-cpt
 
-| metric | sft-from-cpt | dpo-strict change | floor | beyond | grpo change (mean of 2) | floor | beyond |
+| metric | sft-from-cpt | DPO from its own start (sft-from-cpt) | beyond (floor) | GRPO from its own start (dpo-strict) | beyond (floor) | cumulative from sft-from-cpt (grpo) | beyond (floor) |
 |---|---|---|---|---|---|---|---|
-| qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | 3.6 pt | no | +0.6 pt | 3.5 pt | no |
-| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | 0.247 | no | -0.681 [-0.938, -0.436] | 0.247 | yes |
-| qa_strict unseen | 0.116 | -0.6 pt | 2.6 pt | no | -1.6 pt | 2.6 pt | no |
-| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | 0.258 | yes | -1.603 [-1.975, -1.256] | 0.258 | yes |
-| halluc_rate (lower is better) | 0.053 | -1.3 pt | 3.9 pt | no | -3.9 pt | 3.9 pt | no |
-| false_abstain (lower is better) | 0.000 | +0.0 pt | 0.9 pt | no | +0.9 pt | 1.8 pt | no |
-| cite_valid | 1.000 | +0.0 pt | 1.8 pt | no | -0.9 pt | 1.8 pt | no |
-| MMLU | 0.766 | +0.1 pt | 0.4 pt | no | +0.1 pt | 0.4 pt | no |
-| GSM8K | 0.814 | -0.5 pt | 2.2 pt | no | -0.3 pt | 2.2 pt | no |
-| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | 0.4 pt | yes | +6.6 pt [+3.6, +9.8] | 0.2 pt | yes |
-| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | 2.4 pt | no | -6.6 pt [-12.3, -0.9] | 0.0 pt | yes |
-| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | 0.6 pt | no | +2.2 pt [+0.4, +4.0] | 0.6 pt | yes |
-| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | 2.6 pt | no | -4.5 pt [-9.7, +0.3] | 1.3 pt | no |
+| qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
+| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
+| qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
+| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
+| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
+| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
+| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |
+| pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | yes (0.4 pt) | +3.1 pt [+1.3, +5.0] | yes (0.4 pt) | +6.6 pt [+3.6, +9.8] | yes (0.2 pt) |
+| pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | no (2.4 pt) | -3.6 pt [-8.1, +0.9] | no (2.4 pt) | -6.6 pt [-12.3, -0.9] | yes (0.0 pt) |
+| pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | no (0.6 pt) | +1.0 pt [-0.1, +2.2] | no (0.6 pt) | +2.2 pt [+0.4, +4.0] | yes (0.6 pt) |
+| pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | no (2.6 pt) | -3.2 pt [-7.7, +1.0] | no (2.6 pt) | -4.5 pt [-9.7, +0.3] | no (1.3 pt) |
 
 dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge failed its benchmark and its two orders agreed at coin-flip.
 
@@ -1920,6 +1935,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 **Stage 4 (DPO on verifiable preferences):**
 - **One epoch is indistinguishable from the SFT start** on every pre-registered line, with the
   start's own seed gap in the floor.
+  - Sampled accuracy, measured after the fact (a reported line): seen pass@1 +3.1 points, pass@8
+    flat.
   - Read as written, hallucination (4 → 1-2 of 76) and unseen gold_lp (−0.21 nats) cleared the
     noise at 1.3× and 1.1×.
   - 58 of 100 greedy answers are byte-identical to SFT's.
@@ -1957,8 +1974,10 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - years within 2%, by the hack audit.
   - Only the last was learned, on one task.
 - **Going forward:** `stage5-final` stays `dpo-strict`.
-  - CPT and SFT delivered; DPO and GRPO at this scale did not, and the pre-registered rules
-    rejected both.
+  - CPT and SFT delivered; DPO and GRPO at this scale did not clear the floor on the primary lines,
+    and the pre-registered rules rejected both.
+  - Both sharpened sampled accuracy by about 3 points from their own starts; DPO did so at
+    near-zero calibration cost, GRPO at 0.67 and 1.33 nats.
   - Stage 6 serves `dpo-strict`, the SFT model within noise.
 
 ### 5. Serving
