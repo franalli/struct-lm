@@ -55,6 +55,9 @@ CASES = [  # (verifier, text, ids, format, correct)
     (CLOSED_TERM, "cripple walls", EOS, True, True),
     (CLOSED_TERM, "wall", EOS, True, False),
     (CLOSED_TERM, "cripple wall; shear wall", EOS, False, False),
+    (CLOSED_TERM, "cripple wall, shear wall", EOS, False, False),  # a comma list: a format failure
+    (CLOSED_TERM, "shear wall, cripple wall", EOS, False, False),
+    (CLOSED_IDENT, "17.8.3, Section 17.8.2", EOS, False, False),
     # grounded: valid citations; correct = cites the gold passage, at most 2 passages, no abstain
     (CITE, f"The width is 2 in. [{GOLD}]", EOS, True, True),
     (CITE, f"The width is 2 in. [{GOLD}] It is temporary [{IDS[0]}]", EOS, True, True),
@@ -135,7 +138,9 @@ def test_verifier_for():
 )
 def test_stage4_pool_characterisation():
     """The reward's closed-book verdicts on Stage 4's pool samples (sft-from-cpt, T 0.7, 4 per prompt),
-    pinned: a change to the verifier shows here (1,305 correct; same_fact passed 1,492)."""
+    pinned: a change to the verifier shows here (1,299 correct; 1,305 before the 2026-10-09 comma
+    fix, which fails one "triangular or trapezoidal cross sections", and the year fix, which fails
+    five wrong years within 2% of "2010"; same_fact passed 1,492)."""
     sys.path.insert(0, str(REPO / "data/scripts"))
     gold = {}
     for line in (REPO / "data/sft/work/judged.jsonl").open():
@@ -151,4 +156,4 @@ def test_stage4_pool_characterisation():
             n += 1
             correct += R.score(s["text"], s["token_ids"], v)["correct"]
     assert n == 4336
-    assert correct == 1305
+    assert correct == 1299

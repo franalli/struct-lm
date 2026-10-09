@@ -13,6 +13,7 @@
 import hashlib
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -220,6 +221,29 @@ def test_train_function_end_to_end(grpo, tiny_mistral3, tmp_path, monkeypatch):
     assert s["base_drift_max"] == 0.0  # no vLLM sync: the base is never merged into
     rule = grpo.checkpoint_rule(s)
     assert rule["checkpoint"] in ("checkpoint-1", "checkpoint-2")
+    spread = [r for r in log if "zero_spread" in r]  # the stop rule's source, from the rollouts
+    assert [r["step"] for r in spread] == [1, 2] and all(0 <= r["zero_spread"] <= 1 for r in spread)
+
+    # a resume from checkpoint-1 (a stop or a stopped app): the logs keep what led to that save
+    import shutil
+
+    shutil.rmtree(tmp_path / "checkpoints/_train/tiny/checkpoint-2")
+    with (tmp_path / "results/runs/tiny/train_log.jsonl").open("a") as f:
+        f.write(json.dumps({"step": 2, "check": "stop", "reason": "x"}) + "\n")
+    cfg["training"]["max_steps"] = 3
+    s2 = grpo.train(cfg)
+    assert s2["steps"] == 3 and s2["resumed"] == ["checkpoint-1"]
+    log2 = [json.loads(x) for x in (tmp_path / "results/runs/tiny/train_log.jsonl").open()]
+    assert not [r for r in log2 if r.get("check") == "stop"]
+    train_steps = [
+        r["step"] for r in log2 if "reward" in r and not any(k.startswith("eval_") for k in r)
+    ]
+    assert train_steps == [1, 2, 3]  # step 2 once: the abandoned attempt's row is gone
+    assert [r["step"] for r in log2 if "zero_spread" in r] == [1, 2, 3]
+    roll2 = [json.loads(x) for x in (tmp_path / "results/runs/tiny/rollouts.jsonl").open()]
+    by_step = Counter(r["step"] for r in roll2 if r["mode"] == "train")
+    assert by_step == {0: 8, 1: 8, 2: 8}  # one generation per optimizer step, no duplicates
+    assert [e["step"] for e in s2["val_curve"]] == [0, 1, 2, 3]
 
 
 def test_report_stage5(tmp_path, monkeypatch):
@@ -240,7 +264,7 @@ def test_report_stage5(tmp_path, monkeypatch):
                     "reward": 0.45 + 0.002 * step + shift,
                     "entropy": 0.4 - 0.001 * step,
                     "completions/mean_length": 20 + 0.01 * step,
-                    "frac_reward_zero_std": 0.2 + 0.002 * step,
+                    "zero_spread": 0.2 + 0.002 * step,
                     "sampling/sampling_logp_difference/mean": 0.006,
                 }
             )

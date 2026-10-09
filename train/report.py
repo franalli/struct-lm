@@ -1705,7 +1705,12 @@ def plot_grpo(runs: dict, out: Path) -> None:
         (axes[0, 0], "reward", "Train reward (0.1 format + 0.9 correct + length)", "reward"),
         (axes[0, 2], "completions/mean_length", "Mean completion length", "tokens"),
         (axes[1, 0], "entropy", "Policy entropy", "nats / token"),
-        (axes[1, 1], "frac_reward_zero_std", "Groups with zero reward spread", "share"),
+        (
+            axes[1, 1],
+            "zero_spread",
+            "Task groups with identical rewards (from the rollouts)",
+            "share",
+        ),
         (
             axes[1, 2],
             "sampling/sampling_logp_difference/mean",

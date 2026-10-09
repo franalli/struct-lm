@@ -512,6 +512,8 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | dpo-2ep | 6.971 | +1.32% | +0.0131 [+0.0085, +0.0188] | 8.109 | -0.52% | -0.0053 [-0.0085, -0.0022] | 5.894 | -4.70% |
 | dpo-seed1 | 6.885 | +0.08% | +0.0008 [-0.0049, +0.0069] | 8.067 | -1.03% | -0.0104 [-0.0137, -0.0073] | 5.808 | -6.10% |
 | dpo-strict | 6.883 | +0.05% | +0.0005 [-0.0052, +0.0066] | 8.064 | -1.07% | -0.0107 [-0.0140, -0.0077] | 5.805 | -6.14% |
+| grpo | 6.927 | +0.69% | +0.0068 [+0.0019, +0.0127] | 8.086 | -0.80% | -0.0080 [-0.0113, -0.0049] | 5.843 | -5.53% |
+| grpo-seed1 | 6.928 | +0.70% | +0.0070 [+0.0020, +0.0129] | 8.088 | -0.77% | -0.0077 [-0.0111, -0.0046] | 5.843 | -5.52% |
 | sft-from-base | 7.008 | +1.86% | +0.0184 [+0.0166, +0.0211] | 8.234 | +1.01% | +0.0100 [+0.0091, +0.0110] | 6.311 | +2.05% |
 | sft-from-base-seed1 | 7.010 | +1.89% | +0.0187 [+0.0169, +0.0214] | 8.251 | +1.22% | +0.0121 [+0.0110, +0.0133] | 6.316 | +2.13% |
 | sft-from-cpt | 6.872 | -0.11% | -0.0011 [-0.0071, +0.0051] | 8.061 | -1.11% | -0.0111 [-0.0144, -0.0081] | 5.800 | -6.23% |
@@ -729,6 +731,10 @@ is in [`notes/decisions.md`](notes/decisions.md) (2026-10-05 retrospective).
    API client instead of retry-on-429, a judge-cache guard. Each was written after a loss: the
    full-parameter run's weights (and with them its 325-item QA scores), worker time asleep or
    retrying, and 50 re-judged items.
+   - One more from Stage 5: TRL's `frac_reward_zero_std` sounds per group, but under the non-default
+     `scale_rewards="batch"` it measured the batch and read 0 at every step.
+   - Curves that drive stop rules are now recomputed from the raw rollouts, not read from the
+     trainer.
 9. **Calibrate every judge rubric before it labels anything.** The grading judge was hand-checked at
    Stage 0, but the SFT judge, a new rubric labelling training data, went straight to 4,020
    examples. A full-passage audit then found 18% of what it kept defective, every defect a framing
@@ -1255,17 +1261,43 @@ slack) applied before the optimiser could.
 
 **What the audit found:** `same_fact` passed any piece of the gold ("Section" for
 "Section 17.8.2") and judged multi-number golds on their first number ("class 8" for "8 x 19").
-The strict checker that replaced it (`eval/scorers.qa_strict`, 69 fixtures in
+The strict checker that replaced it (`eval/scorers.qa_strict`, 88 fixtures in
 `tests/test_qa_strict.py`) works as follows:
 - **Values:** every gold number must be present, in a compatible unit, with no conflicting value.
 - **Identifiers:** the whole gold must be present, ending on its numbered token. A named document
   passes ("AASHTO LRFD Article 6.5.4.2" for "6.5.4.2"); a fragment, or a parent or child section,
   fails.
 - **Terms:** the whole phrase, with up to three words of context.
-- **Every answer:** one candidate. An "or", or a range the gold lacks, fails.
+- **Every answer:** one candidate. An "or", or a range the gold lacks, fails, and so does a
+  phrase answer that splits into several candidates on a comma, semicolon, slash, "or" or "and",
+  unless it is the gold exactly.
 - **Read before use:** every changed verdict was read against its gold first (rule 8).
 
-**The labels:** 79 of the 458 closed-book chosen labels fail it.
+**Verifiers are adversarial objects once they become rewards. The repo found that out three times
+in one day:**
+1. **The substring checker was caught by auditing its passes.** `same_fact` labelled the Stage 4
+   pairs, and reading what it accepted found the fragment hole before it became a reward.
+2. **The strict checker was caught by reading its code against its own one-answer rule.**
+   - It caught "or", ";" and ranges but not commas, so "cripple wall, shear wall" and "17.8.3,
+     Section 17.8.2" earned full credit.
+   - It was found with both GRPO runs at step ~30 and fixed. Neither run had learned the hole:
+     answer lines with more than one candidate stayed at the start's own rate (2.8% and 2.3%,
+     against 2.77% in the probe) and fell with training. The 16 that were rewarded are terms
+     with a symbol appended ("polar moment of inertia, J"), not lists of guesses.
+   - So the runs went on, and every eval row (none changed), the calibration window (672 → 671
+     tasks) and the `grpo_val` curves are scored with the fixed rule.
+   - The hack audit gained a flag that doesn't use the checker: the raw separator count and the
+     answer line's token length.
+3. **The relative tolerance on years was caught by the hack audit.**
+   - The audit reads the top-reward rollouts, and "1996" was rewarded for "2010": 2% of a year is
+     40 years.
+   - This one was learned, on the one bare-year task in the training window (10 of 16 late
+     rollouts rewarded for a wrong year).
+   - A year gold now needs the exact year. No eval item has one.
+4. **All three are fixtures now** (`tests/test_qa_strict.py`).
+
+**The labels:** 79 of the 458 closed-book chosen labels are wrong under it. The final rule rejects
+an 80th, a right answer that adds a noun to a gold holding "or".
 - 36 state a wrong value, range, unit or section, or hedge.
 - 24 give a fragment of a phrase gold ("Collapse" for "low likelihood of collapse").
 - 10 give the right section without the document the gold names.
@@ -1445,8 +1477,19 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 
 #### Stage 5: GRPO with verifiable rewards
 
-**In progress (2026-10-09):** `grpo` and `grpo-seed1` launched at 11:00 from `dpo-strict`. The
-method and the read below were fixed before training; results land with the runs.
+**Result: GRPO sharpened what the model already answered and added no knowledge.**
+- **Both seeds collapsed and stopped early.** They stopped on entropy collapse (steps 52 and 65:
+  entropy under a third of its start while the train reward climbed from 0.5 to 0.83), and the
+  pre-registered rule kept step 25 of each.
+- **Against `dpo-strict`:**
+  - greedy closed-book accuracy is unchanged (seen −1.2 points, floor 3.6);
+  - sampled pass@1 rose 3.1 points on seen items (paired CI [+1.3, +5.0]) while pass@8 fell 3.6,
+    inside the noise. That is DeepSeekMath's sharpening signature;
+  - the gold answer's log-probability fell 0.67 nats on seen facts and 1.33 on unseen, beyond the
+    floor: the cost of that sharpening;
+  - hallucination fell from 3 to 1 of 76 in both seeds.
+- **The expected +3 to +8 points on seen accuracy did not happen,** so `stage5-final` stays
+  `dpo-strict`, as the rule requires.
 
 Group Relative Policy Optimization from `dpo-strict`, with a fresh LoRA, on tasks the start
 sometimes solves. The policy writes every completion, rules score it, and no judge or reference
@@ -1538,13 +1581,150 @@ within one SE of the best counts as a tie, and ties go to the earliest.
 
 ![Stage 5 GRPO curves: train reward, grpo_val pass@1 and pass@8, length, entropy, zero-spread groups, and the vLLM-vs-policy log-prob gap](results/curves/grpo.png)
 
-##### The read
+##### The read: sharpening, not knowledge
 
-Pre-registered in `notes/decisions.md` (2026-10-09); filled in when the runs are scored.
+Pre-registered in `notes/decisions.md` (2026-10-09). The tables are below the figures. The floor is
+max(the GRPO seed gap, the start's SE, the start's own seed gap); `dpo-strict` has no twin, so the
+start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
+
+1. **Primary:**
+   - Seen strict accuracy: 0.305 → 0.299 / 0.287, −1.2 points against a 3.6-point floor. No
+     change.
+   - Seen gold-answer log-probability: −0.67 nats [−0.86, −0.49], beyond the floor in the wrong
+     direction.
+   - The expected +3 to +8 points did not come.
+2. **pass@1 against pass@8** (322 closed-book items, 8 samples at T 0.7, the strict scorer, paired
+   per item):
+   - Seen: pass@1 +3.1 points [+1.3, +5.0], pass@8 −3.6 [−8.1, +0.9], maj@8 +0.6.
+   - Unseen: pass@1 +1.0 [−0.1, +2.2], pass@8 −3.2 [−7.7, +1.3].
+   - Sampled accuracy rose while coverage stayed within the noise and leaned down. The policy puts
+     more of its mass on the answer it already ranked first, which is why greedy accuracy, already
+     that answer, didn't move.
+3. **Unseen:** strict accuracy −1.0 point (inside the noise). Gold-answer log-probability −1.33
+   nats [−1.61, −1.08]: a cost, named as one. Answers the policy doesn't put first lose
+   probability, the gold among them.
+4. **Guards:**
+   - MMLU (0.767 / 0.767) and GSM8K are within the noise.
+   - Hallucination is 1 of 76 in both seeds.
+   - Length is −3% and 0%.
+   - The hack audit read 1 and 0 of 50: the one is the year hole above.
+   - `grpo-seed1` misses two absolute lines by one item each: false abstain 2 of 108 (line ≤ 1) and
+     `cite_valid` 0.982 (line 1.000). Both are inside the noise floor and equal to
+     `sft-from-cpt-seed1`'s own values.
+   - `grpo` meets every line.
+5. **Same verifier, two algorithms** (against `sft-from-cpt`):
+   - Neither moved seen accuracy beyond the floor (`dpo-strict` +1.8, `grpo` +0.6).
+   - Offline pairs barely touched likelihood (seen gold_lp −0.01 nats).
+   - On-policy groups took 0.68 nats from it in 25 steps.
+   - DPO with 445 near-duplicate pairs did too little; GRPO on the same reward did the wrong thing
+     quickly.
+6. **Why it collapsed so fast:**
+   - The clip never acted: each batch gets one update (μ = 1), so the policy ratio is exactly 1 and
+     `clip_ratio/high_mean` read 0 at every step. The 0.28 clip-higher gets no credit.
+   - There was no KL term (β 0).
+   - Nothing in the objective pushed back on collapse; the stop rule was the only brake.
+   - The train reward rose on tasks it had already seen (about 1.3 visits each by step 52) while
+     `grpo_val` stayed flat: it fit the training set, and it didn't transfer to held-out tasks.
 
 ![pass@1 against pass@8 on the closed-book eval, seen and unseen, strict scorer](results/curves/passk.png)
 
+#### What I would do differently (Stage 5)
+
+1. **Write every stop rule on a moving window from the start.**
+   - The entropy rule read one batch, and one batch tracks its task mix.
+   - It stopped `grpo-seed1` at step 34 (0.14 against a 0.159 line) while the 10-step mean sat at
+     57% of the start.
+   - It is the fourth pre-registered threshold set on a point reading where a window was meant.
+2. **Put a brake in the objective, not only in a stop rule.**
+   - With one update per batch, clip-higher never binds, and β was 0.
+   - Several passes per batch (so the clip acts), a small KL or entropy term, or a lower learning
+     rate would each have pushed back on the collapse that ended both runs within 65 steps.
+3. **Give RL something to improve, not only something to recall.**
+   - Closed-book facts are either in the model or not, and on-policy sampling can only reweight
+     what it already produces.
+   - Compute tasks (a formula from a passage, sampled inputs, a Python-checked answer) would have
+     offered a skill GRPO can sharpen and that transfers to held-out items.
+4. **Make chain retries exclusive.** A Modal retry re-ran `grpo-seed1`'s training on a warm GPU
+   still holding the first run's engine, which failed for lack of memory. A pipeline that never
+   re-enters the train step after it returns would have saved a relaunch.
+
 <!-- stage5-tables:start -->
+##### Training runs
+
+| run | start | tasks | steps | stop | rule picks | grpo_val pass@1 / pass@8 at the pick | final train reward | final entropy | mean length | base drift | wall (h) | GPU-h | $ | peak GB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| grpo | dpo-strict | 622 | 52 | step 52: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.550 / 0.820 | 0.8179 | 0.158 | 19.857 | 2.4e-04 | 0.50 | 0.50 | 1.98 | 77 |
+| grpo-seed1 | dpo-strict | 622 | 65 | step 65: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.562 / 0.800 | 0.8162 | 0.1499 | 18.2883 | 1.2e-04 | 0.58 | 0.58 | 2.30 | 76 |
+
+The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 samples at T 1.0. $ at 3.95 per GPU-hour (assumed).
+
+##### The read: change against dpo-strict, next to the noise
+
+| metric | read | dpo-strict | grpo | grpo-seed1 | change (mean of 2) | floor | beyond |
+|---|---|---|---|---|---|---|---|
+| qa_strict seen (the reward's rule) | primary | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
+| seen gold-answer log-prob (nats) | primary | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
+| qa_acc seen (original scorer) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
+| qa_strict unseen | reported | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
+| qa_acc unseen (original scorer) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
+| unseen gold-answer log-prob (nats) | reported | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
+| halluc_rate (lower is better) | guard | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
+| false_abstain (lower is better) | guard | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
+| cite_valid | guard | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
+| MMLU | guard | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.3 pt | no |
+| GSM8K | guard | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
+| grounded_acc (judge) | reported | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
+| cite_supported (judge) | reported | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
+
+Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
+
+##### Same verifier, two algorithms: change against sft-from-cpt
+
+| metric | sft-from-cpt | dpo-strict change | floor | beyond | grpo change (mean of 2) | floor | beyond |
+|---|---|---|---|---|---|---|---|
+| qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | 3.6 pt | no | +0.6 pt | 3.5 pt | no |
+| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | 0.247 | no | -0.681 [-0.938, -0.436] | 0.247 | yes |
+| qa_strict unseen | 0.116 | -0.6 pt | 2.6 pt | no | -1.6 pt | 2.6 pt | no |
+| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | 0.258 | yes | -1.603 [-1.975, -1.256] | 0.258 | yes |
+| halluc_rate (lower is better) | 0.053 | -1.3 pt | 3.9 pt | no | -3.9 pt | 3.9 pt | no |
+| false_abstain (lower is better) | 0.000 | +0.0 pt | 0.9 pt | no | +0.9 pt | 1.8 pt | no |
+| cite_valid | 1.000 | +0.0 pt | 1.8 pt | no | -0.9 pt | 1.8 pt | no |
+| MMLU | 0.766 | +0.1 pt | 0.4 pt | no | +0.1 pt | 0.4 pt | no |
+| GSM8K | 0.814 | -0.5 pt | 2.2 pt | no | -0.3 pt | 2.2 pt | no |
+
+dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap.
+
+##### pass@k on the closed-book eval (strict scorer)
+
+| run | seen pass@1 | seen maj@8 | seen pass@8 | unseen pass@1 | unseen maj@8 | unseen pass@8 |
+|---|---|---|---|---|---|---|
+| sft-from-cpt | 0.213 ± 0.024 | 0.264 ± 0.034 | 0.479 ± 0.039 | 0.093 ± 0.016 | 0.110 ± 0.025 | 0.310 ± 0.037 |
+| dpo | 0.247 ± 0.027 | 0.270 ± 0.034 | 0.461 ± 0.039 | 0.104 ± 0.019 | 0.103 ± 0.025 | 0.284 ± 0.036 |
+| dpo-seed1 | 0.242 ± 0.027 | 0.258 ± 0.034 | 0.437 ± 0.038 | 0.111 ± 0.019 | 0.103 ± 0.025 | 0.310 ± 0.037 |
+| dpo-strict | 0.248 ± 0.028 | 0.264 ± 0.034 | 0.449 ± 0.039 | 0.105 ± 0.018 | 0.116 ± 0.026 | 0.297 ± 0.037 |
+| grpo | 0.278 ± 0.031 | 0.275 ± 0.035 | 0.413 ± 0.038 | 0.118 ± 0.021 | 0.136 ± 0.028 | 0.258 ± 0.035 |
+| grpo-seed1 | 0.281 ± 0.031 | 0.264 ± 0.034 | 0.413 ± 0.038 | 0.112 ± 0.020 | 0.103 ± 0.025 | 0.271 ± 0.036 |
+| instruct-8b | 0.079 ± 0.013 | 0.096 ± 0.023 | 0.264 ± 0.034 | 0.066 ± 0.011 | 0.077 ± 0.021 | 0.265 ± 0.035 |
+
+8 samples per item at T 0.7 (eval/passk.py); ± is the SE over items.
+
+##### Checks
+
+
+Merge gate (B5, amended): over every sft_val completion position (11,351) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
+
+| run | flips added | \|dlp\| ratio | val loss diff | merged vs unmerged top-1 | probe error ratio | checkpoint sha256 | passed |
+|---|---|---|---|---|---|---|---|
+| grpo | 3 of 11 | 1.079 | 0.08% | 99.53% | 0.2662 | `9f09e4aa569d` | yes |
+| grpo-seed1 | -1 of 11 | 1.185 | 0.15% | 99.52% | 0.4027 | `66c2092e0783` | yes |
+
+Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy over output tokens) and </s> on sampled answers (the eos job: 4 Stage 4 pool prompts per format x 4 at T 0.8; 20 prompts while the pool held replay, 16 after, 2026-10-08):
+
+| run | distinct-4 | entropy (bits) | mean length | distinct-4 general | distinct-4 domain | stopped (T 0.7) | stopped (eos job) |
+|---|---|---|---|---|---|---|---|
+| dpo-strict | 0.7575 | 9.0924 | 172.4 | 0.7394 | 0.8671 | 0.96 | 100.0% of 64 |
+| grpo | 0.7805 | 9.1367 | 167.0 | 0.7654 | 0.8756 | 0.98 | 100.0% of 64 |
+| grpo-seed1 | 0.7741 | 9.0967 | 171.9 | 0.7694 | 0.8038 | 0.98 | 100.0% of 64 |
 <!-- stage5-tables:end -->
 
 ### 4. Results
@@ -1621,6 +1801,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 |
 | dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 |
 | dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 |
+| grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 |
+| grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -1641,6 +1823,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo | 0.917 | 1.000 | 0.870 | 0.013 | 0.000 | 0.838 | 0.891 | 0.789 |
 | dpo-2ep | 0.907 | 1.000 | 0.852 | 0.013 | 0.000 | 0.852 | 0.921 | 0.789 |
 | dpo-strict | 0.926 | 1.000 | 0.861 | 0.040 | 0.000 | 0.824 | 0.861 | 0.789 |
+| grpo | 0.935 | 1.000 | 0.880 | 0.013 | 0.000 | 0.843 | 0.881 | 0.807 |
+| grpo-seed1 | 0.917 | 0.982 | 0.889 | 0.013 | 0.018 | 0.852 | 0.881 | 0.826 |
 
 **General benchmarks (5-shot, no chat template) and perplexity (lower is better)**
 
@@ -1661,6 +1845,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo | 0.767 | 0.729 | 0.703 | 0.859 | 0.814 | 0.810 | 0.796 | 5.80 | 6.88 | 8.07 | 6.30 |
 | dpo-2ep | 0.767 | 0.730 | 0.701 | 0.862 | 0.812 | 0.806 | 0.802 | 5.89 | 6.97 | 8.11 | 6.38 |
 | dpo-strict | 0.767 | 0.730 | 0.701 | 0.861 | 0.813 | 0.809 | 0.796 | 5.81 | 6.88 | 8.06 | 6.30 |
+| grpo | 0.767 | 0.728 | 0.703 | 0.859 | 0.814 | 0.820 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
+| grpo-seed1 | 0.767 | 0.728 | 0.702 | 0.859 | 0.813 | 0.802 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
 <!-- results-table:end -->
 
 **Stage 2 (CPT) earned little.**
@@ -1711,6 +1897,22 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 - **Going forward:** `dpo-strict` (seed 0, strict labels) is the Stage 4 checkpoint and
   `train/configs/grpo.yaml` starts from it. Stage 5 compares offline pairs against on-policy groups
   on the same strict verifier.
+
+**Stage 5 (GRPO with verifiable rewards):**
+- **Training:** 622 in-window tasks with a rule-based reward. Both seeds collapsed (stopped at 52
+  and 65) and kept step 25.
+- **Sharpening, not knowledge** (against `dpo-strict`):
+  - greedy accuracy unchanged;
+  - sampled pass@1 +3.1 points on seen items, with pass@8 −3.6 (inside the noise);
+  - gold-answer log-probability −0.67 nats seen and −1.33 unseen;
+  - hallucination 3 → 1 of 76.
+- **Three verifier holes caught in one day:**
+  - fragments, by auditing the checker's passes;
+  - comma lists, by reading its code;
+  - years within 2%, by the hack audit.
+  - Only the last was learned, on one task.
+- **Going forward:** `stage5-final` stays `dpo-strict`, since nothing cleared the floor on the
+  primary line.
 
 ### 5. Serving
 

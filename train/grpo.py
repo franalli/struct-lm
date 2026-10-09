@@ -31,9 +31,12 @@ completions/*, entropy, clip_ratio/*, sampling/*). Every rollout's text and rewa
 every eval_steps, the last step): grpo_val pass@1 and pass@8 from num_generations_eval samples per
 task, with the per-task SE (the checkpoint rule's input), and at every save 10 fixed greedy
 generations against the start's (dpo.DPOExtras: repetition, length, language). Stop rules
-(pre-registered, notes/decisions.md): frac_reward_zero_std > 0.8 for 10 consecutive steps; entropy
-under a third of its steps 1-5 mean; no new best val pass@1 in 2 evaluations while the train reward
-rose. A stop saves that step. run.smoke: 3 steps of 2 tasks x 8 at lr 1e-4 (a broken weight sync
+(pre-registered, notes/decisions.md; two amended 2026-10-09 before the read): the share of task
+groups with identical rewards over 0.8 for 10 consecutive steps, recomputed from the rollouts
+(TRL's frac_reward_zero_std tests the batch std under scale_rewards="batch" and is never zero);
+entropy's 10-step moving average under a third of its steps 1-10 mean (it read one batch, which
+tracks the batch's task mix); no new best val pass@1 in 2 evaluations while the train reward rose.
+A stop saves that step. run.smoke: 3 steps of 2 tasks x 8 at lr 1e-4 (a broken weight sync
 shows as a jump in sampling/sampling_logp_difference), evaluated at steps 0 and 2 on 5 tasks.
 
 Writes: training.output_dir (adapter; checkpoint-N at every save), <run.results_dir>/runs/<run>/
@@ -82,7 +85,7 @@ VLLM_ARGS = {
 }
 N_GENERATIONS = 10
 ZERO_STD_MAX, ZERO_STD_RUN = 0.8, 10
-ENTROPY_FLOOR = 1 / 3
+ENTROPY_FLOOR, ENTROPY_WINDOW = 1 / 3, 10
 FLAT_EVALS, REWARD_WINDOW = 2, 25
 DRIFT_PARAMS = ("layers.0.self_attn.q_proj", "layers.33.mlp.down_proj")
 
@@ -127,12 +130,33 @@ class Rollouts:
         if mode == "eval":
             for t, s in zip(task_id, scores):
                 self.watch.val[t].append(s["correct"])
+        else:  # the rollouts of the next optimizer step: its per-task reward spread
+            totals = [total(s) for s in scores]
+            self.watch.pending_spread = zero_spread(task_id, format, totals)
         with self.path.open("a") as f:
             for c, t, fmt, s in zip(completions, task_id, format, scores):
-                row = {"step": trainer_state.global_step, "mode": mode, "task_id": t, "format": fmt,
-                       **s, "total": round(total(s), 4), "text": _text(c)}  # fmt: skip
+                row = {"step": trainer_state.global_step, "mode": mode, "task_id": t, "kind": fmt,
+                       "format": fmt, **s, "total": round(total(s), 4), "text": _text(c)}  # fmt: skip
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
         return [CORRECT_W * s["correct"] for s in scores]
+
+
+def zero_spread(task_ids, kinds, totals) -> dict:
+    """The share of task groups whose completions all got the same total reward, overall and by
+    kind. TRL's frac_reward_zero_std tests the std it divides by, which under scale_rewards="batch"
+    is the batch's and never zero (it read 0.0 at every step, 2026-10-09); the advantage itself is
+    reward minus the group mean, so these groups carry no gradient either way."""
+    groups: dict[str, list[float]] = defaultdict(list)
+    kind = {}
+    for t, k, r in zip(task_ids, kinds, totals, strict=True):
+        groups[t].append(r)
+        kind[t] = k
+    same = {t: max(v) - min(v) < 1e-9 for t, v in groups.items()}
+    out = {"zero_spread": round(sum(same.values()) / len(same), 4), "groups": len(same)}
+    for k in sorted(set(kind.values())):
+        ts = [t for t in same if kind[t] == k]
+        out[f"zero_spread/{k}"] = round(sum(same[t] for t in ts) / len(ts), 4)
+    return out
 
 
 class Watch(TrainerCallback):
@@ -146,8 +170,25 @@ class Watch(TrainerCallback):
         self.rewards: list[float] = []
         self.entropy: list[float] = []
         self.zero_std_run = 0
+        self.pending_spread: dict | None = None
         self.stop: dict | None = None
         self.base: dict[str, torch.Tensor] = {}
+
+    def restore(self, rows: list[dict]) -> None:
+        """A resumed run's history, from its (truncated) train_log: the stop rules read the whole
+        run, not only the steps since the resume."""
+        train = {
+            r["step"]: r
+            for r in rows
+            if "reward" in r and not any(k.startswith("eval_") for k in r)
+        }
+        self.rewards = [train[s]["reward"] for s in sorted(train)]
+        self.entropy = [train[s]["entropy"] for s in sorted(train) if "entropy" in train[s]]
+        self.curve = list({r["step"]: r for r in rows if "val_pass@1" in r}.values())
+        spread = {r["step"]: r["zero_spread"] for r in rows if "zero_spread" in r}
+        self.zero_std_run = 0
+        for s in sorted(spread):
+            self.zero_std_run = self.zero_std_run + 1 if spread[s] > ZERO_STD_MAX else 0
 
     def _base_weights(self, model) -> dict[str, torch.Tensor]:
         out = {}
@@ -187,16 +228,23 @@ class Watch(TrainerCallback):
                    "passed": r is not None and abs(r - 1) <= 0.02}  # fmt: skip
             self.log.write(rec)
             print(json.dumps(rec))
-        z = logs.get("frac_reward_zero_std", 0.0)
-        self.zero_std_run = self.zero_std_run + 1 if z > ZERO_STD_MAX else 0
+        if self.pending_spread is not None:  # recomputed from the rollouts (zero_spread())
+            self.log.write({"step": state.global_step, **self.pending_spread})
+            z, self.pending_spread = self.pending_spread["zero_spread"], None
+            self.zero_std_run = self.zero_std_run + 1 if z > ZERO_STD_MAX else 0
         if self.zero_std_run >= ZERO_STD_RUN:
             self._halt(
-                state, control, f"frac_reward_zero_std > {ZERO_STD_MAX} for {ZERO_STD_RUN} steps"
+                state, control, f"zero-spread groups > {ZERO_STD_MAX} for {ZERO_STD_RUN} steps"
             )
-        if len(self.entropy) > 5 and self.entropy[-1] < ENTROPY_FLOOR * statistics.fmean(
-            self.entropy[:5]
-        ):
-            self._halt(state, control, "entropy under a third of its steps 1-5 mean")
+        # amended 2026-10-09 (post hoc, before the read): a 10-step moving average against the
+        # mean of steps 1-10; one batch's reading tracks its task mix, not collapse
+        w = ENTROPY_WINDOW
+        if len(self.entropy) > w and statistics.fmean(
+            self.entropy[-w:]
+        ) < ENTROPY_FLOOR * statistics.fmean(self.entropy[:w]):
+            self._halt(
+                state, control, f"entropy's {w}-step mean under a third of its steps 1-{w} mean"
+            )
 
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         if not self.val:
@@ -227,6 +275,49 @@ class Watch(TrainerCallback):
                 control,
                 f"no new best val pass@1 in {FLAT_EVALS} evaluations while the train reward rose",
             )
+
+
+def truncate_for_resume(results: Path, step: int, kinds: dict[str, str], log: Log) -> list[dict]:
+    """A resume from checkpoint-<step>: the logs keep what led to that save and drop the rest
+    (the abandoned attempt's later steps, its stop and its end-of-run rows). Rollouts generated at
+    global step s train step s + 1, so train rollouts are kept below `step`, evaluations at or
+    below it. Zero-spread rows missing from the kept history (logged before 2026-10-09's fix) are
+    backfilled from the kept rollouts. Returns the kept train_log rows."""
+
+    def keep_file(name: str, keep) -> int:
+        path = results / name
+        if not path.exists():
+            return 0
+        rows = [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
+        kept = [r for r in rows if keep(r)]
+        path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in kept))
+        return len(rows) - len(kept)
+
+    end_rows = ("stop", "base_drift_max")
+    dropped = {
+        "train_log": keep_file("train_log.jsonl", lambda r: r.get("step", 0) <= step
+                               and r.get("check") not in end_rows and "train_runtime" not in r),
+        "rollouts": keep_file("rollouts.jsonl", lambda r: r["step"] < step if r["mode"] == "train"
+                              else r["step"] <= step),
+        "eval_generations": keep_file("eval_generations.jsonl", lambda r: r.get("step", 0) <= step),
+    }  # fmt: skip
+    rows = [
+        json.loads(x) for x in (results / "train_log.jsonl").read_text().splitlines() if x.strip()
+    ]
+    have = {r["step"] for r in rows if "zero_spread" in r}
+    groups: dict[int, list] = defaultdict(list)
+    path = results / "rollouts.jsonl"
+    for r in map(json.loads, path.read_text().splitlines()) if path.exists() else ():
+        if r["mode"] == "train" and r["step"] + 1 not in have:
+            groups[r["step"] + 1].append(r)
+    for s in sorted(groups):
+        rs = groups[s]
+        rec = {"step": s, **zero_spread([r["task_id"] for r in rs], [kinds.get(r["task_id"], "?") for r in rs],
+                                        [r["total"] for r in rs]), "source": "rollouts, backfilled at resume"}  # fmt: skip
+        log.write(rec)
+        rows.append(rec)
+    log.write({"step": step, "check": "resumed", "from": f"checkpoint-{step}", "dropped": dropped})
+    return rows
 
 
 def checkpoint_rule(summary: dict) -> dict:
@@ -335,6 +426,12 @@ def train(cfg: dict, callbacks: list | None = None) -> dict:
     model, tok = load_model_and_tokenizer(cfg["model"])
     peft_cfg = lora_config(cfg)
     watch = Watch(log)
+    last = get_last_checkpoint(t["output_dir"]) if Path(t["output_dir"]).is_dir() else None
+    if last:  # the logs back to that save, the stop rules' history restored; no second step-0 eval
+        print(f"resuming from {last}")
+        kinds = {r["task_id"]: r["format"] for r in train_recs}
+        watch.restore(truncate_for_resume(results, int(Path(last).name.split("-")[1]), kinds, log))
+        t["eval_on_start"] = False
     correctness = Rollouts(results / "rollouts.jsonl", watch)
     gens = fixed_generations(val_recs, model_name)
     every = t.get("save_steps", 0) if t.get("save_strategy", "steps") == "steps" else 0
@@ -368,9 +465,6 @@ def train(cfg: dict, callbacks: list | None = None) -> dict:
         raise SystemExit(f"trainable parameter check failed: {check}")
 
     out_dir = t["output_dir"]
-    last = get_last_checkpoint(out_dir) if Path(out_dir).is_dir() else None
-    if last:
-        print(f"resuming from {last}")
     result = trainer.train(resume_from_checkpoint=last)
     trainer.save_model()
     tok.save_pretrained(out_dir)
@@ -409,6 +503,11 @@ def train(cfg: dict, callbacks: list | None = None) -> dict:
         "final_reward": last_n("reward"),
         "final_entropy": last_n("entropy"),
         "final_mean_length": last_n("completions/mean_length"),
+        "resumed": [
+            r["from"]
+            for r in map(json.loads, (results / "train_log.jsonl").open())
+            if r.get("check") == "resumed"
+        ],
         "val_curve": watch.curve,  # the checkpoint rule's input (modal_train.py --merge-from rule)
         "stop": watch.stop,
         "base_drift_max": getattr(watch, "base_drift", None),

@@ -1,0 +1,15 @@
+{
+  "run": "grpo",
+  "rule": "best grpo_val pass@1 among saves <= the stop; within 1 SE of the best = tie -> earliest",
+  "steps": 52,
+  "stop": {
+    "step": 52,
+    "reason": "entropy's 10-step mean under a third of its steps 1-10 mean"
+  },
+  "best_step": 25,
+  "best_val_pass@1": 0.55,
+  "best_se": 0.0565,
+  "picked_step": 25,
+  "picked_val_pass@1": 0.55,
+  "checkpoint": "checkpoint-25"
+}

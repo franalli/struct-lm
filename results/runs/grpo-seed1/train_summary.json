@@ -1,0 +1,153 @@
+{
+  "stage": "grpo",
+  "run": "grpo-seed1",
+  "base": "checkpoints/dpo-strict",
+  "lora": true,
+  "gpus": 1,
+  "dataset_hash": "4db8f7a6ab678a52387df08102d2082c858842795d1d644e5702eef689ee2830",
+  "tasks": 622,
+  "val_tasks": 50,
+  "by_format": {
+    "abstain": 21,
+    "closed_book": 489,
+    "grounded": 112
+  },
+  "completions_per_step": 128,
+  "num_generations": 8,
+  "steps": 65,
+  "loss_type": "dapo",
+  "scale_rewards": "batch",
+  "beta": 0.0,
+  "epsilon": [
+    0.2,
+    0.28
+  ],
+  "train_runtime_s": 1986.6,
+  "wall_s": 2095.8,
+  "gpu_hours": 0.582,
+  "final_reward": 0.8162,
+  "final_entropy": 0.1499,
+  "final_mean_length": 18.2883,
+  "resumed": [
+    "checkpoint-34",
+    "checkpoint-34"
+  ],
+  "val_curve": [
+    {
+      "step": 0,
+      "val_pass@1": 0.5025,
+      "val_pass@8": 0.84,
+      "val_se": 0.0533,
+      "val_tasks": 50,
+      "val_samples": 400
+    },
+    {
+      "step": 25,
+      "val_pass@1": 0.5625,
+      "val_pass@8": 0.8,
+      "val_se": 0.0535,
+      "val_tasks": 50,
+      "val_samples": 400
+    },
+    {
+      "step": 50,
+      "val_pass@1": 0.51,
+      "val_pass@8": 0.74,
+      "val_se": 0.0607,
+      "val_tasks": 50,
+      "val_samples": 400
+    }
+  ],
+  "stop": {
+    "step": 65,
+    "reason": "entropy's 10-step mean under a third of its steps 1-10 mean"
+  },
+  "base_drift_max": 0.0001220703125,
+  "checkpoints": [
+    "checkpoint-25",
+    "checkpoint-34",
+    "checkpoint-50",
+    "checkpoint-65"
+  ],
+  "peak_mem_gb": 76.18,
+  "smoke": false,
+  "data": {
+    "data/grpo/train.jsonl": "daa84b3cc0281eec359e766c6f226676908f25104075b7bf1f0cfa80413e06ea",
+    "data/grpo/val.jsonl": "98d34944c044fe96e8cfffd88dbb31528116206a9c4e2a48ee4903ae03cdbc18"
+  },
+  "config": {
+    "stage": "grpo",
+    "model": {
+      "init_from": "checkpoints/dpo-strict",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa"
+    },
+    "lora": {
+      "r": 64,
+      "lora_alpha": 128,
+      "lora_dropout": 0.0,
+      "bias": "none",
+      "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
+    },
+    "data": {
+      "dir": "data/grpo",
+      "train": "data/grpo/train.jsonl",
+      "val": "data/grpo/val.jsonl"
+    },
+    "run": {
+      "results_dir": "results"
+    },
+    "training": {
+      "output_dir": "checkpoints/_train/grpo-seed1",
+      "run_name": "grpo-seed1",
+      "num_generations": 8,
+      "per_device_train_batch_size": 8,
+      "gradient_accumulation_steps": 16,
+      "num_iterations": 1,
+      "max_steps": 150,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "max_completion_length": 256,
+      "loss_type": "dapo",
+      "scale_rewards": "batch",
+      "epsilon": 0.2,
+      "epsilon_high": 0.28,
+      "beta": 0.0,
+      "mask_truncated_completions": true,
+      "use_vllm": true,
+      "vllm_mode": "colocate",
+      "vllm_gpu_memory_utilization": 0.35,
+      "vllm_max_model_length": 3072,
+      "vllm_importance_sampling_correction": true,
+      "vllm_importance_sampling_mode": "token_truncate",
+      "vllm_importance_sampling_cap": 3.0,
+      "learning_rate": 1e-05,
+      "lr_scheduler_type": "constant_with_warmup",
+      "warmup_steps": 10,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.999,
+      "weight_decay": 0.0,
+      "max_grad_norm": 1.0,
+      "bf16": true,
+      "tf32": true,
+      "gradient_checkpointing": true,
+      "gradient_checkpointing_kwargs": {
+        "use_reentrant": false
+      },
+      "disable_dropout": true,
+      "eval_strategy": "steps",
+      "eval_steps": 25,
+      "eval_on_start": false,
+      "num_generations_eval": 8,
+      "per_device_eval_batch_size": 80,
+      "save_strategy": "steps",
+      "save_steps": 25,
+      "logging_steps": 1,
+      "log_completions": true,
+      "num_completions_to_print": 8,
+      "report_to": "none",
+      "seed": 1,
+      "data_seed": 1
+    }
+  }
+}

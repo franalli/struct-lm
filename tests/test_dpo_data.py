@@ -230,9 +230,14 @@ def test_strict_labels():
     rows = [r for s in ("train", "val") for r in jsonl(DPO / f"strict/{s}.jsonl")]
     cb = [r for r in rows if r["format"] == "closed_book"]
     assert cb
+    failed = set()
     for r in cb:
         g = gold[r["prompt_id"]]
-        assert ok(r["chosen"][0]["content"], g), r["id"]
+        if not ok(r["chosen"][0]["content"], g):
+            failed.add(r["id"])
         assert not ok(r["rejected"][0]["content"], g), r["id"]
+    # the set was frozen before the 2026-10-09 comma fix, which rejects one chosen answer: a right
+    # answer adding a noun to a gold that holds "or" (notes/decisions.md)
+    assert failed == {"usace-em-1110-2-1611:p62:c0:f2:closed_book:1#0"}
     meta = json.loads((DPO / "strict/pairs_meta.json").read_text())
     assert meta["closed_book_verifier"] == "scorers.qa_strict"

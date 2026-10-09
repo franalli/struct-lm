@@ -1,0 +1,30 @@
+{
+  "run": "grpo-seed1",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.7741,
+    "entropy": 9.0967,
+    "mean_len": 171.9,
+    "stop_rate": 0.98
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.7694,
+    "entropy": 8.9161,
+    "mean_len": 291.1,
+    "stop_rate": 0.96
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.8038,
+    "entropy": 7.9856,
+    "mean_len": 52.6,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 64,
+    "eos_stop_rate": 1.0,
+    "mean_len": 24.1,
+    "passed": true
+  }
+}

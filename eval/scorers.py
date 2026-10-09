@@ -150,8 +150,18 @@ def qa_correct(pred: str, gold: str, answer_type: str, tolerance: float = 0.02) 
 #   a value gold's trailing parenthetical is a conversion and may be left out ("100 mm" for
 #     "100 mm (4 in.)"); "8x19" = "8 x 19".
 #   an "N:1" ratio gold is the value N ("10" for "10:1", the 2026-10-04 eval audit's ruling).
+#   a bare-year gold ("2010") needs the year: 2% of a year is 40 years (found by the Stage 5 hack
+#     audit, "1996" rewarded for "2010").
 #   every kind: one candidate. "or", "and/or", "vs" or ";" the gold lacks, or (values) a range the
 #     gold lacks, fails ("two values on the answer line"; the GRPO reward's format gate).
+#   identifiers, terms and values without a number (amended 2026-10-09, after a read of this code
+#     found "cripple wall, shear wall" and "17.8.3, Section 17.8.2" passing): unless the whole
+#     line is one of the gold's forms, a line that splits into more than one candidate on ",", ";",
+#     "/" (spaced, or between lowercase words: "ASCE/SEI", "A820/A820M" and the ratio "w/c" are one
+#     token),
+#     " or " or " and " fails, whatever the candidates are. A comma between digits ("1,000") is
+#     not a separator; a gold with a separator passes only through the exact branch. Numbers keep
+#     their own rule (every gold number, no conflicting value).
 STRICT_KINDS = {
     "value": "value",
     "number": "value",
@@ -180,6 +190,8 @@ UNITS = {a: canon for canon, aliases in {
 }.items() for a in aliases}  # fmt: skip
 _ALT = re.compile(r"\b(?:or|and/or|either|versus|vs)\b|;", re.IGNORECASE)
 # a range: a number, up to a unit's worth of text ("20% to 100%", "3” to 4”"), then to or a dash
+_CANDIDATES = re.compile(r"(?<!\d),|,(?!\d)|;|\s/\s|(?<=[a-z]{2})/(?=[a-z]{2})|(?i:\s(?:or|and)\s)")
+_YEAR = re.compile(r"^\s*(1[89]\d\d|20\d\d)\s*$")
 _RANGE = re.compile(r"\d[^\d;]{0,12}?(?:\bto\b|[-–—])\s*[\d.]")
 CONTEXT_WORDS = 3
 _LOCATOR = re.compile(r"(?:\b(?:articles?|sections?)\b|§+)", re.IGNORECASE)
@@ -211,6 +223,7 @@ def _close(a: float, g: float, tol: float) -> bool:
 
 def _norm_id(text: str) -> str:
     t = _LOCATOR.sub(" ", text.replace("’", "'").replace("‘", "'"))
+    t = re.sub(r"(?<=\d),(?=\d{3}\b)", "", t)  # thousands separators: "1,000" = "1000"
     t = re.sub(r"/\s*[A-Za-z]?\d+M\b", "", t)  # ASTM's metric companion: "A820/A820M"
     t = re.sub(r"\b([A-Za-z]) (?=\d)", r"\1", t)  # "C 1138" = "C1138" (before normalize drops "a")
     t = re.sub(
@@ -243,11 +256,19 @@ def _identifier_ok(line: str, gold: str) -> bool:
     return set(g) <= set(a) and bool(numbered(a)) and numbered(a)[-1] == numbered(g)[-1]
 
 
+def candidates(line: str) -> list[str]:
+    """The line split on candidate separators (_CANDIDATES), empty pieces dropped."""
+    return [c for c in _CANDIDATES.split(line) if c.strip()]
+
+
 def one_candidate(line: str, gold: str, kind: str) -> bool:
     if _ALT.search(line) and not _ALT.search(gold):
         return False
+    numbered = STRICT_KINDS.get(kind) == "value" and quantities(gold)
+    if not numbered:  # phrases: the exact branch, else one candidate whatever the gold holds
+        return bool(_forms(line) & _forms(gold)) or len(candidates(line)) <= 1
     rng = lambda t: _RANGE.search(_digits(t))
-    return not (STRICT_KINDS.get(kind) == "value" and rng(line) and not rng(gold))
+    return not (rng(line) and not rng(gold))
 
 
 def qa_strict_reason(pred: str, gold: str, kind: str, tolerance: float = 0.02) -> str | None:
@@ -266,6 +287,8 @@ def qa_strict_reason(pred: str, gold: str, kind: str, tolerance: float = 0.02) -
         if kind == "identifier" and re.search(r"\d", gold):
             return None if _identifier_ok(line, gold) else "phrase"
         return None if _term_ok(line, gold) else "phrase"
+    if _YEAR.match(gold):
+        tolerance = 0.0
     bare = re.sub(r"\s*\([^()]*\)\s*$", "", gold)
     if bare != gold and quantities(bare) and _values(line, quantities(bare), tolerance) is None:
         return None

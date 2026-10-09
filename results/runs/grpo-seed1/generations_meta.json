@@ -1,0 +1,38 @@
+{
+  "domain_qa": {
+    "date": "2026-10-09",
+    "model": "/vol/checkpoints/grpo-seed1",
+    "chat": true,
+    "config_format": "hf",
+    "vllm": "0.29.0",
+    "n": 322,
+    "prompts_sha256": "b7fc3e81db74f35e6c5920ccefd229ccdf19894eeee5a3ecdf0ed8bf1a9cde35"
+  },
+  "grounded": {
+    "date": "2026-10-09",
+    "model": "/vol/checkpoints/grpo-seed1",
+    "chat": true,
+    "config_format": "hf",
+    "vllm": "0.29.0",
+    "n": 108,
+    "prompts_sha256": "9bce7b0595a629e0a024111699b871f32f13224f77983a29d87450bd1b56fcc7"
+  },
+  "vocab": {
+    "date": "2026-10-09",
+    "model": "/vol/checkpoints/grpo-seed1",
+    "chat": true,
+    "config_format": "hf",
+    "vllm": "0.29.0",
+    "n": 210,
+    "prompts_sha256": "805b70686106823a6211b1b0c83030f14d97f33a9c1e84db2fb9a53a9a1615cb"
+  },
+  "adversarial": {
+    "date": "2026-10-09",
+    "model": "/vol/checkpoints/grpo-seed1",
+    "chat": true,
+    "config_format": "hf",
+    "vllm": "0.29.0",
+    "n": 76,
+    "prompts_sha256": "6768bf31088806ab11f307ad6637ea08b80cb0d086dfa9a6bf8f0423500de87c"
+  }
+}

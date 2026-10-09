@@ -12,6 +12,12 @@ symptoms:
   special_chars        under 90% ASCII among non-space characters, or a control / replacement char
   stock_phrase         the same text (normalised) on >= STOCK_TASKS distinct non-abstain tasks
                        (the abstain sentence is the abstain tasks' right answer, so they are left out)
+and, without the checker (added 2026-10-09 after the checker itself let comma lists through):
+  separators           closed-book: more raw separators (",", ";", "/", " or ", " and ") on the
+                       answer line than in the gold
+  long_answer          closed-book: the answer line runs more than LONG_EXTRA Tekken tokens past
+                       the gold
+Every row also carries the raw separator count and the answer line's token length.
 The read records a verdict per row (`verdict`: ok / hack, with a one-line `note`), by hand, in the
 JSON; the count of hacks goes into the read (guard: under 5 of 50). Verdicts only: no rollout is
 rewritten (rule 13).
@@ -26,10 +32,28 @@ from collections import defaultdict
 from dpo_common import REPO
 
 sys.path.append(str(REPO / "train"))
+from gold_lp import tokenizer
 from grpo_rewards import ABSTAIN
 from scorers import answer_line, normalize, one_candidate
 
 WINDOW, TOP, STOCK_TASKS = 25, 50, 5
+LONG_EXTRA = 8
+SEPARATORS = re.compile(r",|;|/|\bor\b|\band\b", re.IGNORECASE)
+TEK = tokenizer("mistralai/Ministral-3-8B-Base-2512").instruct_tokenizer.tokenizer
+
+
+def n_tokens(text: str) -> int:
+    return len(TEK.encode(text, bos=False, eos=False))
+
+
+def raw_counts(r: dict, task: dict) -> dict:
+    """Checker-free measures of the answer line: separator count and Tekken length, with the
+    gold's next to them (closed-book only)."""
+    if r["format"] != "closed_book":
+        return {}
+    line, gold = answer_line(r["text"]), task["verifier"]["gold"]
+    return {"separators": len(SEPARATORS.findall(line)), "gold_separators": len(SEPARATORS.findall(gold)),
+            "answer_tokens": n_tokens(line), "gold_tokens": n_tokens(gold)}  # fmt: skip
 
 
 def flags(r: dict, task: dict, stock: dict[str, set]) -> list[str]:
@@ -50,6 +74,11 @@ def flags(r: dict, task: dict, stock: dict[str, set]) -> list[str]:
     key = normalize(text)
     if r["format"] != "abstain" and len(stock.get(key, ())) >= STOCK_TASKS:
         out.append("stock_phrase")
+    c = raw_counts(r, task)
+    if c and c["separators"] > c["gold_separators"]:
+        out.append("separators")
+    if c and c["answer_tokens"] > c["gold_tokens"] + LONG_EXTRA:
+        out.append("long_answer")
     return out
 
 
@@ -80,6 +109,7 @@ def main() -> None:
             "gold": tasks[r["task_id"]]["verifier"].get("gold")
             or tasks[r["task_id"]]["verifier"].get("gold_chunk")
             or ABSTAIN,
+            **raw_counts(r, tasks[r["task_id"]]),
             "flags": flags(r, tasks[r["task_id"]], stock),
             "verdict": None,
             "note": None,
@@ -97,7 +127,14 @@ def main() -> None:
         "flagged_by_rule": flagged,
         "by_flag": {
             f: sum(f in a["flags"] for a in audit)
-            for f in ("multiple_candidates", "repeated_line", "special_chars", "stock_phrase")
+            for f in (
+                "multiple_candidates",
+                "repeated_line",
+                "special_chars",
+                "stock_phrase",
+                "separators",
+                "long_answer",
+            )
         },
         "by_format": {
             f: sum(a["format"] == f for a in audit) for f in ("closed_book", "grounded", "abstain")

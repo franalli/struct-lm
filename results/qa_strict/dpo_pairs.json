@@ -1,8 +1,8 @@
 {
   "pairs": 458,
   "chosen_wrong": {
-    "phrase": 58,
-    "two_candidates": 5,
+    "phrase": 57,
+    "two_candidates": 7,
     "missing_number": 11,
     "conflict": 1,
     "unit": 4
@@ -379,7 +379,7 @@
       "kind": "identifier",
       "gold": "AASHTO LRFD 7th Edition, 2014",
       "chosen": "7th Edition, 2014",
-      "reason": "phrase"
+      "reason": "two_candidates"
     },
     {
       "id": "usace-em-1110-2-1611:p22:c0:f1:closed_book:2#0",
@@ -429,6 +429,13 @@
       "gold": "AASHTO LRFD 4.7.4.3.1",
       "chosen": "4.7.4.3",
       "reason": "phrase"
+    },
+    {
+      "id": "usace-em-1110-2-1611:p62:c0:f2:closed_book:1#0",
+      "kind": "value",
+      "gold": "triangular or trapezoidal",
+      "chosen": "triangular or trapezoidal cross sections",
+      "reason": "two_candidates"
     },
     {
       "id": "fema-p-2355:p34:c0:f2:closed_book:1#0",
@@ -564,10 +571,10 @@
       "reason": "missing_number"
     }
   ],
-  "chosen_wrong_total": 79,
+  "chosen_wrong_total": 80,
   "by_kind": {
     "identifier": 39,
-    "value": 35,
+    "value": 36,
     "term": 5
   }
 }

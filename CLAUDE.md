@@ -233,7 +233,9 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
 
 ### Stage 5: GRPO with verifiable rewards (tasks on the Mac, probe and training on Modal)
 
-Pre-registration, corrections and the read: `notes/decisions.md` (2026-10-09).
+Pre-registration, corrections and the read: `notes/decisions.md` (2026-10-09). Stage5-final is
+`checkpoints/dpo-strict` (nothing cleared the floor on the primary line; `grpo` / `grpo-seed1`,
+both checkpoint-25, are the evaluated rows). Both runs stopped on entropy collapse (steps 52, 65).
 
 ```bash
 make grpo-data                     # data/grpo/tasks.jsonl (Stage 4 pool minus judge split, + verifiers), contamination --only grpo, tests

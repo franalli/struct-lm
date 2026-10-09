@@ -1,0 +1,30 @@
+{
+  "run": "grpo",
+  "diversity": {
+    "answers": 100,
+    "distinct_4": 0.7805,
+    "entropy": 9.1367,
+    "mean_len": 167.0,
+    "stop_rate": 0.98
+  },
+  "diversity_general": {
+    "answers": 50,
+    "distinct_4": 0.7654,
+    "entropy": 8.9211,
+    "mean_len": 284.6,
+    "stop_rate": 0.96
+  },
+  "diversity_domain": {
+    "answers": 50,
+    "distinct_4": 0.8756,
+    "entropy": 8.2151,
+    "mean_len": 49.3,
+    "stop_rate": 1.0
+  },
+  "eos": {
+    "samples": 64,
+    "eos_stop_rate": 1.0,
+    "mean_len": 24.0,
+    "passed": true
+  }
+}

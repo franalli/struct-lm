@@ -3741,7 +3741,7 @@ reward. An audit of what it passed found two holes RL would game inside 50 steps
 The verifier was caught by auditing its passes before it became an RL reward: the RLHF Book's
 ch. 14 lesson (over-optimisation finds the proxy's slack) applied before the optimiser could.
 
-**The strict checker** (`eval/scorers.qa_strict`; fixtures in `tests/test_qa_strict.py`, 69 cases):
+**The strict checker** (`eval/scorers.qa_strict`; fixtures in `tests/test_qa_strict.py`, 69 cases then, 88 after the comma fix below):
 - **Normalisation, on both sides:** case, whitespace, unit spellings, and "Article/Section/§"
   stripped. "6.10.10" passes for "Article 6.10.10" (a must-pass fixture).
 - **Values:** every gold number is in the answer within tolerance, in a compatible unit. No other
@@ -3963,3 +3963,260 @@ chain: noop, train, merge, mergecheck (sft_val, nats line now reported), ppl, ev
 - **IS ratio mean off 1.0 by more than 10%:** check the weight sync first.
 - **A hack pattern in the audit:** tighten the gate, one rerun, and the pattern goes in the
   README.
+
+## 2026-10-09: The strict checker let comma lists through; fixed mid-run, runs continued (user decision on the evidence)
+
+**Found by reading the code against the one-answer rule (user review, ~11:35, both GRPO runs at
+step ~30):**
+- The checker caught "or", ";" and ranges but not commas.
+- Tested before anything else, it confirmed full reward (format and correctness) for:
+  - "cripple wall, shear wall" and "shear wall, cripple wall" (gold "cripple wall");
+  - "17.8.3, Section 17.8.2" (the gold last; first-place passed only by luck);
+  - "cripple wall/shear wall", "cripple wall and shear wall", "Appendix A, Appendix B" and
+    "chamfers, fillets".
+- Numbers were safe: a second value in a gold unit fails as a conflict.
+
+**The fix (the user's rule):**
+- After normalisation, a line that is one of the gold's forms passes.
+- Otherwise, a phrase line (identifier, term, a value gold without a number) that splits into more
+  than one candidate fails, whatever the candidates are. The split is on ",", ";", "/", " or " and
+  " and ".
+- Numbers keep their own rule.
+- Operationalised:
+  - a comma between digits is a thousands separator;
+  - a slash splits when spaced or between two lowercase words of at least two letters, so
+    "ASCE/SEI", "A820/A820M" and the ratio "w/c" stay one token;
+  - thousands commas are dropped in phrase normalisation ("1,000-year" = "1000-year").
+- Fixtures: both orders of the comma cases, the slash and "and" lists, and the must-passes (exact
+  golds holding a comma or "or", "ASCE/SEI 7-22 §12.11.2", "lowest practical w/c ratio"). The
+  fixture count is 88.
+
+**The rollouts decided it** (the user's three outcomes, fixed before looking). Closed-book answer
+lines with more than one candidate under the fixed rule:
+
+| | multi-candidate lines | trend |
+|---|---|---|
+| Base rate: the probe on dpo-strict, in-window closed-book | 117 of 4,224 = 2.77% | |
+| `grpo`, steps 0-28 | 2.82% | 2.9 → 4.6 → 3.3 → 2.4 → 1.8 → 1.5% by 5-step bin |
+| `grpo-seed1`, steps 0-31 | 2.27% | 2.3 → 1.5 → 3.2 → 3.2 → 1.9 → 1.5 → 2.6% |
+
+- Multi-candidate and rewarded: 16 of ~6,000 rollouts. Read: terms with a symbol or title appended
+  ("polar moment of inertia, J", "Residual strength, fr", "FEMA 547, Active Retrofit Methods"),
+  not lists of guesses.
+- **Outcome 1:** flat at the start's base rate, falling with step, so both runs finish. The
+  training reward was slightly wrong, but the policy did not learn the hole.
+
+**Re-scored with the fixed rule:**
+- every eval row: unchanged, 16 of 16;
+- the as-run DPO set: 80 of 458 chosen rejected, against 79. The 80th is a right answer that adds a
+  noun to a gold holding "or", so "79 wrong" stands;
+- dpo-strict's pairs: 1 chosen label rejected (the same sample), no list among them;
+- the calibration window: 672 → 671. The one task that leaves is in grpo_val, so the grpo_val curves
+  are re-scored from the eval rollouts with the fixed rule for the read;
+- the probe characterisation pin: 1,305 → 1,304.
+
+**Against a third time:**
+- The hack audit gained flags that don't use the checker: the raw separator count on the answer
+  line (more than the gold's) and its length in Tekken tokens (more than the gold's + 8).
+- The README's verifier section states both catches in order: the substring checker caught by
+  auditing its passes, the strict checker caught by reading its code against the one-answer rule,
+  fixtures for both.
+
+## 2026-10-09: Two stop-rule sources corrected mid-run; both runs resumed from their saves (user decisions, before the read)
+
+**The entropy rule, amended (post hoc, before the read it governs).**
+- **Registered:** stop when entropy falls under a third of its steps 1-5 mean.
+- **What fired:** implemented on one step's reading, it stopped `grpo-seed1` at step 34. That step
+  read 0.14 against a 0.159 line (a third of 0.476), on a batch of short closed-book answers (mean
+  length 11 tokens).
+- **The evidence is the opposite of collapse:**
+  - the 10-step mean was 0.27, 57% of the start;
+  - reward was rising (0.63-0.83);
+  - grpo_val pass@1 was up at step 25 (0.5025 → 0.5625).
+  - One batch is a sample of whichever task mix the step drew: closed-book one-liners sit lower
+    than grounded answers, so a point reading crosses any line eventually.
+- **Amended rule:** stop when the 10-step moving average of entropy falls below one third of the
+  mean over steps 1-10. The same window on both ends.
+
+**The zero-spread rule's source, corrected (the rule itself unchanged).**
+- **The fault:** TRL's `frac_reward_zero_std` read 0.0 at every step. Under
+  `scale_rewards="batch"` it tests the std it divides by (`grpo_trainer.py` 1895-1909), the
+  batch's, which is never zero.
+- **The learning signal is intact (verified):** the advantage is `rewards - mean_grouped_rewards`
+  (line 1906, the group mean from line 1887), divided by `batch std + 1e-4`.
+  - So a group whose 8 rewards are equal has advantage exactly 0 for every member, as under
+    per-group scaling. The batch std only rescales the non-zero advantages.
+  - Checked on `grpo`'s first logged step, recomputing TRL's formula from its 128 logged rewards:
+    16 groups, 6 with identical totals. Every advantage in those 6 is exactly 0.0, the mixed
+    groups reach |1.75|, and the batch std is 0.45, so TRL's `is_std_zero` is False for all 128.
+  - Only the metric was wrong.
+- **The rule now reads the recomputed number:** the share of task groups with identical total
+  rewards, computed in the reward call from the rollouts and logged per step (`zero_spread`, by
+  kind). Steps before the fix are backfilled from `rollouts.jsonl` at resume.
+- **Sanity against expectation** (a 1-7 of 8 window should give about 0.2-0.4 at the start; the
+  probe's own pass rates give 0.19 for identical correctness):
+
+  | | steps 0-9 | 10-19 | 20-29 | 30+ |
+  |---|---|---|---|---|
+  | grpo | 0.25 | 0.32 | 0.42 | 0.49 |
+  | grpo-seed1 | 0.33 | 0.29 | 0.46 | 0.61 |
+
+  - Neither near 0 (a wrong field) nor near 1 (a trainer reward differing from the calibration's).
+  - It is rising: the zero-spread stop may now fire before step 150.
+
+**The resume:**
+- Both apps were stopped (grpo at ~step 35, seed1 mid-merge of checkpoint-25).
+- Both resumed under the amended rules: grpo from checkpoint-25 (~10 steps lost), grpo-seed1 from
+  its step-34 save.
+- The rollout and train logs are truncated to what led to each save; the abandoned steps, the stop
+  row and the end-of-run rows are dropped.
+- The stop rules' history is restored from the log, so the baseline is the run's own steps 1-10.
+- No repeat step-0 evaluation. Constant LR, so the schedule resumes cleanly.
+- `tests/test_grpo_train.py` covers the resume.
+- **The resumed runs train on the fixed checker** (recorded as observed, flagged after the
+  relaunch). Modal ships the local code at launch, and the comma fix was already in
+  `eval/scorers.py`, so the reward changed at the resume:
+  - steps 1-25 (`grpo`) and 1-34 (`grpo-seed1`) were rewarded by the comma-hole checker, every later
+    step by the fixed one;
+  - the difference touches multi-candidate phrase answers only (~2% of rollouts; 0.27% had been
+    rewarded through the hole) and the policies had not learned the hole;
+  - the grpo_val evaluations at steps 0 and 25 were re-scored with the fixed rule from the eval
+    rollouts and are identical for both runs (pass@1 0.5225 / 0.5500 for grpo, 0.5025 / 0.5625 for
+    seed1; pass@8 unchanged). So the curve the checkpoint rule reads is one rule end to end.
+
+**Noted, not acted on today:** this is the fourth pre-registered rule amended for the same reason, a
+threshold set on a point reading where a window was meant:
+1. the merge gate on 295 positions;
+2. the step-1 loss band on the mixture mean;
+3. the DPO checkpoint rule on the loss;
+4. entropy on one batch.
+
+Each amendment went in before the read it governs, which is the discipline that matters. The
+README's "what I would do differently" says: write every stop rule on a moving window from the
+start.
+
+## 2026-10-09: grpo stopped at step 52 (entropy, sustained); checkpoint-25 picked; the hack audit found a third verifier hole (recorded as observed)
+
+**The stop and the pick:**
+- `grpo` (resumed at 25) stopped at step 52 under the amended rule: entropy's 10-step mean fell
+  under a third of its steps 1-10 mean (0.482).
+- This time it is sustained:
+
+  | steps | entropy | train correctness | zero-spread |
+  |---|---|---|---|
+  | 1-10 | 0.48 | 0.45 | 0.25 |
+  | 41-50 | 0.18 | 0.73 | 0.76 |
+
+- Over the same steps grpo_val pass@1 stayed flat (0.5225 / 0.55 / 0.52 at steps 0 / 25 / 50) and
+  pass@8 fell (0.86 / 0.82 / 0.74). That is the pre-registered memorisation signature, caught by
+  the collapse rule first.
+- **The checkpoint rule picked checkpoint-25** (0.55; step 50's 0.52 is within one SE, 0.057, and
+  ties go to the earliest).
+
+**The hack audit** (`data/scripts/grpo_audit.py grpo`, steps 27-51, the 50 highest-reward training
+rollouts, all read):
+- 49 ok: the gold verbatim, in groups where all 8 samples were right, and grounded answers citing
+  their gold passage.
+- 1 hack: "1996" rewarded for gold "2010". The value rule's 2% relative tolerance accepts any year
+  from about 1970 to 2050.
+- The 11 stock-phrase flags ("1 inch", "50 percent") are right answers. On their other tasks the
+  same text earned 0, so the reward does not credit them as a guess.
+- **Hacks by reading: 1 of 50**, under the pre-registered guard of 5.
+
+**The third verifier hole:**
+- Only 5 closed-book tasks have a bare-year gold, and 1 is in the window. On it, 10 of the 16
+  rollouts after step 30 were rewarded for a wrong year: the policy did learn this one, on one task
+  of 622.
+- **Fixed:** a bare-year gold needs the exact year, with fixtures.
+- **Effects:**
+  - no eval item has a year gold, so every eval row is unchanged;
+  - none of the year samples is a dpo-strict chosen label;
+  - the Stage 4 pool pin moves 1,304 → 1,299 (five wrong years within 2% of "2010").
+- `grpo-seed1` keeps training on the code it was launched with (the year rule as it was), on the same
+  one task. The read names it.
+
+**The verifier record, three holes in one day:**
+1. `same_fact`'s fragments, caught by auditing its passes;
+2. the strict checker's comma lists, caught by reading its code against the one-answer rule;
+3. the relative tolerance on years, caught by the hack audit reading the top-reward rollouts.
+
+The first two were closed before they could be learned. The third was learned on one task.
+
+**grpo-seed1** stopped at step 65 under the same sustained entropy rule. Its checkpoint rule also
+picked **checkpoint-25** (0.5625; step 50's 0.51 is within one SE, 0.054).
+- **Both evaluated checkpoints are steps 1-25 of the original 11:00 launches.** They predate every
+  resume, amendment and checker fix of the afternoon.
+- **Their weights were trained entirely on the launch-time reward:**
+  - the comma hole, which the rollouts show was not learned (multi-candidate answer lines at the
+    start's base rate);
+  - the year tolerance, on its one task.
+- The amendments decided only when each run stopped, never which weights are read.
+
+**grpo-seed1's chain retried after its pick (recorded as observed, 12:44):**
+- **What happened:** the chain's pipeline container was terminated (SIGTERM) just after the
+  checkpoint rule ran. Modal retried it, and the retry's train step resumed from the step-65 save.
+- **Why it doesn't matter:** the resume restores the stop rules' history, so the entropy rule
+  stands where it stood. The retry trains at most one step and stops again, and the rule re-reads
+  the same grpo_val curve, so the pick (checkpoint-25) cannot change.
+- **The record it leaves:** a "resumed" row at 65 and a stop at 66 in the log.
+- **If the first attempt's merge was still running,** two merges wrote identical files to
+  `checkpoints/grpo-seed1`. The merge gate's checkpoint sha is checked against the adapter's merge
+  before the read.
+- No relaunch was needed.
+
+## 2026-10-09: Stage 5 read (pre-registered rules applied): sharpening, not knowledge; stage5-final stays dpo-strict
+
+**Rows** (`results/table.md`): `grpo`, `grpo-seed1` (both checkpoint-25, merge gates passed: 3 and −1
+added flips, 0.00047 and 0.00085 nats). The two-algorithm and pass@k comparison rows are
+`sft-from-cpt`, `dpo`, `dpo-seed1`, `dpo-strict` and `instruct-8b`.
+
+**The read, item by item** (against dpo-strict, floor = max(GRPO seed gap, start SE, the lenient dpo
+pair's gap); 1 df):
+1. **Primary:**
+   - Seen qa_strict 0.305 → 0.299 / 0.287, −1.2 pt against a 3.6 floor: not beyond.
+   - Seen gold_lp −0.671 nats [−0.858, −0.492] against a floor of 0.193: beyond, a cost.
+   - The registered expectation (+3 to +8 pt on seen) was not met.
+2. **pass@1 vs pass@8** (paired per item, strict scorer, 8 × T 0.7):
+   - Seen: pass@1 +3.1 pt [+1.3, +5.0] (seed gaps 0.2 and 0.4); pass@8 −3.6 [−8.1, +0.9]; maj@8
+     +0.6.
+   - Unseen: pass@1 +1.0 [−0.1, +2.2]; pass@8 −3.2 [−7.7, +1.3].
+   - Pass@1 rose while pass@8 stayed within the noise: sharpening, as registered.
+3. **Unseen:** qa_strict −1.0 pt (inside the noise); gold_lp −1.333 nats [−1.608, −1.076], a cost,
+   named.
+4. **Guards:**
+   - MMLU −0.0 pt and GSM8K +0.2 pt, within the noise.
+   - Hallucination 1 and 1 of 76 (line ≤ 2).
+   - False abstain 0 and 2 of 108 (line ≤ 1: seed1 misses by one item, inside the 1.8-pt floor,
+     equal to sft-from-cpt-seed1's own value).
+   - cite_valid 1.000 and 0.982 (line 1.000: seed1 misses by two items, inside the floor, equal to
+     sft-from-cpt-seed1's).
+   - Length −3% and 0% (line +30%).
+   - Hack audit 1 and 0 of 50 (line < 5; the 1 is the year hole).
+5. **Same verifier, two algorithms** (against sft-from-cpt):
+
+   | | seen qa | seen gold_lp | unseen gold_lp |
+   |---|---|---|---|
+   | dpo-strict | +1.8 pt | −0.01 | −0.27 (at the floor) |
+   | grpo | +0.6 pt | −0.68 | −1.60 |
+
+   Neither moved seen accuracy beyond the floor.
+6. **Floor:** 1 df, as in Stages 3 and 4.
+
+**Why the collapse came within 65 steps:**
+- With μ = 1 the policy ratio is exactly 1, so the clip never binds: `clip_ratio/high_mean` read 0 at
+  every step, and clip-higher gets no credit.
+- β is 0. Nothing in the objective resisted collapse; the stop rule was the brake.
+- grpo_val pass@1 stayed flat (0.52 / 0.55 / 0.52) while the train reward rose 0.55 → 0.83: the
+  policy fit the 622 tasks without transfer.
+
+**stage5-final = dpo-strict, as registered** ("the start, if nothing cleared the floor"):
+- Nothing cleared the floor on the primary line in the right direction. Seen gold_lp cleared it in
+  the wrong one.
+- `checkpoints/grpo` and `grpo-seed1` stay as evaluated rows (rule 12), and Stage 6 serves
+  dpo-strict.
+- The alternative, serving grpo for its sampled-accuracy and hallucination gains, was offered to the
+  user before this entry; the registered rule stands unless they say otherwise.
+
+**For a rerun:**
+- a brake in the objective (μ > 1 so the clip acts, a small KL or entropy term, or a lower LR);
+- compute tasks, where a skill can improve rather than recall be reweighted.

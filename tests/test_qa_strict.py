@@ -53,8 +53,21 @@ HEDGES = [  # one candidate per line: alternatives or a range the gold doesn't h
     ("steel shape, angle, or tee", "steel shapes", "value"),
     ("3 to 5 ft", "3 ft", "value"),
     ("10 ft; 15 ft", "10 ft", "value"),
+    # comma, slash and "and" lists of phrases (2026-10-09: found by reading the code), both orders
+    ("cripple wall, shear wall", "cripple wall", "term"),
+    ("shear wall, cripple wall", "cripple wall", "term"),
+    ("cripple wall/shear wall", "cripple wall", "term"),
+    ("cripple wall and shear wall", "cripple wall", "term"),
+    ("17.8.3, Section 17.8.2", "Section 17.8.2", "identifier"),
+    ("Section 17.8.2, 17.8.3", "Section 17.8.2", "identifier"),
+    ("Section 17.8.2 / Section 17.8.3", "Section 17.8.2", "identifier"),
+    ("Appendix A, Appendix B", "Appendix A", "identifier"),
+    ("chamfers, fillets", "chamfers", "value"),
+    # a gold holding a separator passes only exactly
+    ("triangular or trapezoidal cross sections", "triangular or trapezoidal", "value"),
     ("1.05 to 1.1", "1.1", "value"),
     ("8–15 m", "8 m", "value"),
+    ("1996", "2010", "value"),  # a year is exact: 2% of 2010 is 40 years (the Stage 5 hack audit)
 ]
 MUST_PASS = [
     ("6.10.10", "Article 6.10.10", "identifier"),
@@ -82,7 +95,13 @@ MUST_PASS = [
     ("cripple walls", "cripple wall", "term"),
     ("polar moment of inertia", "polar moment of inertia (Jr)", "term"),
     ("Level III operations", "Level III", "identifier"),
-    ("triangular or trapezoidal cross sections", "triangular or trapezoidal", "value"),
+    ("triangular or trapezoidal", "triangular or trapezoidal", "value"),
+    ("Edris, Strohm, and Woo (1991)", "Edris, Strohm, and Woo (1991)", "term"),
+    ("AISC 360, Section I2.1b", "AISC 360, Section I2.1b", "identifier"),
+    ("1,000-year flood", "1000-year flood", "term"),  # a thousands comma is not a separator
+    ("lowest practical w/c ratio", "lowest practical w/c", "value"),  # a ratio, not a list
+    ("10 ft, 3 m", "10 ft", "value"),
+    ("2010", "2010", "value"),  # numbers keep their rule: a conversion is not a candidate
     ("20 to 100 percent", "20% to 100%", "value"),  # the gold's own range, with units between
     ("3 to 4 inches", "3” to 4”", "value"),
 ]
