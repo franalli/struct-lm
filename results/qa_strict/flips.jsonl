@@ -1,16 +1,17 @@
-{"id": "qa-1101", "gold": "3 archetypes", "kind": "number", "answer": "three archetypes", "lenient": false, "reason": null, "runs": ["sft-from-cpt", "dpo-seed1", "dpo", "dpo-strict", "grpo", "grpo-seed1"]}
+{"id": "qa-1101", "gold": "3 archetypes", "kind": "number", "answer": "three archetypes", "lenient": false, "reason": null, "runs": ["sft-from-cpt", "dpo-seed1", "dpo", "dpo-strict", "grpo", "grpo-seed1", "dpo-strict-fp8", "dpo-strict-fp8kv", "dpo-strict-w4a16"]}
 {"id": "qa-1114", "gold": "3 times", "kind": "number", "answer": "three times", "lenient": false, "reason": null, "runs": ["dpo-2ep"]}
+{"id": "qa-1204", "gold": "6 inches", "kind": "number", "answer": "150 mm (6 in.)", "lenient": false, "reason": null, "runs": ["dpo-strict-w4a16"]}
 {"id": "qa-0565", "gold": "SSPC-SP 10", "kind": "number", "answer": "SSPC-SP 10 / NACE No. 2", "lenient": true, "reason": "conflict", "runs": ["mistral-large-3"]}
 {"id": "qa-1076", "gold": "50 percent RH", "kind": "number", "answer": "50 ± 5 % RH", "lenient": true, "reason": "conflict", "runs": ["mistral-large-3"]}
 {"id": "qa-1037", "gold": "1 in.", "kind": "number", "answer": "1/4 inch (6 mm)", "lenient": true, "reason": "missing_number", "runs": ["instruct-8b"]}
-{"id": "qa-1037", "gold": "1 in.", "kind": "number", "answer": "1/2 inch", "lenient": true, "reason": "missing_number", "runs": ["sft-from-base", "sft-from-cpt-seed1", "sft-from-cpt", "sft-from-base-seed1", "dpo-seed1", "dpo", "dpo-strict"]}
+{"id": "qa-1037", "gold": "1 in.", "kind": "number", "answer": "1/2 inch", "lenient": true, "reason": "missing_number", "runs": ["sft-from-base", "sft-from-cpt-seed1", "sft-from-cpt", "sft-from-base-seed1", "dpo-seed1", "dpo", "dpo-strict", "dpo-strict-fp8", "dpo-strict-fp8kv", "dpo-strict-w4a16"]}
 {"id": "qa-0511", "gold": "4.6.2.1", "kind": "identifier", "answer": "4.6.2.1.8", "lenient": true, "reason": "phrase", "runs": ["mistral-large-3"]}
 {"id": "qa-1034", "gold": "6.10.10", "kind": "identifier", "answer": "AASHTO LRFD Article 6.10.10.2", "lenient": true, "reason": "phrase", "runs": ["sft-from-base"]}
 {"id": "qa-1043", "gold": "6.10.1.9", "kind": "identifier", "answer": "6.10.1.9.1", "lenient": true, "reason": "phrase", "runs": ["mistral-large-3"]}
 {"id": "qa-1056", "gold": "12.11.2", "kind": "identifier", "answer": "12.11.2.1", "lenient": true, "reason": "phrase", "runs": ["mistral-large-3"]}
-{"id": "qa-0510", "gold": "1.1", "kind": "number", "answer": "1.1 to 1.2", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-cpt-seed1", "dpo-seed1", "dpo"]}
-{"id": "qa-0556", "gold": "12 in.", "kind": "number", "answer": "12 to 18 inches", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-base", "sft-from-cpt-seed1", "sft-from-cpt", "sft-from-base-seed1", "dpo-seed1", "dpo", "dpo-strict", "grpo"]}
+{"id": "qa-0510", "gold": "1.1", "kind": "number", "answer": "1.1 to 1.2", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-cpt-seed1", "dpo-seed1", "dpo", "dpo-strict-fp8", "dpo-strict-fp8kv"]}
+{"id": "qa-0556", "gold": "12 in.", "kind": "number", "answer": "12 to 18 inches", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-base", "sft-from-cpt-seed1", "sft-from-cpt", "sft-from-base-seed1", "dpo-seed1", "dpo", "dpo-strict", "grpo", "dpo-strict-fp8", "dpo-strict-fp8kv", "dpo-strict-w4a16"]}
 {"id": "qa-1039", "gold": "10 feet", "kind": "number", "answer": "10 to 15 feet", "lenient": true, "reason": "two_candidates", "runs": ["mistral-large-3"]}
 {"id": "qa-1039", "gold": "10 feet", "kind": "number", "answer": "10 to 12 feet", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-base", "sft-from-base-seed1"]}
-{"id": "qa-1039", "gold": "10 feet", "kind": "number", "answer": "10 to 12 ft", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-cpt-seed1", "sft-from-cpt", "dpo-seed1", "dpo", "dpo-2ep", "dpo-strict", "grpo", "grpo-seed1"]}
+{"id": "qa-1039", "gold": "10 feet", "kind": "number", "answer": "10 to 12 ft", "lenient": true, "reason": "two_candidates", "runs": ["sft-from-cpt-seed1", "sft-from-cpt", "dpo-seed1", "dpo", "dpo-2ep", "dpo-strict", "grpo", "grpo-seed1", "dpo-strict-fp8", "dpo-strict-fp8kv"]}
 {"id": "qa-1132", "gold": "15 days", "kind": "number", "answer": "15-minute period", "lenient": true, "reason": "unit", "runs": ["sft-from-base", "sft-from-cpt-seed1", "dpo", "dpo-2ep"]}

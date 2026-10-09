@@ -1,0 +1,10 @@
+{
+  "model": "/vol/checkpoints/dpo-strict-fp8",
+  "config_format": "hf",
+  "no_yarn_scale": false,
+  "kv_cache_dtype": "auto",
+  "windows": 49,
+  "tokens": 200655,
+  "nats": 1.93399,
+  "ppl_val_slice": 6.9171
+}

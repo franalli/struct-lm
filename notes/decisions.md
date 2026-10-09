@@ -4489,3 +4489,90 @@ byte-identity is not required.
 - Weights are ~17.8 / ~10.4 / ~6.8 GB, not 17 / 9 / 5: embeddings, lm_head and the tower stay bf16.
 - vLLM 0.29 pins compressed-tensors 0.17.0, while llmcompressor 0.14.0 writes with 0.19.0. The first
   GPU job loads the FP8 save in vLLM 0.29 before anything else is trusted.
+
+## 2026-10-09: Stage 6 outcome: FP8 ships; FP8-KV and INT4 fail the gate; the bench stopped at the Modal spend limit (recorded as observed, read against the pre-registration)
+
+**Served (user decision, after the open-loop read):** `checkpoints/dpo-strict` in bf16 or FP8 by
+load, with `serve/serve_vllm.sh` (DEPLOY.md). bf16 serves up to the measured 16 req/s of open
+arrivals: faster first token, and at 16 req/s E2EL p99 1,298 against 1,399 ms, goodput 98.8%
+against 95.6%. FP8 serves near saturation or when the KV cache binds. Quantized: FP8 10.42 GB on disk (digest `a241f60f…`), INT4 6.83 GB (`c7a87b49…`), both
+from `e686ca7b…` with llmcompressor 0.14.0. vLLM 0.29 (compressed-tensors 0.17) loads both
+(CUTLASS FP8 kernel for FP8); the GPTQ decoder layer is `Ministral3DecoderLayer`.
+
+**The gate, as registered** (changes against bf16; floor = Stage 3):
+
+| line | FP8 | FP8 + FP8 KV | INT4 W4A16 | floor |
+|---|---|---|---|---|
+| qa_strict unseen / seen (pt) | −1.3 / −1.2 | +0.6 / **−4.2** | −2.6 / −3.0 | 2.6 / 3.5 |
+| gold_lp answer tokens unseen / seen (nats) | +0.000 / −0.007 | −0.055 / −0.056 | **−0.424 / −0.307** | 0.210 / 0.173 |
+| gold_lp end token unseen / seen (nats) | −0.020 / −0.004 | −0.029 / −0.008 | **+0.059** / +0.015 | 0.048 / 0.074 |
+| grounded_acc / cite_valid (pt) | −1.8 / 0 | +0.9 / 0 | −2.8 / 0 | 2.8 / 1.85 |
+| halluc_rate / false_abstain (pt) | +1.3 / 0 | +2.6 / 0 | 0 / 0 | 3.9 / 0.9 |
+| GSM8K, 1,319, one BOS (pt) | −0.2 | not run | **−6.1** | 2.2 |
+| eos job: answers ending on `</s>` | 64/64 | 64/64 | 64/64 | >= 0.95 |
+| reported: identifiers (pt) / vLLM perplexity | −1.6 / +0.33% | −1.6 / +0.58% | **−7.8** / +3.53% | 5.0 / – |
+| **verdict** | **ships** | **fails** | **fails** | |
+
+- **FP8 ships.** Every line is inside its floor and the answer-token log-probability doesn't move
+  (+0.0005 / −0.0065 nats, CIs ±0.06). It still changes outputs: 65/210 vocab and 58/108 grounded
+  answers are byte-identical to bf16; the gate says those changes cost nothing measurable.
+- **FP8-KV fails** on one line, qa_strict seen −4.2 (7 net items of 167 against a 3.5-pt floor),
+  with its log-probabilities well inside (−0.055). As registered, that's a fail, and it stays a
+  benchmark row. Its GSM8K line is blank (next bullet).
+- **INT4 fails broadly**, not only on identifiers: answer-token log-probability −0.42 / −0.31 (twice
+  the floor, CI excludes 0), GSM8K −6.1, identifiers −7.8. The plan's expectation (1-2 points, on
+  identifiers) was wrong. A benchmark row labelled "fails quality gate", not in DEPLOY.md, and no
+  claim that it is a 24 GB-card option for this model.
+
+**What went wrong on the way, and the fixes:**
+- **lm-eval and BOS.** The frozen flags send no BOS: `bos_probe.py` shows 0 BOS without
+  `add_bos_token`, so every lm-eval row since Stage 0 is BOS-less. That doesn't change any delta in
+  the tables (all rows ran the same way). With one BOS, bf16 scores 1,067/1,319 on GSM8K, the same
+  count as its BOS-less row (per-item agreement not logged).
+- **lm-eval's CLI can't pass `add_bos_token` under `tokenizer_mode=mistral`** (vLLM forwards it to
+  MistralCommonBackend, which refuses it). `eval/gsm8k_gate.py` builds the model with
+  run_lm_eval.sh's arguments, sets the attribute, and checks that every prompt sent starts with
+  exactly one BOS (1,319 of 1,319 checked per run).
+- **My bug:** the first FP8-KV GSM8K run went without the FP8 KV cache (the wrapper didn't take the
+  flag). Its result was discarded; the rerun was refused by the spend limit, so the line is blank.
+- **The served smoke across server starts.** For bf16, the check-only start gave 18 identical + 2
+  near-ties. The bench's own start gave 16 + 3 near-ties + 1 beyond the rule: `gr-0532` diverged
+  with the eval's token second at 0.125 nats (threshold 0.1), byte-identical in the first start.
+  Greedy serving here isn't bit-reproducible across server starts (same weights, image and flags;
+  hosts with drivers 580.95 and 610.57). Recorded as a fail of that start under the rule, not
+  re-thresholded; `tests/test_template.py` lists it and fails on any new one. The prompt ids equal
+  the trainer's in every start and variant (one BOS, one `[INST]`, no system prompt, ends on
+  `</s>`).
+
+**The bench (one H100 80GB HBM3 via `H100!`, both repeats within 4% of each other):**
+- **Not run:** FP8-KV, INT4 and the n-gram rows. Modal refused the workspace ("exceeded its spend
+  limit") during FP8-KV, after bf16 and FP8 had finished. One request of 360 failed (a client
+  disconnect) in one FP8 run at 1 req/s and is excluded from that run.
+- **Against the plan's expectations:**
+  - **Decode at concurrency 1:** FP8 cuts ITL 6.90 → 4.70 ms (−32%), as expected. bf16 sits at
+    69% of the H100's bandwidth floor (4.75 ms), FP8 at 53% of its own (2.5 ms).
+  - **Throughput at 64:** FP8 +22% requests/s (53.1 vs 43.7) and −40% ITL. At 32, the
+    goodput-maximising concurrency for both, the gain is +12% goodput (31.5 vs 28.1 req/s).
+  - **Not foreseen: FP8 roughly doubles TTFT at low load** (17.9 → 35.2 ms p50 at concurrency 1).
+    It is a near-constant +10-20 ms per prefill whatever the prompt length (+16.6 ms on 206-token
+    closed-book prompts, +10 ms on 1,700-token grounded ones). It is unexplained; per-step
+    quantization kernels outside CUDA graphs is a hypothesis, not tested. It disappears into
+    queueing by 64 (TTFT p99 717 vs 952 ms, FP8 better).
+  - **Prefix caching on shared retrieval contexts:** hit rate 6% → 75%, grounded TTFT p50 −29%
+    (62.4 → 44.6 ms), p99 unchanged. The expected "half or more" didn't happen: prefilling ~1.7k
+    tokens is short on an H100 next to queueing at concurrency 8.
+  - **FP8-KV raises the concurrency at which p99 TTFT breaks:** not measured. Only its memory was:
+    934,608 KV tokens, 114 concurrent 8k sequences against FP8's 57.
+- **Memory (vLLM, util 0.90):** weights 15.94 / 9.01 / 5.66 GiB (the vision tower is never loaded),
+  8k sequences 49.6 / 57.0 / 58.5 (Step 0: 44 / 50 / 53), KV 139,264 bytes per token exactly as
+  computed.
+- **Cost (prices checked 2026-10-09):**
+  - H100 SXM5 $0.001097/s = $3.95/h. Small 4's API is $0.15 / $0.60 per million tokens, and its
+    self-hosting minimum is 4× HGX H100 (both from the announcement).
+  - FP8 at its goodput maximum: $0.035 per 1,000 requests, against $0.127 at Small 4's API prices
+    for the same tokens.
+  - The GPU is cheaper only above 8.7 sustained requests/s (31k an hour).
+
+**Stage6-final:** `dpo-strict`, served by `serve/serve_vllm.sh` as bf16 (`checkpoints/dpo-strict`)
+up to the measured 16 req/s, as FP8 (`checkpoints/dpo-strict-fp8`) near saturation or when the KV
+cache binds. The crossover between 16 req/s and saturation is unmeasured.

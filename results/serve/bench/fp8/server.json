@@ -1,0 +1,20 @@
+{
+  "model": "/vol/checkpoints/dpo-strict-fp8",
+  "server_env": {},
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "compute_capability": "9.0",
+  "driver": "610.57.04",
+  "memory": "81559 MiB",
+  "cuda": "13.0",
+  "torch": "2.13.0+cu130",
+  "vllm": "0.29.0",
+  "server": {
+    "weights_gib": 9.01,
+    "kv_cache_gib": 60.61,
+    "kv_cache_tokens": 467296,
+    "max_concurrency_8192": 57.04,
+    "quantization": "compressed-tensors",
+    "kv_cache_dtype": "auto",
+    "linear_kernel": "CutlassFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8"
+  }
+}

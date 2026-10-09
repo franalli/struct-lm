@@ -1,0 +1,36 @@
+{
+  "results": {
+    "gsm8k": {
+      "name": "gsm8k",
+      "alias": "gsm8k",
+      "sample_len": 1319,
+      "exact_match,strict-match": 0.8074298711144806,
+      "exact_match_stderr,strict-match": 0.010861483868509924,
+      "exact_match,flexible-extract": 0.8089461713419257,
+      "exact_match_stderr,flexible-extract": 0.010828791191755177
+    }
+  },
+  "n-samples": {
+    "gsm8k": {
+      "original": 1319,
+      "effective": 1319
+    }
+  },
+  "model": "/vol/checkpoints/dpo-strict-fp8",
+  "model_args": {
+    "tokenizer_mode": "mistral",
+    "dtype": "bfloat16",
+    "gpu_memory_utilization": 0.85,
+    "max_model_len": 4096,
+    "seed": 0,
+    "limit_mm_per_prompt": {
+      "image": 0
+    },
+    "config_format": "hf",
+    "add_bos_token": true
+  },
+  "num_fewshot": 5,
+  "limit": null,
+  "bos_checked_prompts": 1319,
+  "lm_eval": "0.4.13"
+}

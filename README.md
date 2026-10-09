@@ -7,7 +7,8 @@ Domain adaptation of an open base LLM
 ([`mistralai/Ministral-3-8B-Base-2512`](https://huggingface.co/mistralai/Ministral-3-8B-Base-2512))
 to structural and civil engineering through **CPT → SFT → DPO → GRPO**, with every stage
 measured on the same KPI tasks and general-capability regression suite, then quantized
-(AWQ) and served with vLLM.
+(FP8, INT4) behind a pre-registered quality gate and served with vLLM on one H100
+([`DEPLOY.md`](DEPLOY.md)).
 
 > This README is the write-up. Numbers live in [`results/table.md`](results/table.md);
 > the reasoning behind every choice lives in [`notes/decisions.md`](notes/decisions.md).
@@ -61,7 +62,7 @@ the first two rows.
 | 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
 | 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
 | 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot | `mmlu`, `gsm8k`, `hellaswag` |
-| 6 | Serving cost | vLLM at 1, 8 and 32 concurrent requests | time to first token, inter-token latency, throughput |
+| 6 | Serving cost | vLLM on one H100: 1 / 8 / 32 / 64 concurrent requests, Poisson 1 / 4 / 16 req/s (Stage 6) | time to first token, inter-token latency, throughput, goodput, $ per 1,000 requests |
 
 Every task item was reviewed against its source passages before any model was run on it: 524 of
 1,176 generated items survived the first review (2026-09-27), and 219 of 1,174 the second (195 in
@@ -137,7 +138,7 @@ judge). What doesn't: the engineering difficulty at scale.
 ## Pipeline
 
 ```
-sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ──► CPT ─merge─► SFT ─merge─► DPO ─merge─► GRPO ─merge─► AWQ ─► vLLM
+sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ──► CPT ─merge─► SFT ─merge─► DPO ─merge─► GRPO ─merge─► FP8 ─► vLLM
                             │                               │  replay (FineWeb-Edu)                                              │
                             │                               └─ tokenizer_coverage, stats    run_eval + run_lm_eval + bench  ◄────┘
                             └─ extract --chunks ─ make_tasks (eval/tasks/, frozen eval docs only)
@@ -177,8 +178,8 @@ export MISTRAL_API_KEY=...                  # task generation + judge (scripts d
 ```
 
 `quantize` (llm-compressor) conflicts with `serve`/`eval` (compressed-tensors pins), so it gets
-its own env: `uv sync --extra quantize`. Modal needs two secrets: `huggingface` (`HF_TOKEN`) and
-`mistral` (`MISTRAL_API_KEY`).
+its own env: `uv sync --extra quantize` (Stage 6 runs it in its own Modal image). Modal needs two
+secrets: `huggingface` (`HF_TOKEN`) and `mistral` (`MISTRAL_API_KEY`).
 
 ### Data and eval tasks
 
@@ -272,21 +273,20 @@ What each KPI task measures:
 | `grounded` | 4 passages (gold, neighbours, off-doc distractor) | citations are provided ids; judge checks support | `cite_valid`, `cite_supported` |
 | `adversarial` | 3 related passages without the answer | exact abstain phrase, else judge | `halluc_rate` |
 
-### Quantize, serve, benchmark
+### Quantize, gate, serve, benchmark (Stage 6)
 
 ```bash
-uv sync --extra quantize && bash serve/quantize.sh checkpoints/grpo-merged checkpoints/awq
-uv sync --extra serve && bash serve/serve_vllm.sh checkpoints/awq &
-python serve/bench_latency.py --label awq   # → results/bench/awq.json
+python serve/bench_data.py      # the bench request sets from the eval prompts (pinned: serve/bench_manifest.json)
+modal run serve/modal_serve.py --action quantize --scheme fp8          # -> checkpoints/dpo-strict-fp8
+modal run --detach serve/modal_serve.py --action quantize --scheme w4a16   # GPTQ -> checkpoints/dpo-strict-w4a16
+modal run --detach serve/modal_serve.py --action gate --variant fp8    # KPI, eos, perplexity, GSM8K
+modal run --detach serve/modal_serve.py --action bench --variants bf16,fp8,fp8kv,w4a16 --spec   # one H100
+bash serve/serve_vllm.sh checkpoints/dpo-strict-fp8   # serving it yourself: DEPLOY.md
 ```
 
-On Modal, `--which latency` starts `serve_vllm.sh` in the container, waits for it, and runs the
-benchmark (64 KPI prompts, seeded sample across all four tasks; concurrency 1 / 8 / 32):
-
-```bash
-modal run --detach eval/modal_app.py --which latency --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b
-# → results/bench/base-8b.json on the volume
-```
+The full sequence (pulls, scoring, report) is in `CLAUDE.md`, Stage 6. The earlier per-checkpoint
+latency step (`--which latency`, `serve/bench_latency.py`) still exists; its rows are the
+"GPU not recorded" table in [Serving](#5-serving-stage-6).
 
 Override any config value from the CLI:
 `python train/sft.py --config train/configs/sft.yaml --override training.learning_rate=1e-4`
@@ -302,7 +302,9 @@ eval/     make_tasks.py (task generation), tasks/*.jsonl (KPI tasks + rejects.js
           list + eval_chunk_ids.txt), prompts.py, scorers.py, judge.py, run_eval.py,
           run_lm_eval.sh, modal_app.py (Modal H100 runner)
 train/    one script per stage + common.py, merge.py, configs/*.yaml
-serve/    quantize.sh (AWQ), serve_vllm.sh, bench_latency.py
+serve/    serve_vllm.sh (the served config), quantize.py (FP8 / GPTQ W4A16), modal_serve.py
+          (quantize, quality gate, H100 bench), bench_data.py + bench_manifest.json (request sets),
+          served_check.py (template ids, served-vs-eval smoke), bench_latency.py (Stages 2-5)
 results/  all committed: table.md (one row per run), runs/<run>/{generations,scored}.jsonl +
           metrics.json, judge_cache.jsonl, lm_eval/<run>/**/results_*.json, bench/, curves/.
           Anyone can re-score with `run_eval.py --rescore` without a GPU or API key.
@@ -497,7 +499,7 @@ run lands):
 
 - **cpt-8b-fsdp2 vs cpt-8b:** 2 GPUs give 2.23x the tokens/s (13,221 vs 5,939), so per GPU +11% at the same micro-batch and per-layer checkpointing (peak memory 43 vs 51 GB): the FSDP2 code path, not scaling (finding 6 below); per-step losses differ by 0.038% (median) / 0.171% (max) over 100 steps, the 10-step moving averages by 0.01% on average.
 
-$ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against modal.com/pricing); wall time includes tokenising and model load.
+$ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09); wall time includes tokenising and model load.
 
 ##### Perplexity vs base-8b
 
@@ -804,7 +806,7 @@ Generated by `train/report.py` from `results/runs/`, `results/noop/` and `result
 | sft-from-cpt-seed1 | cpt-8b-replay10 | 154 | 2.70M | 1,737 | 0.54 | 0.54 | 2.12 | 55 | 0.362 | 0.5586 / 0.5804 | 1.1696 / 1.3126 | 1.8940 / 2.1049 | epoch 1 |
 | sft-from-base-seed1 | base-8b-hf | 154 | 2.70M | 2,022 | 0.45 | 0.45 | 1.79 | 55 | 0.364 | 0.5580 / 0.5782 | 1.2347 / 1.3453 | 1.9116 / 2.0432 | epoch 1 |
 
-B4 (pre-registered, amended before training): epoch 2 unless the closed-book or the definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is shown, not used. $ at 3.95 per GPU-hour (assumed).
+B4 (pre-registered, amended before training): epoch 2 unless the closed-book or the definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is shown, not used. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
 ##### Results next to the noise
 
@@ -878,8 +880,8 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
      watch for overfitting.
 2. **It stops.**
    - Every KPI answer, 98.75% of sampled answers and 100% of bench requests end on `</s>`.
-   - End-to-end latency at one request is 159 ms, against the CPT checkpoint's 1,753 ms, at the same
-     per-token speed (Serving).
+   - End-to-end latency at one request is 159 ms, against the CPT checkpoint's 1,753 ms: it stops
+     instead of running to the cap (Serving).
 3. **It cites and it doesn't over-refuse.**
    - Cited answers backed by the cited passages: 86.1% against Instruct's 78.7%.
    - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
@@ -1261,9 +1263,8 @@ for the CPT-vs-base read: the start is one run of a noisy stage, so its own seed
   - 58 of 100 greedy answers are byte-identical to SFT's.
   - 82 of 100 win-rate comparisons are ties.
   - The win rate itself is 0.52 and 0.515 (SE 0.05), reported only.
-- **Serving:** `dpo`'s 496 tok/s at 8 concurrent requests is not a DPO gain. It confirms that
-  sft-from-cpt's 297 was the single-sample outlier flagged in Stage 3; the per-token speed is the
-  same (6.8 ms).
+- **Serving:** not read here. The Stage 2-5 latency cells are single samples on an unrecorded GPU;
+  Stage 6 measures serving.
 
 ##### The finding: the displacement curve
 
@@ -1430,7 +1431,7 @@ wrong under the strict rule); `dpo-strict` and Stage 5 are strict.
 | dpo-2ep | sft-from-cpt | 484 | 62 | 2,297 | 0.13 | 0.13 | 0.52 | 37 | 0.382 | 0.571 | 0.682 | 0.378 | step 62 (final): 0.5711 vs 0.6471 at 30 |
 | dpo-strict | sft-from-cpt | 445 | 28 | 2,589 | 0.08 | 0.08 | 0.32 | 37 | 0.662 | 0.670 | 0.556 | 0.051 | step 28 (final): 0.6696 vs 0.6839 at 10 |
 
-The checkpoint rule (pre-registered): the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (assumed).
+The checkpoint rule (pre-registered): the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
 ##### The read: change against sft-from-cpt, next to the noise
 
@@ -1774,7 +1775,7 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
 | grpo | dpo-strict | 622 | 52 | step 52: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.550 / 0.820 | 0.8179 | 0.158 | 19.857 | 2.4e-04 | 0.50 | 0.50 | 1.98 | 77 |
 | grpo-seed1 | dpo-strict | 622 | 65 | step 65: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.562 / 0.800 | 0.8162 | 0.1499 | 18.2883 | 1.2e-04 | 0.58 | 0.58 | 2.30 | 76 |
 
-The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 samples at T 1.0. $ at 3.95 per GPU-hour (assumed).
+The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 samples at T 1.0. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
 ##### The read: change against dpo-strict, next to the noise
 
@@ -1916,7 +1917,12 @@ passage in the prompt.
   - From 2026-10-09 every `gold_lp` row shows both parts, because a stage can change the answer's
     format (whether the model stops after the gold) without changing the fact.
   - The composite was the right single number in Stage 3, where stopping was the failure measured.
-- **Benchmarks** are from lm-eval: 5-shot, never with the chat template.
+- **Benchmarks** are from lm-eval: 5-shot, never with the chat template, and without a BOS token:
+  the frozen flags send none, as Stage 6 found (`eval/bos_probe.py`). Every row ran the same way, so
+  the deltas stand.
+- **The Stage 6 rows** (`dpo-strict-fp8`, `-fp8kv`, `-w4a16`) are the quantized serving variants of
+  `dpo-strict`. They have no lm-eval or perplexity columns; their GSM8K (with one BOS) and vLLM
+  perplexity lines are in the Stage 6 gate under [Serving](#5-serving-stage-6).
 - **Perplexity** is from `eval/perplexity.py` (lower is better). `ppl_postcutoff` covers the 13
   federal reports published after the base model.
 
@@ -1943,6 +1949,9 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 | 0.211 | 0.305 | 0.110 |
 | grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 | 0.202 | 0.299 | 0.097 |
 | grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 | 0.199 | 0.287 | 0.103 |
+| dpo-strict-fp8 | -5.898 | -5.141 | -6.715 | 0.208 | 0.241 | 0.172 | 0.079 | 0.293 | 0.116 | 0.199 | 0.293 | 0.097 |
+| dpo-strict-fp8kv | -5.957 | -5.194 | -6.780 | 0.202 | 0.236 | 0.172 | 0.053 | 0.264 | 0.136 | 0.193 | 0.264 | 0.116 |
+| dpo-strict-w4a16 | -6.211 | -5.421 | -7.061 | 0.183 | 0.223 | 0.109 | 0.079 | 0.270 | 0.090 | 0.183 | 0.275 | 0.084 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -1965,6 +1974,9 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo-strict | 0.926 | 1.000 | 0.861 | 0.040 | 0.000 | 0.824 | 0.861 | 0.789 |
 | grpo | 0.935 | 1.000 | 0.880 | 0.013 | 0.000 | 0.843 | 0.881 | 0.807 |
 | grpo-seed1 | 0.917 | 0.982 | 0.889 | 0.013 | 0.018 | 0.852 | 0.881 | 0.826 |
+| dpo-strict-fp8 | 0.907 | 1.000 | 0.852 | 0.053 | 0.000 | 0.829 | 0.881 | 0.780 |
+| dpo-strict-fp8kv | 0.935 | 1.000 | 0.843 | 0.066 | 0.000 | 0.833 | 0.881 | 0.789 |
+| dpo-strict-w4a16 | 0.898 | 1.000 | 0.843 | 0.040 | 0.000 | 0.776 | 0.881 | 0.679 |
 
 **General benchmarks (5-shot, no chat template) and perplexity (lower is better)**
 
@@ -2080,7 +2092,9 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
   - Both sharpened sampled accuracy by about 3 points from their own starts; DPO did so at
     a small calibration cost (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 /
     1.32).
-  - Stage 6 serves `dpo-strict`, the SFT model within noise.
+  - Stage 6 serves `dpo-strict`, the SFT model within noise, in bf16 or FP8 (W8A8) by load: FP8
+    passed the pre-registered quality gate on every line; INT4 and an FP8 KV cache did not
+    ([Serving](#5-serving-stage-6)).
 
 **What the whole chain shows: knowledge went in once, at CPT.** Every number in this paragraph is
 on the gold answer's tokens alone (the end token excluded), unseen half, with item-bootstrap 95%
@@ -2096,10 +2110,147 @@ CIs.
 - **The trade:** each later stage bought behaviour with a little of the knowledge, and the sharper
   the optimiser, the larger the trade.
 
-### 5. Serving
+### 5. Serving (Stage 6)
 
-vLLM on one H100, `serve/bench_latency.py` (64 streamed requests per concurrency level, 256 output
-tokens max; generated by `train/report.py` from `results/bench/`).
+`stage5-final` = `dpo-strict`, served by vLLM 0.29 on one H100 80GB HBM3 in three precisions, with
+a quality gate registered before any quantized checkpoint existed (`notes/decisions.md`,
+2026-10-09). The deployment reference, with the serve commands, the request contract and the
+memory budget, is [`DEPLOY.md`](DEPLOY.md).
+
+- **FP8 (W8A8) passes the gate; FP8 with an FP8 KV cache and INT4 (W4A16, GPTQ) don't.**
+  - **FP8:** every gated line sits inside its Stage 3 floor. The answer-token log-probability
+    doesn't move (+0.000 / −0.007 nats), GSM8K −0.2, perplexity +0.33%.
+  - **FP8 + FP8 KV:** fails on one line, strict closed-book on the seen half (−4.2 against a
+    3.5-pt floor: 7 items of 167), with its log-probabilities well inside.
+  - **INT4:** fails broadly, not only on identifiers as expected. Answer-token log-probability
+    −0.42 / −0.31 nats (about twice the floor), GSM8K −6.1, identifiers −7.8.
+  - **Served by load** ([`DEPLOY.md`](DEPLOY.md); user decision after the open-loop read):
+    - **bf16 up to the measured 16 req/s of open arrivals:** faster first token (21-40 against
+      39-76 ms p50), and at 16 req/s E2EL p99 1,298 against 1,399 ms and goodput 98.8% against
+      95.6%.
+    - **FP8 near saturation or when the KV cache binds.**
+    - **Unmeasured:** where between 16 req/s and saturation the crossover lies.
+- **What FP8 buys on one H100:**
+  - Decode at one request is 32% faster: 6.90 → 4.70 ms per token, both above the bandwidth floor
+    (4.75 / 2.5 ms).
+  - At 64 concurrent requests: 22% more requests per second and 40% lower ITL.
+  - At 32 concurrent requests, where both serve the most requests inside the SLO (TTFT ≤ 500 ms,
+    TPOT ≤ 25 ms), goodput is 12% higher (31.5 vs 28.1 req/s).
+- **What FP8 costs, which the sources didn't predict:** time to first token roughly doubles at low
+  load (17.9 → 35.2 ms p50 at one request). It is a near-constant 10-20 ms per prefill whatever
+  the prompt length. It is unexplained (untested hypothesis: the activation-quantization kernels
+  outside CUDA graphs), and it vanishes into queueing by 64 requests.
+- **Prefix caching (FP8, 8 concurrent requests):** a retrieval deployment that reuses a context across 4 questions raises the
+  hit rate from 6% to 75% and cuts grounded TTFT by 29% (p50), not the expected half. A 1.7k-token
+  prefill is already short on an H100 next to queueing.
+- **Cost:**
+  - At their goodput maximum (32 concurrent requests), one H100 costs $0.035 per 1,000 requests
+    with FP8 and $0.039 with bf16, against $0.127 for the same tokens through Mistral Small 4's
+    API.
+  - The GPU is cheaper only above 8.7 sustained requests/s; Small 4 self-hosted needs at least four
+    H100s.
+  - The tuned 8B's case is the customer's facts on one GPU (Stage 3: the CPT arm against the base
+    arm). On general capability, Small 4 (119B MoE) is the likelier winner; that isn't measured
+    here.
+- **Not measured:** the FP8-KV, INT4 and speculative-decoding bench rows and FP8-KV's GSM8K line.
+  Modal stopped the workspace at its spend limit mid-run (`notes/decisions.md`, Stage 6 outcome).
+- **The served path is the trained one:** the prompt ids from `/v1/chat/completions` equal the
+  trainer's in every variant (one BOS, no system prompt, answers ending on `</s>`).
+  - Greedy serving isn't bit-reproducible across server starts on different hosts: one of 20 smoke
+    items diverged at a 0.125-nat near-tie in one start and was identical in the other.
+  - Also found on the way: the frozen lm-eval flags have sent no BOS since Stage 0 (deltas
+    unaffected).
+
+![Latency vs concurrency per variant](results/curves/serve_latency.png)
+
+![Throughput and tail latency vs offered load](results/curves/serve_load.png)
+
+Up to 16 requests/s of Poisson arrivals neither variant saturates (throughput follows the offered
+load; the concurrency sweep saturates near 44 req/s for bf16 and 53 for FP8). FP8's slower prefill
+shows in the tail: TTFT p99 93 against 57 ms at 1 req/s, 143 against 116 at 16.
+
+<!-- stage6-tables:start -->
+##### Quality gate (pre-registered): change against bf16, next to the Stage 3 floor
+
+| line | bf16 | FP8 − bf16 | FP8 + FP8 KV − bf16 | INT4 W4A16 − bf16 | floor |
+|---|---|---|---|---|---|
+| qa_strict unseen | 0.110 | -1.3 | +0.6 | -2.6 | 2.6 pt |
+| qa_strict seen | 0.305 | -1.2 | **-4.2** | -3.0 | 3.5 pt |
+| gold_lp answer tokens, unseen (nats) | -6.274 | +0.000 | -0.055 | **-0.424** | 0.210 |
+| gold_lp answer tokens, seen (nats) | -4.811 | -0.007 | -0.056 | **-0.307** | 0.173 |
+| gold_lp end token, unseen (nats) | -0.421 | -0.020 | -0.029 | **+0.059** | 0.048 |
+| gold_lp end token, seen (nats) | -0.319 | -0.004 | -0.008 | +0.015 | 0.074 |
+| grounded_acc | 0.926 | -1.8 | +0.9 | -2.8 | 2.8 pt |
+| cite_valid | 1.000 | +0.0 | +0.0 | +0.0 | 1.85 pt |
+| halluc_rate | 0.040 | +1.3 | +2.6 | +0.0 | 3.9 pt |
+| false_abstain | 0.000 | +0.0 | +0.0 | +0.0 | 0.9 pt |
+| GSM8K (all 1,319, add_bos_token) | 0.809 | -0.2 |  | **-6.1** | 2.2 pt |
+| qa_strict identifiers (reported) | 0.188 | -1.6 | -1.6 | **-7.8** | 5 pt |
+| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 | >= 0.95 |
+| vLLM val-slice perplexity (reported) | 6.894 | +0.33% | +0.58% | +3.53% |  |
+| **verdict** |  | **ships** | **fails** | **fails** |  |
+
+A variant ships if every gated line is within its floor (bold: beyond it) and the eos job ends >= 95% of answers on </s> (notes/decisions.md, 2026-10-09). The floor is the sft-from-cpt seed gap or the SE, whichever is larger: a cost under it is invisible to every other comparison here, which is what ships means, not that it costs nothing. GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under the same flags), not the table's frozen-flag row.
+
+##### Serving memory (vLLM's own accounting at start-up)
+
+| variant | GPU | weights (vLLM, GiB) | KV cache (GiB) | KV cache tokens | 8,192-token sequences: vLLM / Step 0 estimate |
+|---|---|---|---|---|---|
+| bf16 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 15.94 | 52.75 | 406,688 | 49.6 / 44 |
+| FP8 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 467,296 | 57.0 / 50 |
+| FP8 + FP8 KV | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 934,608 | 114.1 / 100 |
+
+##### Latency and throughput vs concurrency (`unique`: 360 eval requests, 60 / 30 / 10)
+
+| variant | concurrency | TTFT p50 / p99 (ms) | ITL p50 / p99 (ms) | E2EL p50 / p99 (ms) | req/s | output tok/s | goodput share | run pair spread |
+|---|---|---|---|---|---|---|---|---|
+| bf16 | 1 | 17.9 / 54.0 | 6.90 / 7.80 | 71 / 964 | 4.78 | 130 | 100% | 0% |
+| bf16 | 8 | 44.9 / 224.1 | 7.83 / 36.74 | 111 / 1,512 | 23.88 | 655 | 100% | 1% |
+| bf16 | 32 | 87.9 / 638.4 | 10.90 / 88.83 | 286 / 3,058 | 40.28 | 1,096 | 70% | 0% |
+| bf16 | 64 | 213.4 / 952.5 | 17.54 / 197.57 | 635 / 5,411 | 43.67 | 1,189 | 24% | 0% |
+| FP8 | 1 | 35.2 / 59.9 | 4.70 / 5.63 | 71 / 804 | 5.94 | 164 | 100% | 0% |
+| FP8 | 8 | 79.8 / 214.6 | 5.30 / 49.55 | 149 / 1,688 | 21.20 | 580 | 99% | 2% |
+| FP8 | 32 | 128.3 / 478.6 | 7.66 / 59.36 | 290 / 3,172 | 40.75 | 1,117 | 77% | 4% |
+| FP8 | 64 | 222.5 / 717.2 | 10.53 / 127.30 | 575 / 4,434 | 53.08 | 1,461 | 30% | 1% |
+
+Means of two runs per config, prefix cache reset before each; goodput share = requests with TTFT <= 500 ms and TPOT <= 25 ms. ITL at concurrency 1 under the decode floor (weight bytes / 3.35 TB/s: bf16 4.75, FP8 2.5, INT4 1.5 ms) would mean the run wasn't on an H100.
+
+##### Latency under load (Poisson arrivals, `unique`)
+
+| variant | offered req/s | achieved req/s | TTFT p50 / p99 (ms) | E2EL p99 (ms) | goodput share |
+|---|---|---|---|---|---|
+| bf16 | 1 | 1.00 | 21.1 / 57.3 | 1,028 | 100% |
+| bf16 | 4 | 4.00 | 25.7 / 67.8 | 1,031 | 100% |
+| bf16 | 16 | 15.42 | 40.1 / 116.4 | 1,298 | 99% |
+| FP8 | 1 | 1.00 | 39.0 / 92.9 | 857 | 100% |
+| FP8 | 4 | 4.00 | 55.7 / 107.9 | 795 | 100% |
+| FP8 | 16 | 15.65 | 75.8 / 143.3 | 1,399 | 96% |
+
+##### Prefix caching: shared retrieval context (FP8, concurrency 8)
+
+| run | TTFT p50 (ms) | TTFT p99 (ms) | prefix-cache hit rate | E2EL p50 (ms) |
+|---|---|---|---|---|
+| grounded, passages as evaluated (none shared) | 62.4 | 257.4 | 6% | 633 |
+| grounded, 4 questions per shared context (rag) | 44.6 | 256.4 | 75% | 523 |
+
+Same 108 questions in the same order; rag prompts are ~9% longer (gold passages run long), which counts against rag. TTFT is the comparison; output lengths differ.
+
+##### Cost
+
+| variant | gate | best concurrency | goodput (req/s) | $ / 1k requests (1 H100) | API $ / 1k requests (Small 4 prices) | break-even sustained req/s |
+|---|---|---|---|---|---|---|
+| bf16 | reference | 32 | 28.1 | 0.0390 | 0.1266 | 8.7 |
+| FP8 | ships | 32 | 31.5 | 0.0348 | 0.1267 | 8.7 |
+
+One H100 at $3.95/h (Modal's H100 SXM5 list price, $0.001097/s, checked 2026-10-09); Small 4's API at $0.15 / $0.6 per million input / output tokens and its self-hosting minimum of 4 H100s ($15.80/h before any request), both from Mistral's Small 4 announcement. Tokens per request are the bench mix's measured means. The break-even is the sustained load above which the GPU is cheaper than the API; below it, an idle GPU costs the same per hour.
+<!-- stage6-tables:end -->
+
+#### Stages 2-5: latency columns (single samples, GPU not recorded)
+
+These rows came from `serve/bench_latency.py` (64 streamed requests per concurrency level, 256
+output tokens max), one sample each. The GPU wasn't recorded, and Modal may run an "H100" request
+on an H200, so they support one claim only: SFT fixed stopping (1,753 ms to ~150 ms end to end is
+not a bandwidth effect). Stage 6's tables above are the serving numbers.
 - **Paths:** `base-8b` and `instruct-8b` run Mistral's native vLLM path. The rest run the HF path
   with the YaRN fix.
 - **New columns from Stage 3:** stop before cap and mean output tokens, at one request.
@@ -2120,30 +2271,27 @@ tokens max; generated by `train/report.py` from `results/bench/`).
 | dpo | 17.3 | 6.8 | 140 | 100% | 22 | 125 | 496 | 784 |
 <!-- serving-table:end -->
 
-- **The two paths serve the base at the same speed** once the YaRN fix is in: per-token latency
-  6.6 ms either way, end to end 180 vs 187 ms.
-- **`cpt-8b`'s end-to-end time is not a latency result.** It decodes at the same 6.6-6.9 ms per
-  token as the base. It runs to the 256-token cap, though, where the base stops after ~28 tokens,
-  hence the ~10x end-to-end time and the higher throughput (more tokens per request).
+- **The one claim these rows support: SFT fixed stopping.** `cpt-8b` runs every request to the
+  256-token cap, where the base stops after ~28 tokens, hence its 1,753 ms end to end.
   - **Cause:** the corpus holds one EOS per whole manual, 234 in 19.4M tokens. Section-level units
     would likely have avoided it (item 6 of
     [What I would do differently](#what-i-would-do-differently)).
   - **Fix, confirmed by Stage 3:** after SFT every request stops before the cap (mean 23 output
-    tokens), and end to end at one request is 159 ms against 1,753 ms, at the same per-token speed
-    (6.8 ms).
-  - **Use:** compare the row only with this note.
-- **The SFT rows' lower throughput is short answers, not slower decoding.** At 8 and 32 concurrent
-  requests, tokens/s counts output tokens. With ~23 tokens per answer, prefill and scheduling take
-  a larger share of each request, so the SFT rows produce fewer output tokens per second.
-  - **One cell isn't explained by that:** `sft-from-cpt` at 8 concurrent requests (297 tok/s,
-    against 509-563 for its siblings at the same mean length). Each cell is a single 64-request
-    sample.
-  - **`dpo` confirms it was an outlier:** it is the SFT checkpoint within noise, and it measures 496
-    tok/s at 8 concurrent requests at the same per-token speed (6.8 ms).
-- _Stage 6 adds the AWQ checkpoint of the SFT'd model: its quality delta against bf16 and its
-  latency at 1 and 32 concurrent requests._
+    tokens), and end to end at one request is ~150 ms against 1,753 ms. A tenfold change in tokens
+    generated is not a hardware effect, whatever GPU ran the rows.
+- **Not read from these rows any more:** path parity, throughput differences between checkpoints,
+  and single cells (the 297 tok/s one). Each is one unrecorded-GPU sample.
 
 ### 6. What I'd do next
+
+**From Stage 6:**
+1. **Measure the crossover:** open-loop 24 and 32 req/s for bf16 and FP8, where the default
+   switches from one to the other.
+2. **Profile FP8's prefill overhead** (+10-20 ms per request at low load) with CUDA graphs on and
+   off before trusting the per-step-kernel hypothesis.
+3. **Finish the blocked rows** once the spend limit allows: FP8-KV's GSM8K, and the FP8-KV, INT4 and
+   n-gram bench rows (none can change a verdict). Log per-item GSM8K outcomes, so the BOS
+   comparison can be read paired.
 
 **From Stage 5:**
 1. **μ = 2 with ε_high 0.28, first.** Two optimisation passes per generation batch give the

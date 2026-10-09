@@ -1,0 +1,10 @@
+{
+  "model": "/vol/checkpoints/dpo-strict-w4a16",
+  "config_format": "hf",
+  "no_yarn_scale": false,
+  "kv_cache_dtype": "auto",
+  "windows": 49,
+  "tokens": 200655,
+  "nats": 1.96542,
+  "ppl_val_slice": 7.1379
+}

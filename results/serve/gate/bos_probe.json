@@ -1,0 +1,30 @@
+{
+  "model": "/vol/checkpoints/dpo-strict",
+  "text": "Question: Natalia sold clips to 48 of her friends in April. How many clips did she sell?\nAnswer:",
+  "bos_id": 1,
+  "add_bos_token=False": {
+    "head": [
+      25229,
+      1058,
+      91510,
+      6981,
+      72327,
+      1317
+    ],
+    "n_bos": 0,
+    "len": 24
+  },
+  "add_bos_token=True": {
+    "head": [
+      1,
+      25229,
+      1058,
+      91510,
+      6981,
+      72327
+    ],
+    "n_bos": 1,
+    "len": 25
+  },
+  "one_bos": true
+}

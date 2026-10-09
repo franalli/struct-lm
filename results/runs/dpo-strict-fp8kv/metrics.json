@@ -1,0 +1,30 @@
+{
+  "qa_acc": 0.2019,
+  "qa_num": 0.2364,
+  "qa_ident": 0.1719,
+  "qa_term": 0.0526,
+  "qa_seen": 0.2635,
+  "qa_unseen": 0.1355,
+  "grounded_acc": 0.9352,
+  "cite_valid": 1.0,
+  "cite_supported": 0.8426,
+  "vocab_recall": 0.8333,
+  "vocab_seen": 0.8812,
+  "vocab_unseen": 0.789,
+  "halluc_rate": 0.0658,
+  "false_abstain": 0.0,
+  "gold_lp": -5.9572,
+  "gold_lp_seen": -5.1935,
+  "gold_lp_unseen": -6.7801,
+  "n": {
+    "domain_qa": 322,
+    "grounded": 108,
+    "vocab": 210,
+    "adversarial": 76
+  },
+  "gold_lp_median": -4.8701,
+  "gold_lp_n": 322,
+  "gold_lp_end": -0.3861,
+  "model": "/vol/checkpoints/dpo-strict-fp8",
+  "chat": true
+}
