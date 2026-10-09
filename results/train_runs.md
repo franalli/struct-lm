@@ -48,7 +48,10 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
 | closed-book gold-answer log-prob (nats) | -6.77 | +0.59 | +0.58 | +0.51 |  | 0.08 |
-| closed-book qa_acc | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+|   of it, the answer tokens | -6.32 | +0.56 | +0.55 | +0.50 |  | 0.07 |
+|   of it, the end token | -0.45 | +0.03 | +0.03 | +0.01 |  | 0.01 |
+| closed-book qa_strict | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+| closed-book qa_acc (lenient) | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
 | grounded_acc (with passages) | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
@@ -73,10 +76,17 @@ B4 (pre-registered, amended before training): epoch 2 unless the closed-book or 
 | metric | instruct-8b | base-8b-hf | sft-from-base | sft-from-base-seed1 | cpt-8b-replay10 | sft-from-cpt | sft-from-cpt-seed1 | noise (Stage 3) | noise (Stage 2) |
 |---|---|---|---|---|---|---|---|---|---|
 | unseen gold-answer log-prob (nats) | -8.581 | -6.822 | -6.780 | -6.741 | -6.157 | -6.426 | -6.168 | 0.258 | 0.033 |
+|   of it, the answer tokens | -7.709 | -6.356 | -6.197 | -6.199 | -5.697 | -5.895 | -5.684 | 0.210 | 0.033 |
+|   of it, the end token | -0.872 | -0.466 | -0.583 | -0.542 | -0.460 | -0.531 | -0.484 | 0.048 | 0.005 |
 | seen gold-answer log-prob (nats) | -8.008 | -6.722 | -5.409 | -5.249 | -6.356 | -5.120 | -4.873 | 0.247 | 0.032 |
-| qa_unseen | 0.084 | 0.116 | 0.110 | 0.097 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
-| qa_seen | 0.114 | 0.126 | 0.245 | 0.234 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
-| qa_ident (identifiers) | 0.031 | 0.078 | 0.125 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
+|   of it, the answer tokens | -7.313 | -6.278 | -4.973 | -4.869 | -5.931 | -4.697 | -4.524 | 0.173 | 0.032 |
+|   of it, the end token | -0.695 | -0.444 | -0.436 | -0.380 | -0.425 | -0.423 | -0.349 | 0.074 | 0.005 |
+| qa_strict unseen | 0.077 | 0.116 | 0.084 | 0.077 | 0.110 | 0.116 | 0.110 | 2.6 | 2.7 |
+| qa_unseen (lenient) | 0.084 | 0.116 | 0.110 | 0.097 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
+| qa_strict seen | 0.114 | 0.126 | 0.239 | 0.234 | 0.150 | 0.287 | 0.258 | 3.5 | 2.8 |
+| qa_seen (lenient) | 0.114 | 0.126 | 0.245 | 0.234 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
+| qa_strict identifiers | 0.031 | 0.078 | 0.109 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
+| qa_ident (lenient) | 0.031 | 0.078 | 0.125 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
 | grounded_acc | 0.898 | 0.843 | 0.926 | 0.898 | 0.778 | 0.907 | 0.935 | 2.8 | 3.7 |
 | cite_supported | 0.787 | 0.083 | 0.870 | 0.880 | 0.037 | 0.861 | 0.880 | 3.3 | 3.7 |
 | halluc_rate (lower is better) | 0.013 | 0.895 | 0.066 | 0.013 | 0.934 | 0.053 | 0.013 | 3.9 | 3.3 |
@@ -91,8 +101,8 @@ Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in na
 
 ## B7's first line: what CPT bought, measured after SFT
 
-- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
-- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.409 [+0.227, +0.602] and the end token +0.055 [+0.021, +0.099]. The item CI conditions on these training runs; run variance enters only through the noise.
+- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.311 [+0.173, +0.456] and the end token +0.022 [+0.003, +0.039]. The item CI conditions on these training runs; run variance enters only through the noise.
 
 ## Checks
 
@@ -142,10 +152,16 @@ The checkpoint rule (pre-registered): the final step unless the dpo_val loss at 
 | halluc_rate (lower is better) | primary | 0.053 | 0.013 | 0.026 | -3.3 pt | 2.6 pt | yes | 3.9 pt | no |
 | false_abstain (lower is better) | primary | 0.000 | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no | 0.9 pt | no |
 | cite_valid | primary | 1.000 | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no | 1.8 pt | no |
-| qa_seen | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no | 3.5 pt | no |
-| qa_unseen | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no | 2.7 pt | no |
+| qa_seen (lenient, as registered) | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no | 3.5 pt | no |
+| qa_unseen (lenient, as registered) | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no | 2.7 pt | no |
+| qa_strict seen | reported | 0.287 | 0.305 | 0.287 | +0.9 pt | 3.5 pt | no | 3.5 pt | no |
+| qa_strict unseen | reported | 0.116 | 0.116 | 0.110 | -0.3 pt | 2.6 pt | no | 2.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.120 | -5.003 | -5.196 | +0.021 [-0.072, +0.113] | 0.193 | no | 0.247 | no |
+|   of it, the answer tokens | reported | -4.697 | -4.705 | -4.848 | -0.079 [-0.168, +0.008] | 0.143 | no | 0.173 | no |
+|   of it, the end token | reported | -0.423 | -0.298 | -0.348 | +0.100 [+0.079, +0.123] | 0.050 | yes | 0.074 | yes |
 | unseen gold-answer log-prob (nats) | primary | -6.426 | -6.544 | -6.731 | -0.212 [-0.335, -0.097] | 0.187 | yes | 0.258 | no |
+|   of it, the answer tokens | reported | -5.895 | -6.161 | -6.282 | -0.327 [-0.445, -0.218] | 0.121 | yes | 0.210 | yes |
+|   of it, the end token | reported | -0.531 | -0.383 | -0.449 | +0.115 [+0.090, +0.143] | 0.066 | yes | 0.066 | yes |
 | MMLU | guard | 0.766 | 0.767 | 0.765 | -0.0 pt | 0.3 pt | no | 0.4 pt | no |
 | GSM8K | guard | 0.814 | 0.810 | 0.807 | -0.6 pt | 1.1 pt | no | 2.2 pt | no |
 | grounded_acc (judge) | reported | 0.907 | 0.917 | 0.907 | +0.5 pt | 2.8 pt | no | 2.8 pt | no |
@@ -161,10 +177,16 @@ Rows marked primary are the amended read (2026-10-08, fixed before launch); guar
 | halluc_rate (lower is better) | primary | 0.013 | 0.013 | +0.0 pt | 1.3 pt | no |
 | false_abstain (lower is better) | primary | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
 | cite_valid | primary | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
-| qa_seen | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
-| qa_unseen | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| qa_seen (lenient, as registered) | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
+| qa_unseen (lenient, as registered) | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| qa_strict seen | reported | 0.305 | 0.258 | -4.8 pt | 3.6 pt | yes |
+| qa_strict unseen | reported | 0.116 | 0.129 | +1.3 pt | 2.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.003 | -8.012 | -3.010 [-3.522, -2.514] | 0.193 | yes |
+|   of it, the answer tokens | reported | -4.705 | -7.816 | -3.112 [-3.618, -2.622] | 0.143 | yes |
+|   of it, the end token | reported | -0.298 | -0.196 | +0.102 [+0.067, +0.140] | 0.050 | yes |
 | unseen gold-answer log-prob (nats) | primary | -6.544 | -10.845 | -4.301 [-4.999, -3.653] | 0.187 | yes |
+|   of it, the answer tokens | reported | -6.161 | -10.570 | -4.408 [-5.101, -3.759] | 0.121 | yes |
+|   of it, the end token | reported | -0.383 | -0.276 | +0.107 [+0.062, +0.154] | 0.066 | yes |
 | MMLU | guard | 0.767 | 0.767 | +0.0 pt | 0.3 pt | no |
 | GSM8K | guard | 0.810 | 0.806 | -0.4 pt | 1.1 pt | no |
 | grounded_acc (judge) | reported | 0.917 | 0.907 | -0.9 pt | 2.7 pt | no |
@@ -228,10 +250,14 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | primary | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
-| qa_acc seen (original scorer) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
+|   of it, the answer tokens | reported | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
+|   of it, the end token | reported | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
+| qa_acc seen (lenient) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
 | qa_strict unseen | reported | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
-| qa_acc unseen (original scorer) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
+| qa_acc unseen (lenient) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
 | unseen gold-answer log-prob (nats) | reported | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
+|   of it, the answer tokens | reported | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
+|   of it, the end token | reported | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
 | halluc_rate (lower is better) | guard | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
 | false_abstain (lower is better) | guard | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
 | cite_valid | guard | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
@@ -252,8 +278,12 @@ Rows marked primary are the pre-registered read (2026-10-09); guards must stay w
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
 | seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
+|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.143) | -0.821 [-1.072, -0.579] | yes (0.173) |
+|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.050) | +0.140 [+0.110, +0.171] | yes (0.074) |
 | qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
 | unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
+|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.121) | -1.699 [-2.063, -1.363] | yes (0.210) |
+|   of it, the end token | -0.531 | +0.110 [+0.084, +0.138] | yes (0.066) | -0.013 [-0.068, +0.031] | no (0.066) | +0.097 [+0.052, +0.136] | yes (0.048) |
 | halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
 | MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
 | GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |

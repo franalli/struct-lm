@@ -469,14 +469,59 @@ def results_table(path: Path = Path("results/table.md")) -> str:
     cells = [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in lines]
     head = cells[0]
     out = [f"Items per task: {', '.join(s.replace('=', ' ') for s in sizes)}."]
+    strict = json.loads(QA_STRICT.read_text()) if QA_STRICT.exists() else {}
     for title, names in RESULT_BLOCKS:
         idx = [head.index(n) for n in names if n in head]
         rows = [[row[0], *(row[i] for i in idx)] for row in cells]
+        if "qa_acc" in names:  # the strict checker beside the lenient columns of table.md
+            keys = ("qa_strict", "seen_strict", "unseen_strict")
+            rows[0] = [*(f"{c} (lenient)" if c.startswith("qa_") else c for c in rows[0]),
+                       "qa_acc (strict)", "qa_seen (strict)", "qa_unseen (strict)"]  # fmt: skip
+            rows[1] = [*rows[1], "---", "---", "---"]
+            for r in rows[2:]:
+                st = strict.get(r[0], {})
+                ok = st and not st.get("partial")
+                r += [f"{st[k]:.3f}" if ok and st.get(k) is not None else "" for k in keys]
         rows = [rows[0], rows[1]] + [r for r in rows[2:] if any(r[1:])]  # rows with numbers here
         if len(rows) == 2:
             continue
         out.append(f"**{title}**\n\n" + "\n".join("| " + " | ".join(r) + " |" for r in rows))
+    out.append(
+        "qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa_* (strict) "
+        "is `scorers.qa_strict` (2026-10-09, the GRPO reward's rule: the whole gold, one candidate, "
+        "units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. No "
+        "ordering changes between the two."
+    )
     return "\n\n".join(out)
+
+
+STRICT_KEYS = {  # metrics key -> eval/qa_strict.py's evals.json key (2026-10-09)
+    "qa_strict": "qa_strict",
+    "qa_strict_seen": "seen_strict",
+    "qa_strict_unseen": "unseen_strict",
+    "qa_strict_num": "number_strict",
+    "qa_strict_ident": "identifier_strict",
+    "qa_strict_term": "term_strict",
+}
+
+
+def load_metrics(run: str) -> dict | None:
+    """results/runs/<run>/metrics.json, with the strict closed-book columns of
+    results/qa_strict/evals.json added (eval/qa_strict.py; the qa_* keys are the lenient scorer,
+    scorers.qa_correct)."""
+    f = RUNS / run / "metrics.json"
+    if not f.exists():
+        return None
+    m = json.loads(f.read_text())
+    strict = json.loads(QA_STRICT.read_text()).get(run, {}) if QA_STRICT.exists() else {}
+    if not strict.get("partial"):  # a run scored on part of the items has no strict column
+        m.update({k: strict[v] for k, v in STRICT_KEYS.items() if v in strict})
+    for part, tag in (("answer", "ans"), ("end", "end")):  # gold_lp's two parts, per half
+        for half, suffix in ((None, ""), ("seen", "_seen"), ("unseen", "_unseen")):
+            v = item_lp(run, half, part)
+            if v:
+                m[f"gold_lp_{tag}{suffix}"] = statistics.fmean(v.values())
+    return m
 
 
 REF = "base-8b-hf"  # Stage 2 rows are read against the base evaluated through the same vLLM path
@@ -491,22 +536,20 @@ DELTA_ROWS = [  # (label, metrics.json key, kind, lm-eval task and stderr key or
     ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
     ("HellaSwag", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
     ("closed-book gold-answer log-prob (nats)", "gold_lp", "lp", None),
-    ("closed-book qa_acc", "qa_acc", "kpi", "domain_qa"),
+    ("  of it, the answer tokens", "gold_lp_ans", "lp_ans", None),
+    ("  of it, the end token", "gold_lp_end", "lp_end", None),
+    ("closed-book qa_strict", "qa_strict", "kpi", "domain_qa"),
+    ("closed-book qa_acc (lenient)", "qa_acc", "kpi", "domain_qa"),
     ("grounded_acc (with passages)", "grounded_acc", "kpi", "grounded"),
     ("vocab_recall", "vocab_recall", "kpi", "vocab"),
     ("halluc_rate", "halluc_rate", "kpi", "adversarial"),
 ]
 
 
-def paired_lp_se(ref: str, run: str) -> float:
+def paired_lp_se(ref: str, run: str, part: str = "total") -> float:
     """Standard error of the per-item gold_lp difference run - ref on the same domain_qa items:
     the noise a paired comparison of a continuous score has to beat."""
-
-    def load(r: str) -> dict:
-        rows = (json.loads(line) for line in (RUNS / r / "generations.jsonl").open())
-        return {x["id"]: x["gold_lp"] for x in rows if x["task"] == "domain_qa" and "gold_lp" in x}
-
-    a, b = load(ref), load(run)
+    a, b = item_lp(ref, None, part), item_lp(run, None, part)
     d = [b[i] - a[i] for i in a if i in b]
     return statistics.stdev(d) / math.sqrt(len(d)) if len(d) > 1 else 0
 
@@ -517,9 +560,8 @@ def delta_table() -> str:
     %, the rest in points. Empty when the reference or the seed pair isn't scored yet."""
     runs = {}
     for r in [REF, *DELTA_RUNS]:
-        f = RUNS / r / "metrics.json"
-        if f.exists():
-            runs[r] = json.loads(f.read_text())
+        if (v := load_metrics(r)) is not None:
+            runs[r] = v
     if REF not in runs or not all(r in runs for r in SEED_PAIR):
         return ""
     ref = runs[REF]
@@ -540,14 +582,14 @@ def delta_table() -> str:
                     (v / ref[key] - 1) * 100
                     if kind == "ppl"
                     else (v - ref[key])
-                    if kind == "lp"
+                    if kind in LP_PART
                     else (v - ref[key]) * 100
                 )
         # the seed gap needs both seeds measured; a missing one is no gap, not a gap of 0
         pair = [change.get(r) for r in SEED_PAIR]
         seed = abs(pair[0] - pair[1]) if None not in pair else None
-        if kind == "lp":
-            se = paired_lp_se(REF, SEED_PAIR[0])
+        if kind in LP_PART:
+            se = paired_lp_se(REF, SEED_PAIR[0], LP_PART[kind])
         elif kind == "lm" and extra[0] in lm:
             se = lm[extra[0]].get(extra[1], 0) * 100
         elif kind == "kpi":
@@ -555,9 +597,9 @@ def delta_table() -> str:
             se = math.sqrt(ref[key] * (1 - ref[key]) / n) * 100 if n else 0
         else:
             se = 0
-        base = f"{ref[key]:.2f}" if kind in ("ppl", "lp") else f"{ref[key]:.3f}"
+        base = f"{ref[key]:.2f}" if kind == "ppl" or kind in LP_PART else f"{ref[key]:.3f}"
         cells = [label, base]
-        fmt = {"ppl": "{:+.2f}%", "lp": "{:+.2f}"}.get(kind, "{:+.1f}")
+        fmt = "{:+.2f}" if kind in LP_PART else {"ppl": "{:+.2f}%"}.get(kind, "{:+.1f}")
         for r in names:
             v = change.get(r)
             cells.append("" if v is None else fmt.format(v))
@@ -609,10 +651,17 @@ def serving_table() -> str:
 SFT_SEED_PAIR = ("sft-from-cpt", "sft-from-cpt-seed1")
 SFT_ROWS = [  # (label, metrics.json key, kind, half / items key, or lm-eval task + stderr key)
     ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen"),
+    ("  of it, the answer tokens", "gold_lp_ans_unseen", "lp_ans", "unseen"),
+    ("  of it, the end token", "gold_lp_end_unseen", "lp_end", "unseen"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen"),
-    ("qa_unseen", "qa_unseen", "kpi", "qa_unseen"),
-    ("qa_seen", "qa_seen", "kpi", "qa_seen"),
-    ("qa_ident (identifiers)", "qa_ident", "kpi", "qa_identifier"),
+    ("  of it, the answer tokens", "gold_lp_ans_seen", "lp_ans", "seen"),
+    ("  of it, the end token", "gold_lp_end_seen", "lp_end", "seen"),
+    ("qa_strict unseen", "qa_strict_unseen", "kpi", "qa_unseen"),
+    ("qa_unseen (lenient)", "qa_unseen", "kpi", "qa_unseen"),
+    ("qa_strict seen", "qa_strict_seen", "kpi", "qa_seen"),
+    ("qa_seen (lenient)", "qa_seen", "kpi", "qa_seen"),
+    ("qa_strict identifiers", "qa_strict_ident", "kpi", "qa_identifier"),
+    ("qa_ident (lenient)", "qa_ident", "kpi", "qa_identifier"),
     ("grounded_acc", "grounded_acc", "kpi", "grounded"),
     ("cite_supported", "cite_supported", "kpi", "grounded"),
     ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial"),
@@ -751,13 +800,29 @@ def plot_sft_loss(runs: dict, out: Path) -> None:
     print(f"-> {out}")
 
 
-def item_lp(run: str, half: str | None = None) -> dict[str, float]:
-    """{domain_qa id: gold_lp} for a run, optionally one half (eval/tasks/sft_seen_chunks.txt)."""
+# gold_lp's parts (2026-10-09): the answer tokens and the one end token after them; the composite
+# is their sum. A stage that changes the answer format moves the end token without the fact.
+LP_PART = {"lp": "total", "lp_ans": "answer", "lp_end": "end"}
+
+
+def lp_value(x: dict, part: str = "total") -> float:
+    if part == "answer":
+        return x["gold_lp"] - x["gold_lp_end"]
+    return x["gold_lp_end"] if part == "end" else x["gold_lp"]
+
+
+def item_lp(run: str, half: str | None = None, part: str = "total") -> dict[str, float]:
+    """{domain_qa id: gold_lp} for a run, optionally one half (eval/tasks/sft_seen_chunks.txt);
+    part "answer" is the answer tokens alone, "end" the end token alone."""
     path = RUNS / run / "generations.jsonl"
     if not path.exists():
         return {}
     rows = (json.loads(line) for line in path.open())
-    lp = {x["id"]: x["gold_lp"] for x in rows if x["task"] == "domain_qa" and "gold_lp" in x}
+    lp = {
+        x["id"]: lp_value(x, part)
+        for x in rows
+        if x["task"] == "domain_qa" and x.get("gold_lp") is not None
+    }
     if half is None:
         return lp
     seen = set(Path("eval/tasks/sft_seen_chunks.txt").read_text().split())
@@ -768,10 +833,10 @@ def item_lp(run: str, half: str | None = None) -> dict[str, float]:
     return {i: v for i, v in lp.items() if i in src and (src[i] in seen) == (half == "seen")}
 
 
-def paired_lp(a: str, b: str, half: str, n_boot: int = 10_000) -> dict:
+def paired_lp(a: str, b: str, half: str, n_boot: int = 10_000, part: str = "total") -> dict:
     """Mean per-item gold_lp difference b - a on one half, its paired SE and a 95% bootstrap
     interval over items (seeded): B7's first line with a = sft-from-base, b = sft-from-cpt."""
-    x, y = item_lp(a, half), item_lp(b, half)
+    x, y = item_lp(a, half, part), item_lp(b, half, part)
     ids = sorted(set(x) & set(y))
     if len(ids) < 2:
         return {}
@@ -814,8 +879,9 @@ def noise(m: dict, pair: tuple[str, str], key: str, kind: str, extra, sizes: dic
     a, b = (m.get(r, {}).get(key) for r in pair)
     if a is None or b is None:
         return None
-    if kind == "lp":
-        return max(abs(a - b), paired_lp(pair[1], pair[0], extra).get("se", 0))
+    if kind in LP_PART:
+        se = paired_lp(pair[1], pair[0], extra, part=LP_PART[kind]).get("se", 0)
+        return max(abs(a - b), se)
     if kind == "lm":
         return max(abs(a - b) * 100, lm_se(pair[0], *extra))
     n = sizes.get(extra) or m[pair[0]]["n"].get(extra, 0)
@@ -827,9 +893,8 @@ def sft_delta_table() -> str:
     Stage 2 (cpt-8b vs cpt-8b-seed1) next to them, both max(seed gap, SE)."""
     m = {}
     for r in [*SFT_COLUMNS, "cpt-8b", "cpt-8b-seed1"]:
-        f = RUNS / r / "metrics.json"
-        if f.exists():
-            m[r] = json.loads(f.read_text())
+        if (v := load_metrics(r)) is not None:
+            m[r] = v
     if not all(r in m for r in SFT_SEED_PAIR):
         return ""
     sizes = half_sizes()
@@ -841,16 +906,16 @@ def sft_delta_table() -> str:
         if n3 is None:
             continue
         n2 = noise(m, ("cpt-8b", "cpt-8b-seed1"), key, kind, extra, sizes)
-        unit = "{:.3f}" if kind == "lp" else "{:.1f}"
+        unit = "{:.3f}" if kind in LP_PART else "{:.1f}"
         cells = [label] + ["" if m[r].get(key) is None else f"{m[r][key]:.3f}" for r in cols]
         cells += [unit.format(n3), "" if n2 is None else unit.format(n2)]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
-def mean_lp(runs: list[str], half: str) -> dict[str, float]:
+def mean_lp(runs: list[str], half: str, part: str = "total") -> dict[str, float]:
     """Per-item gold_lp averaged over runs (items every run has)."""
-    per = [item_lp(r, half) for r in runs]
+    per = [item_lp(r, half, part) for r in runs]
     ids = set.intersection(*(set(x) for x in per))
     return {i: sum(x[i] for x in per) / len(per) for i in ids}
 
@@ -881,9 +946,8 @@ def b7_first_line() -> str:
     to exceed the noise."""
     m = {}
     for r in SFT_COLORS:
-        f = RUNS / r / "metrics.json"
-        if f.exists():
-            m[r] = json.loads(f.read_text())
+        if (v := load_metrics(r)) is not None:
+            m[r] = v
     if not all(r in m for r in ("sft-from-cpt", "sft-from-base")):
         return ""
     two_arm = all(r in m for r in ("sft-from-cpt-seed1", "sft-from-base-seed1"))
@@ -941,11 +1005,22 @@ def b7_first_line() -> str:
             if (lo > 0 or hi < 0) and abs(c["mean"]) > floor
             else "inside the noise: CPT's value is not distinguishable at this scale"
         )
+        split = ""
+        if two_arm:
+            parts = [
+                bootstrap_diff(mean_lp(base, half, p), mean_lp(cpt, half, p))
+                for p in ("answer", "end")
+            ]
+            split = (
+                f" Of it, the answer tokens {parts[0]['mean']:+.3f} [{parts[0]['ci'][0]:+.3f}, "
+                f"{parts[0]['ci'][1]:+.3f}] and the end token {parts[1]['mean']:+.3f} "
+                f"[{parts[1]['ci'][0]:+.3f}, {parts[1]['ci'][1]:+.3f}]."
+            )
         out.append(
             f"- **{half} gold_lp, {label}:** {c['mean']:+.3f} nats per answer [95% CI over items "
             f"{lo:+.3f}, {hi:+.3f}; {c['n']} items, {c['up']:.0%} up]; noise {floor:.3f} "
-            f"({detail}): {verdict}. The item CI conditions on these training runs; run variance "
-            "enters only through the noise."
+            f"({detail}): {verdict}.{split} The item CI conditions on these training runs; run "
+            "variance enters only through the noise."
         )
     return "\n".join(out)
 
@@ -1055,7 +1130,7 @@ def plot_sft_kpi(out: Path) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
 
-    m = {r: json.loads((RUNS / r / "metrics.json").read_text()) for r in names}
+    m = {r: load_metrics(r) for r in names}
     colors = {
         **SFT_COLORS,
         "instruct-8b": "#52514e",
@@ -1120,7 +1195,7 @@ def plot_sft_kpi(out: Path) -> None:
             error_kw={"ecolor": INK_2, "lw": 1, "capsize": 2},
         )
     ax_qa.set_xticks(range(2), halves)
-    style(ax_qa, "Closed-book qa_acc (%, +-1 binomial SE)", "", "%")
+    style(ax_qa, "Closed-book qa_acc, lenient scorer (%, +-1 binomial SE)", "", "%")
     handles = [
         Patch(
             facecolor=colors.get(r, INK_2),
@@ -1263,10 +1338,16 @@ DPO_ROWS = [  # the amended read (2026-10-08): primary verifier lines, then the 
     ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial", "primary"),
     ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded", "primary"),
     ("cite_valid", "cite_valid", "kpi", "grounded", "primary"),
-    ("qa_seen", "qa_seen", "kpi", "qa_seen", "primary"),
-    ("qa_unseen", "qa_unseen", "kpi", "qa_unseen", "primary"),
+    ("qa_seen (lenient, as registered)", "qa_seen", "kpi", "qa_seen", "primary"),
+    ("qa_unseen (lenient, as registered)", "qa_unseen", "kpi", "qa_unseen", "primary"),
+    ("qa_strict seen", "qa_strict_seen", "kpi", "qa_seen", "reported"),
+    ("qa_strict unseen", "qa_strict_unseen", "kpi", "qa_unseen", "reported"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
+    ("  of it, the answer tokens", "gold_lp_ans_seen", "lp_ans", "seen", "reported"),
+    ("  of it, the end token", "gold_lp_end_seen", "lp_end", "seen", "reported"),
     ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen", "primary"),
+    ("  of it, the answer tokens", "gold_lp_ans_unseen", "lp_ans", "unseen", "reported"),
+    ("  of it, the end token", "gold_lp_end_unseen", "lp_end", "unseen", "reported"),
     ("MMLU", "mmlu", "lm", ("mmlu", "acc_stderr,none"), "guard"),
     ("GSM8K", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match"), "guard"),
     ("grounded_acc (judge)", "grounded_acc", "kpi", "grounded", "reported"),
@@ -1284,9 +1365,8 @@ def dpo_delta_table() -> str:
     |change| > floor (and, for gold_lp, the CI excluding 0). One seed pair each: 1 df."""
     m = {}
     for r in (DPO_START, *DPO_PAIR, *SFT_SEED_PAIR):
-        f = RUNS / r / "metrics.json"
-        if f.exists():
-            m[r] = json.loads(f.read_text())
+        if (v := load_metrics(r)) is not None:
+            m[r] = v
     if not all(r in m for r in (DPO_START, *DPO_PAIR, *SFT_SEED_PAIR)):
         return ""
     sizes = half_sizes()
@@ -1298,12 +1378,15 @@ def dpo_delta_table() -> str:
         if any(v is None for v in vals):
             continue
         start, a, b = vals
-        scale = 1 if kind == "lp" else 100
+        scale = 1 if kind in LP_PART else 100
         change = ((a + b) / 2 - start) * scale
         n_start = noise(m, SFT_SEED_PAIR, key, kind, extra, sizes) or 0
-        if kind == "lp":
-            n = max(abs(a - b), paired_lp(DPO_PAIR[1], DPO_PAIR[0], extra).get("se", 0))
-            ci = bootstrap_diff(item_lp(DPO_START, extra), mean_lp(list(DPO_PAIR), extra))["ci"]
+        if kind in LP_PART:
+            part = LP_PART[kind]
+            n = max(abs(a - b), paired_lp(DPO_PAIR[1], DPO_PAIR[0], extra, part=part).get("se", 0))
+            ci = bootstrap_diff(
+                item_lp(DPO_START, extra, part), mean_lp(list(DPO_PAIR), extra, part)
+            )["ci"]
             excl = ci[0] > 0 or ci[1] < 0
             note, unit = f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]", "{:.3f}"
         else:
@@ -1331,9 +1414,8 @@ def dpo_more_table() -> str:
     per-item SE), with the item-bootstrap CI for gold_lp."""
     m = {}
     for r in (DPO_PAIR[0], DPO_PAIR[1], DPO_MORE):
-        f = RUNS / r / "metrics.json"
-        if f.exists():
-            m[r] = json.loads(f.read_text())
+        if (v := load_metrics(r)) is not None:
+            m[r] = v
     if not all(r in m for r in (*DPO_PAIR, DPO_MORE)):
         return ""
     sizes = half_sizes()
@@ -1352,9 +1434,10 @@ def dpo_more_table() -> str:
         a, b, twin = m[one].get(key), m[more].get(key), m[DPO_PAIR[1]].get(key)
         if a is None or b is None or twin is None:
             continue
-        if kind == "lp":
-            floor = max(abs(a - twin), paired_lp(DPO_PAIR[1], one, extra).get("se", 0))
-            d = bootstrap_diff(item_lp(one, extra), item_lp(more, extra))
+        if kind in LP_PART:
+            part = LP_PART[kind]
+            floor = max(abs(a - twin), paired_lp(DPO_PAIR[1], one, extra, part=part).get("se", 0))
+            d = bootstrap_diff(item_lp(one, extra, part), item_lp(more, extra, part))
             change, beyond = b - a, abs(b - a) > floor and (d["ci"][0] > 0 or d["ci"][1] < 0)
             note, unit = f"{change:+.3f} [{d['ci'][0]:+.3f}, {d['ci'][1]:+.3f}]", "{:.3f}"
         else:
@@ -1511,10 +1594,14 @@ PASSK = Path("results/passk")
 GRPO_ROWS = [  # the pre-registered read (2026-10-09): primary, reported, guards
     ("qa_strict seen (the reward's rule)", "qa_strict_seen", "kpi", "qa_seen", "primary"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
-    ("qa_acc seen (original scorer)", "qa_seen", "kpi", "qa_seen", "reported"),
+    ("  of it, the answer tokens", "gold_lp_ans_seen", "lp_ans", "seen", "reported"),
+    ("  of it, the end token", "gold_lp_end_seen", "lp_end", "seen", "reported"),
+    ("qa_acc seen (lenient)", "qa_seen", "kpi", "qa_seen", "reported"),
     ("qa_strict unseen", "qa_strict_unseen", "kpi", "qa_unseen", "reported"),
-    ("qa_acc unseen (original scorer)", "qa_unseen", "kpi", "qa_unseen", "reported"),
+    ("qa_acc unseen (lenient)", "qa_unseen", "kpi", "qa_unseen", "reported"),
     ("unseen gold-answer log-prob (nats)", "gold_lp_unseen", "lp", "unseen", "reported"),
+    ("  of it, the answer tokens", "gold_lp_ans_unseen", "lp_ans", "unseen", "reported"),
+    ("  of it, the end token", "gold_lp_end_unseen", "lp_end", "unseen", "reported"),
     ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial", "guard"),
     ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded", "guard"),
     ("cite_valid", "cite_valid", "kpi", "grounded", "guard"),
@@ -1527,17 +1614,7 @@ GRPO_ROWS = [  # the pre-registered read (2026-10-09): primary, reported, guards
 
 def metrics_with_strict(runs) -> dict:
     """metrics.json per run, plus the strict closed-book columns (eval/qa_strict.py)."""
-    strict = json.loads(QA_STRICT.read_text()) if QA_STRICT.exists() else {}
-    m = {}
-    for r in runs:
-        f = RUNS / r / "metrics.json"
-        if not f.exists():
-            continue
-        m[r] = json.loads(f.read_text())
-        if r in strict:
-            m[r].update(qa_strict=strict[r]["qa_strict"], qa_strict_seen=strict[r].get("seen_strict"),
-                        qa_strict_unseen=strict[r].get("unseen_strict"))  # fmt: skip
-    return m
+    return {r: v for r in runs if (v := load_metrics(r)) is not None}
 
 
 def change_row(m, label, key, kind, extra, start, pair, start_pairs, sizes):
@@ -1548,12 +1625,13 @@ def change_row(m, label, key, kind, extra, start, pair, start_pairs, sizes):
     if start not in m or m[start].get(key) is None or not runs:
         return None
     st = m[start][key]
-    scale = 1 if kind == "lp" else 100
+    scale = 1 if kind in LP_PART else 100
     change = (sum(m[r][key] for r in runs) / len(runs) - st) * scale
     gaps = [noise(m, pp, key, kind, extra, sizes) for pp in start_pairs if all(r in m for r in pp)]
-    if kind == "lp":
+    if kind in LP_PART:
+        part = LP_PART[kind]
         own = noise(m, pair, key, kind, extra, sizes) if len(runs) == 2 else 0
-        ci = bootstrap_diff(item_lp(start, extra), mean_lp(runs, extra))["ci"]
+        ci = bootstrap_diff(item_lp(start, extra, part), mean_lp(runs, extra, part))["ci"]
         excl, note = ci[0] > 0 or ci[1] < 0, f"{change:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]"
         floor, unit = max([own or 0, *(g or 0 for g in gaps)]), "{:.3f}"
     else:
@@ -1664,7 +1742,11 @@ def two_algorithm_table() -> str:
         "qa_strict_seen",
         "qa_strict_unseen",
         "gold_lp_seen",
+        "gold_lp_ans_seen",
+        "gold_lp_end_seen",
         "gold_lp_unseen",
+        "gold_lp_ans_unseen",
+        "gold_lp_end_unseen",
         "halluc_rate",
         "mmlu",
         "gsm8k",

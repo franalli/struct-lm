@@ -56,7 +56,7 @@ the first two rows.
 
 | # | What it measures | Task | Metrics |
 |---|---|---|---|
-| 1 | Closed-book domain knowledge | 322 questions with exact or numeric answers from the corpus (eval v3 from Stage 3; 325 in v2, 130 until 2026-10-04) | `qa_acc`, by answer kind (`qa_num` / `qa_ident` / `qa_term`) and by SFT half (`qa_seen` / `qa_unseen`), plus the gold answer's log-probability (`gold_lp`) |
+| 1 | Closed-book domain knowledge | 322 questions with exact or numeric answers from the corpus (eval v3 from Stage 3; 325 in v2, 130 until 2026-10-04) | `qa_acc`, by answer kind (`qa_num` / `qa_ident` / `qa_term`) and by SFT half (`qa_seen` / `qa_unseen`), plus the gold answer's log-probability (`gold_lp`: the answer tokens plus the one end token after them, both parts shown from 2026-10-09). From 2026-10-09 each `qa_*` is shown strict (`scorers.qa_strict`: the whole gold, one candidate, units compared) and lenient (the original `qa_correct`). |
 | 2 | Answering from given passages, with citations | 108 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
 | 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
 | 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
@@ -84,8 +84,9 @@ v3's 322 items in [`results/table.md`](results/table.md)):
   10% of the time, and answers 88% of unanswerable questions with something invented.
 - **The instruct model** has the behaviour (79% of answers correct and backed by their citations,
   99% of unanswerable questions declined), but it knows no more of the domain closed-book: 9.9%
-  against the base model's 12.0% on the 325 questions (12% against 14% on the original 130). For
-  scale, Mistral Large 3 answers 28% of them closed-book.
+  against the base model's 12.0% on the 325 questions (12% against 14% on the original 130). Those
+  are the lenient scorer's numbers. On v3's 322 items with the strict checker of 2026-10-09 they
+  are 9.6% against 12.1%. For scale, Mistral Large 3 answers 28% of them closed-book (26% strict).
 - **Closed-book domain accuracy is low for both.** That is the knowledge gap CPT is meant to close,
   while SFT brings citation and refusal behaviour up to the instruct model's level or beyond (DPO,
   on verifier-labelled pairs, left it where SFT put it), and the general-capability columns stay
@@ -266,7 +267,7 @@ What each KPI task measures:
 
 | Task | Context | Scoring | Metric |
 |------|---------|---------|--------|
-| `domain_qa` | closed-book, 3-shot | exact match / numeric ±2% | `qa_acc` |
+| `domain_qa` | closed-book, 3-shot | exact match / numeric ±2% (lenient); the whole gold, one candidate, units compared (strict, 2026-10-09) | `qa_acc`; strict via `eval/qa_strict.py` |
 | `vocab` | closed-book, 3-shot definitions | judge vs reference definition | `vocab_recall` |
 | `grounded` | 4 passages (gold, neighbours, off-doc distractor) | citations are provided ids; judge checks support | `cite_valid`, `cite_supported` |
 | `adversarial` | 3 related passages without the answer | exact abstain phrase, else judge | `halluc_rate` |
@@ -531,7 +532,10 @@ $ at 3.95 per GPU-hour (Modal's H100 list price as assumed, not checked against 
 | GSM8K | 0.793 | -0.8 | -0.7 | -0.2 | -3.0 | 1.1 |
 | HellaSwag | 0.801 | +0.1 | -0.1 | -0.0 | -0.2 | 0.4 |
 | closed-book gold-answer log-prob (nats) | -6.77 | +0.59 | +0.58 | +0.51 |  | 0.08 |
-| closed-book qa_acc | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+|   of it, the answer tokens | -6.32 | +0.56 | +0.55 | +0.50 |  | 0.07 |
+|   of it, the end token | -0.45 | +0.03 | +0.03 | +0.01 |  | 0.01 |
+| closed-book qa_strict | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
+| closed-book qa_acc (lenient) | 0.121 | +2.5 | +0.9 | +0.9 |  | 1.8 |
 | grounded_acc (with passages) | 0.843 | -0.9 | -4.6 | -6.5 | +4.6 | 3.7 |
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
@@ -542,7 +546,7 @@ Perplexity in %, the gold-answer log-probability in nats per answer, the rest in
 **Bottom line.** At 20M tokens and one epoch, CPT learns the documents it reads (-8% perplexity) and
 almost nothing that transfers to documents it hasn't seen (-0.4% on reports published in 2026).
 It does make the facts in the documents it read more likely: closed-book gold answers become about
-1.8x more probable (+0.59 nats per answer, both seeds), a gain pass/fail accuracy is too coarse to
+1.8x more probable (+0.59 nats per answer, both seeds; +0.56 of it in the answer tokens, +0.03 in the end token), a gain pass/fail accuracy is too coarse to
 resolve at this size.
 
 - **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
@@ -616,7 +620,7 @@ and it needs repetition or augmentation to stick.
    - **Full-parameter:** about 3x the main run's general-text rise, and about 4x its GSM8K loss
      (-3.0 points against -0.7 to -0.8). That GSM8K drop is the one benchmark delta that clears the
      noise (1.1) by a wide margin.
-   - **Full-parameter's task gains** on the 130-item eval v1 (`results/table_v1.md`): +3.1 qa_acc
+   - **Full-parameter's task gains** on the 130-item eval v1 (`results/table_v1.md`, lenient scorer): +3.1 qa_acc
      (noise 3.2) and +3.8 vocab (noise 3.1), at the noise edge. Every one of those items comes from
      a training document, so they are knowledge of what it read. Its weights were deleted before
      the QA task grew, so it has no 325-item QA scores.
@@ -629,7 +633,7 @@ and it needs repetition or augmentation to stick.
    ruled out: one epoch of our own CPT moves verbatim recall by 0.13 tokens, less than this
    comparison resolves.
 4. **Pass/fail scores can't see Stage 2; the gold answer's probability can.** On the 325-item
-   closed-book task (eval v2), qa_acc moves +2.5, +0.9 and +0.9 points for the three LoRA runs,
+   closed-book task (eval v2), qa_acc moves +2.5, +0.9 and +0.9 points for the three LoRA runs (strict and lenient alike),
    against a noise of 1.8. The log-probability of the gold answer (`gold_lp`, per item, paired
    against `base-8b-hf`) moves clearly:
 
@@ -786,7 +790,7 @@ completions) carry 75% of the gradient weight. Grounded answers carry 16%, and t
 
 ![Stage 3 loss curves: train loss (10-step moving average) and the token-mean sft_val loss per run, epoch boundary marked](results/curves/sft.png)
 
-![Stage 3 closed-book knowledge by half: gold-answer log-probability (chat-format runs) and qa_acc with binomial SE](results/curves/sft_kpi.png)
+![Stage 3 closed-book knowledge by half: gold-answer log-probability (chat-format runs) and qa_acc (lenient scorer) with binomial SE](results/curves/sft_kpi.png)
 
 Generated by `train/report.py` from `results/runs/`, `results/noop/` and `results/diversity/`:
 
@@ -807,10 +811,17 @@ B4 (pre-registered, amended before training): epoch 2 unless the closed-book or 
 | metric | instruct-8b | base-8b-hf | sft-from-base | sft-from-base-seed1 | cpt-8b-replay10 | sft-from-cpt | sft-from-cpt-seed1 | noise (Stage 3) | noise (Stage 2) |
 |---|---|---|---|---|---|---|---|---|---|
 | unseen gold-answer log-prob (nats) | -8.581 | -6.822 | -6.780 | -6.741 | -6.157 | -6.426 | -6.168 | 0.258 | 0.033 |
+|   of it, the answer tokens | -7.709 | -6.356 | -6.197 | -6.199 | -5.697 | -5.895 | -5.684 | 0.210 | 0.033 |
+|   of it, the end token | -0.872 | -0.466 | -0.583 | -0.542 | -0.460 | -0.531 | -0.484 | 0.048 | 0.005 |
 | seen gold-answer log-prob (nats) | -8.008 | -6.722 | -5.409 | -5.249 | -6.356 | -5.120 | -4.873 | 0.247 | 0.032 |
-| qa_unseen | 0.084 | 0.116 | 0.110 | 0.097 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
-| qa_seen | 0.114 | 0.126 | 0.245 | 0.234 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
-| qa_ident (identifiers) | 0.031 | 0.078 | 0.125 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
+|   of it, the answer tokens | -7.313 | -6.278 | -4.973 | -4.869 | -5.931 | -4.697 | -4.524 | 0.173 | 0.032 |
+|   of it, the end token | -0.695 | -0.444 | -0.436 | -0.380 | -0.425 | -0.423 | -0.349 | 0.074 | 0.005 |
+| qa_strict unseen | 0.077 | 0.116 | 0.084 | 0.077 | 0.110 | 0.116 | 0.110 | 2.6 | 2.7 |
+| qa_unseen (lenient) | 0.084 | 0.116 | 0.110 | 0.097 | 0.110 | 0.136 | 0.129 | 2.7 | 2.7 |
+| qa_strict seen | 0.114 | 0.126 | 0.239 | 0.234 | 0.150 | 0.287 | 0.258 | 3.5 | 2.8 |
+| qa_seen (lenient) | 0.114 | 0.126 | 0.245 | 0.234 | 0.150 | 0.281 | 0.270 | 3.5 | 2.8 |
+| qa_strict identifiers | 0.031 | 0.078 | 0.109 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
+| qa_ident (lenient) | 0.031 | 0.078 | 0.125 | 0.141 | 0.125 | 0.203 | 0.234 | 5.0 | 4.1 |
 | grounded_acc | 0.898 | 0.843 | 0.926 | 0.898 | 0.778 | 0.907 | 0.935 | 2.8 | 3.7 |
 | cite_supported | 0.787 | 0.083 | 0.870 | 0.880 | 0.037 | 0.861 | 0.880 | 3.3 | 3.7 |
 | halluc_rate (lower is better) | 0.013 | 0.895 | 0.066 | 0.013 | 0.934 | 0.053 | 0.013 | 3.9 | 3.3 |
@@ -825,8 +836,8 @@ Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in na
 
 ##### B7's first line: what CPT bought, measured after SFT
 
-- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
-- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. The item CI conditions on these training runs; run variance enters only through the noise.
+- **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.409 [+0.227, +0.602] and the end token +0.055 [+0.021, +0.099]. The item CI conditions on these training runs; run variance enters only through the noise.
+- **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.311 [+0.173, +0.456] and the end token +0.022 [+0.003, +0.039]. The item CI conditions on these training runs; run variance enters only through the noise.
 
 ##### Checks
 
@@ -905,17 +916,18 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - **The robust statement is the rank one.** Every CPT run beats every base run, and the smallest
      of the four pair differences (+0.32) exceeds the CPT arm's own seed gap (0.258). With 2 runs
      per arm, that ordering has an exact permutation probability of 1 in 6.
-   - **Pass/fail:** unseen qa_acc is 13.2% against 10.3% between the arm means, inside the binomial
-     noise: reported, not argued. The effect lives in the probabilities, as Stage 2's did.
+   - **Pass/fail:** unseen qa_acc is 11.3% against 8.1% between the arm means on the strict
+     checker (13.2% against 10.3% lenient), inside the binomial noise: reported, not argued. The effect lives in the probabilities, as Stage 2's did.
    - **Identifiers are the line that holds across stages.**
      - Stage 2's CPT moved them most per answer. Per token (+0.127 nats) they were second to terms
        (+0.147, a wide interval on 38 items); per answer they lead because they are the longest
        answers.
-     - After SFT, the CPT arm leads the base arm on qa_ident by +8.6 points (0.219 vs 0.133). That
-       is on 64 items, with a standard error of about 5 points per run.
+     - After SFT, the CPT arm leads the base arm on qa_ident by +9.4 points on the strict checker
+       (0.219 vs 0.125; +8.6 lenient, 0.219 vs 0.133). That is on 64 items, with a standard error
+       of about 5 points per run.
    - **The design is blocked by seed, and the seed shows.**
      - Seed 1 beats seed 0 in both arms: on seen `gold_lp` (−5.25 vs −5.41 base, −4.87 vs −5.12
-       CPT), on unseen `gold_lp` (−6.74 vs −6.78, −6.17 vs −6.43), on qa_ident, and on final train
+       CPT), on unseen `gold_lp` (−6.74 vs −6.78, −6.17 vs −6.43), on qa_ident (strict and lenient), and on final train
        loss (0.36 vs 0.43 in both arms).
      - Hallucinations follow the same line: 5 and 4 at seed 0, 1 and 1 at seed 1.
      - In a one-epoch run, data order is a hyperparameter, and the "seed gap" here is LoRA init
@@ -929,24 +941,29 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 1. **The gain over Instruct on closed-book facts is retention, not capability.** The seen half's
    facts were in the training set by design; the unseen half's were not.
 
-   | closed-book | seen half: retention of trained facts | unseen half: transfer |
-   |---|---|---|
-   | instruct-8b | 19/167 (11.4%) | 13/155 (8.4%) |
-   | cpt-8b-replay10 (start) | 25/167 (15.0%) | 17/155 (11.0%) |
-   | sft-from-base | 41/167 (24.5%) | 17/155 (11.0%) |
-   | **sft-from-cpt** | **47/167 (28.1%)** | **21/155 (13.5%)** |
-   | identifiers, instruct-8b | 2/30 | 0/34 |
-   | identifiers, sft-from-cpt | 10/30 | 3/34 (its CPT start: 3/34) |
+   | closed-book | seen half, strict: retention of trained facts | unseen half, strict: transfer | seen / unseen, lenient |
+   |---|---|---|---|
+   | instruct-8b | 19/167 (11.4%) | 12/155 (7.7%) | 19 / 13 |
+   | cpt-8b-replay10 (start) | 25/167 (15.0%) | 17/155 (11.0%) | 25 / 17 |
+   | sft-from-base | 40/167 (24.0%) | 13/155 (8.4%) | 41 / 17 |
+   | **sft-from-cpt** | **48/167 (28.7%)** | **18/155 (11.6%)** | 47 / 21 |
+   | identifiers, instruct-8b | 2/30 | 0/34 | 2 / 0 |
+   | identifiers, sft-from-cpt | 10/30 | 3/34 (its CPT start: 3/34) | 10 / 3 |
+
+   Strict is the checker written for Stage 5's reward (`scorers.qa_strict`, 2026-10-09). The
+   lenient counts are what this section first reported (`qa_correct`): ranges, fraction first
+   numbers and child sections pass there. No ordering changes.
 
    - **Terms are 38 items, so read them as counts.** Correct answers are 2 for instruct-8b, base and
      CPT, 0 and 2 for sft-from-base s0/s1, 1 and 4 for sft-from-cpt s0/s1, and 7 for Large 3. As a
      rate (0.000-0.105) the column invites a reading it can't support: one item is 2.6 points.
 
    - **Seen half:** a client wants the model to know their documents, and SFT delivers that here,
-     about 2.5x Instruct. At 28.1% it matches Mistral Large 3's 27.5% on the same items. These are
-     facts that were in the training set, and Large 3 never saw them.
-   - **Unseen half:** 13.5% against Instruct's 8.4% sits inside the noise floor. Every unseen
-     identifier it gets right, its CPT start already had.
+     about 2.5x Instruct (strict: 28.7% against 11.4%). It matches Mistral Large 3's 26.3% on the
+     same items (lenient: 28.1% against 27.5%). These are facts that were in the training set, and
+     Large 3 never saw them.
+   - **Unseen half:** 11.6% against Instruct's 7.7% (strict; lenient 13.5% against 8.4%) sits inside
+     the noise floor. Every unseen identifier it gets right, its CPT start already had.
 2. **Replay carried the gradient.**
    - 500 general Tulu 3 answers are 20% of the records, but their long completions are 75% of the
      token-weighted loss. The closed-book and definition records the seen half measures are 9%.
@@ -976,10 +993,10 @@ targets and are marked as such.
 | target (B7, fixed before training, unless marked) | result | verdict |
 |---|---|---|
 | CPT's advantage survives SFT (unseen `gold_lp` beyond the floor) | +0.46 nats, all four pairings positive | pass; the SD multiple rests on one seed pair per arm |
-| beat Instruct on identifiers | 0.203 vs 0.031 | pass |
+| beat Instruct on identifiers | 0.203 vs 0.031 (strict and lenient agree) | pass |
 | beat Instruct on vocab | 0.833 vs 0.786 | pass, narrowly (1.5x the noise) |
 | match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation |
-| guards: no half below its start by more than the noise; MMLU and GSM8K within noise + 1 point | all four runs (the base arm's unseen half is 0.110 / 0.097 against its start's 0.116, inside the noise) | pass |
+| guards: no half below its start by more than the noise; MMLU and GSM8K within noise + 1 point | lenient (as scored then): all four runs (the base arm's unseen half 0.110 / 0.097 against its start's 0.116). Strict (2026-10-09): the CPT arm passes, but the base arm's unseen half is 0.084 / 0.077 against 0.116, 3.2-3.9 points down against a 2.7-point noise | pass as scored then; under the strict checker it fails for the base arm, the control (its unseen hedges, above), not for the chain |
 | abstain: > 80% on unanswerable, < 5% false refusals | 94.7%; 0% | pass |
 | diversity within 10% of Instruct | distinct-4 −4.7%, entropy −8.0% | pass, length-confounded |
 | stops before the cap; latency (B5/B6 checks, not B7) | 100%; 159 ms vs 1,753 ms | pass |
@@ -995,16 +1012,22 @@ target.
   from CPT and 0.126 → 0.245 from the base. Most of that gain is SFT teaching the facts in its
   data, not CPT's knowledge surfacing.
 - **What is CPT-specific is the arm difference.** SFT preserved CPT's knowledge and made it usable
-  in chat form. Starting from CPT rather than the base is worth +0.46 nats on unseen `gold_lp`,
+  in chat form. Starting from CPT rather than the base is worth +0.46 nats on unseen `gold_lp` (+0.41 of it in the answer tokens [+0.23, +0.60], +0.06 in the end token),
   +3.6 points on the seen half and +8.6 on identifiers (about 1.7 SE). It is real by the rule and
   smaller than the seen-half gain.
-  - Unseen accuracy differs by +2.9 points between the arms (0.133 vs 0.104). That is inside the
-    binomial noise, so it isn't the evidence; `gold_lp` is.
-  - Whether this is "the same" knowledge CPT added (+0.66 nats over the base, in base format)
+  - Unseen accuracy differs by +3.2 points between the arms on the strict checker (0.113 vs 0.081;
+    +2.9 lenient, 0.133 vs 0.104). That is inside the binomial noise, so it isn't the evidence;
+    `gold_lp` is.
+  - Whether this is "the same" knowledge CPT added (+0.66 nats over the base, in base format; +0.66 in the answer tokens)
     can't be computed across the format split. The arm difference is consistent with it.
 - **SFT added no unseen knowledge in either arm.**
-  - Unseen accuracy moved 0.116 → 0.104 (base arm) and 0.110 → 0.133 (CPT arm), both inside the
-    noise.
+  - Unseen accuracy moved 0.110 → 0.113 for the CPT arm (strict; 0.133 lenient), inside the noise.
+  - **The base arm's unseen accuracy fell 0.116 → 0.081 on the strict checker** (0.104 lenient), which
+    is beyond the noise.
+    - Its lenient-only passes on unseen items were hedges: two ranges ("12 to 18 inches" for "12
+      in.", "10 to 12 feet" for "10 feet"), a fraction read as its first number ("1/2 inch" for "1
+      in.") and a child section.
+    - The control arm learned to hedge where it didn't know, and the lenient scorer credited it.
   - The only unseen effect in the whole table is CPT's. The unseen half is bounded by what the
     weights knew before SFT: pretraining plus 19M tokens of CPT.
   - This is the textbook division of labour. Continued pre-training puts knowledge in;
@@ -1173,7 +1196,7 @@ Every label is a verifier or a rule (`data/scripts/dpo_score.py`, `dpo_pairs.py`
   - 458 of the 506 pairs are closed-book: one-line answers to prompts SFT already trained on.
   - Chosen and rejected share everything but the value: a median 5-token answer differing in a
     median 3 tokens ("48 months" against "36 months").
-  - Seen qa_acc didn't move beyond the noise even there (below).
+  - Seen qa_acc didn't move beyond the noise even there (below), strict or lenient.
 - **Size:** 506 pairs (train 484, dpo_val 22), dataset hash `a899f7d2` (`data/dpo/SHA256SUMS`).
   That is under smol's 1,000-pair floor for domain DPO; Tülu 3 used ~270k.
 - **The cap was a mix rule, not a validity rule.** Lifting it is a post-hoc amendment of the mix,
@@ -1209,12 +1232,19 @@ for the CPT-vs-base read: the start is one run of a noisy stage, so its own seed
   the noise:
   - hallucination −3.3 pt against 2.6 (1.3×);
   - unseen gold-answer log-probability −0.21 nats against 0.19 (1.1×).
+- **The split, measured after the fact (2026-10-09, post hoc):** DPO moved the answer's format as
+  well as its likelihood.
+  - **The end token rose:** +0.10 nats on seen facts and +0.12 on unseen, both beyond the noise.
+    DPO made stopping after the gold more likely.
+  - **The answer tokens fell:** −0.08 on seen facts (inside the noise) and −0.33 [−0.45, −0.22] on
+    unseen, which is beyond the Stage 3-way floor (0.21).
+  - **The composite hid it:** it netted the two, which is why it read as inside the noise.
 - **With the start's seed gap in the floor, both fall inside:** −3.3 against 3.9 pt, −0.21
   against 0.258 nats. No other primary line moves either way.
 - **Hallucination carries no headline:** 4 of 76 → 1 and 2, resting on 6 abstain pairs, and the
   SFT start's own twin already sits at 1 of 76.
-- **Facts:** qa_seen +1.8 pt and qa_unseen −0.3 pt, inside the noise. That includes the seen facts
-  the pairs were made of.
+- **Facts:** qa_seen +1.8 pt and qa_unseen −0.3 pt (the lenient scorer, as registered; strict
+  +0.9 and −0.3), inside the noise. That includes the seen facts the pairs were made of.
 - **Unchanged:** false abstain (0 of 108), `cite_valid` (1.000), MMLU, GSM8K, answer length (−21%
   to +3%).
 - **The policy barely moved:** train loss 0.693 → 0.654, dpo_val margin 0.06, `rewards/chosen`
@@ -1239,8 +1269,9 @@ ended at 0.654 with the margin still rising.
     rejected about 6.1, so the margin grew by pushing both down;
   - gold-answer log-probability fell 3.0 nats on seen facts and 4.3 on unseen (CIs
     [−3.5, −2.5] and [−5.0, −3.7]), in the answer tokens, on 80% of items;
-  - seen qa_acc fell 4.8 points against one epoch (0.311 → 0.264), below the SFT start's 0.281.
-- **Unchanged even then:** hallucination, false abstain, `cite_valid`, qa_unseen, MMLU, GSM8K.
+  - seen qa_acc fell 4.8 points against one epoch (lenient 0.311 → 0.264, strict 0.305 → 0.258),
+    below the SFT start (0.281 lenient, 0.287 strict).
+- **Unchanged even then:** hallucination, false abstain, `cite_valid`, qa_unseen (strict and lenient), MMLU, GSM8K.
 - **What it is:** the preference displacement of the RLHF Book's ch. 8, measured end to end on a
   verifier-labelled set.
 - **Why the window is so narrow here:** with 484 near-duplicate pairs (chosen and rejected share
@@ -1324,7 +1355,7 @@ It is lenient elsewhere: a range for a point value passes, the first number of a
 units are never compared, and a child section passes by containment.
 - Every row's stored answers were re-scored ([`results/qa_strict/evals.md`](results/qa_strict/evals.md)).
 - 16 distinct verdicts change; 14 strict verdicts are right and 2 are arguable (both Large 3's).
-- `qa_acc` drops 0 to 1.6 points per 8B row and 1.9 for Large 3, and no ordering changes, Stage
+- `qa_acc` drops 0 to 1.6 points per 8B row (lenient → strict) and 1.9 for Large 3, and no ordering changes, Stage
   3's Instruct comparison included.
 - `gold_lp` never depended on a string match.
 
@@ -1341,10 +1372,14 @@ lenient `dpo` pair's seed gap.
 | line | sft-from-cpt | dpo-strict | change | floor | beyond |
 |---|---|---|---|---|---|
 | qa_seen, strict | 0.287 | 0.305 | +1.8 pt | 3.5 pt | no |
-| qa_seen, original scorer | 0.281 | 0.299 | +1.8 pt | 3.5 pt | no |
+| qa_seen, lenient | 0.281 | 0.299 | +1.8 pt | 3.5 pt | no |
 | hallucination | 4 of 76 | 3 of 76 | −1.3 pt | 3.9 pt | no |
 | seen gold-answer log-prob | −5.120 | −5.130 | −0.01 [−0.10, +0.08] nats | 0.258 | no |
+| of it, the answer tokens | −4.697 | −4.811 | −0.11 [−0.20, −0.03] nats | 0.173 | no |
+| of it, the end token | −0.423 | −0.319 | +0.10 [+0.08, +0.13] nats | 0.074 | yes |
 | unseen gold-answer log-prob | −6.426 | −6.695 | −0.27 [−0.40, −0.16] nats | 0.258 | at the floor |
+| of it, the answer tokens | −5.895 | −6.274 | −0.38 [−0.50, −0.27] nats | 0.210 | yes |
+| of it, the end token | −0.531 | −0.421 | +0.11 [+0.08, +0.14] nats | 0.066 | yes |
 | MMLU (guard) | 0.766 | 0.767 | +0.1 pt | 0.35 pt | no |
 | GSM8K (guard) | 0.814 | 0.809 | −0.5 pt | 2.2 pt | no |
 
@@ -1353,6 +1388,9 @@ lenient `dpo` pair's seed gap.
   accuracy and hallucination sit inside the noise: label noise was not why DPO didn't move.
 - **Unseen gold-answer log-probability fell 0.27 nats,** just past the 0.258 floor on one run. It
   is the same direction as `dpo`'s −0.21 and is named as a cost, not argued.
+- **Split after the fact, the cost is in the answer tokens:** −0.38 nats unseen, beyond the floor,
+  and −0.11 seen, inside it. The end token rose +0.10 to +0.11, as for `dpo`: DPO made stopping
+  after the gold more likely, and the composite netted that against the cost.
 - **Stage 4's checkpoint is `dpo-strict`.** Every stage from here reads "reward = the strict
   verifier". `dpo` and `dpo-seed1` stay in the tables as the as-run rows.
 
@@ -1392,10 +1430,16 @@ The checkpoint rule (pre-registered): the final step unless the dpo_val loss at 
 | halluc_rate (lower is better) | primary | 0.053 | 0.013 | 0.026 | -3.3 pt | 2.6 pt | yes | 3.9 pt | no |
 | false_abstain (lower is better) | primary | 0.000 | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no | 0.9 pt | no |
 | cite_valid | primary | 1.000 | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no | 1.8 pt | no |
-| qa_seen | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no | 3.5 pt | no |
-| qa_unseen | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no | 2.7 pt | no |
+| qa_seen (lenient, as registered) | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no | 3.5 pt | no |
+| qa_unseen (lenient, as registered) | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no | 2.7 pt | no |
+| qa_strict seen | reported | 0.287 | 0.305 | 0.287 | +0.9 pt | 3.5 pt | no | 3.5 pt | no |
+| qa_strict unseen | reported | 0.116 | 0.116 | 0.110 | -0.3 pt | 2.6 pt | no | 2.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.120 | -5.003 | -5.196 | +0.021 [-0.072, +0.113] | 0.193 | no | 0.247 | no |
+|   of it, the answer tokens | reported | -4.697 | -4.705 | -4.848 | -0.079 [-0.168, +0.008] | 0.143 | no | 0.173 | no |
+|   of it, the end token | reported | -0.423 | -0.298 | -0.348 | +0.100 [+0.079, +0.123] | 0.050 | yes | 0.074 | yes |
 | unseen gold-answer log-prob (nats) | primary | -6.426 | -6.544 | -6.731 | -0.212 [-0.335, -0.097] | 0.187 | yes | 0.258 | no |
+|   of it, the answer tokens | reported | -5.895 | -6.161 | -6.282 | -0.327 [-0.445, -0.218] | 0.121 | yes | 0.210 | yes |
+|   of it, the end token | reported | -0.531 | -0.383 | -0.449 | +0.115 [+0.090, +0.143] | 0.066 | yes | 0.066 | yes |
 | MMLU | guard | 0.766 | 0.767 | 0.765 | -0.0 pt | 0.3 pt | no | 0.4 pt | no |
 | GSM8K | guard | 0.814 | 0.810 | 0.807 | -0.6 pt | 1.1 pt | no | 2.2 pt | no |
 | grounded_acc (judge) | reported | 0.907 | 0.917 | 0.907 | +0.5 pt | 2.8 pt | no | 2.8 pt | no |
@@ -1411,10 +1455,16 @@ Rows marked primary are the amended read (2026-10-08, fixed before launch); guar
 | halluc_rate (lower is better) | primary | 0.013 | 0.013 | +0.0 pt | 1.3 pt | no |
 | false_abstain (lower is better) | primary | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
 | cite_valid | primary | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
-| qa_seen | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
-| qa_unseen | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| qa_seen (lenient, as registered) | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
+| qa_unseen (lenient, as registered) | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| qa_strict seen | reported | 0.305 | 0.258 | -4.8 pt | 3.6 pt | yes |
+| qa_strict unseen | reported | 0.116 | 0.129 | +1.3 pt | 2.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.003 | -8.012 | -3.010 [-3.522, -2.514] | 0.193 | yes |
+|   of it, the answer tokens | reported | -4.705 | -7.816 | -3.112 [-3.618, -2.622] | 0.143 | yes |
+|   of it, the end token | reported | -0.298 | -0.196 | +0.102 [+0.067, +0.140] | 0.050 | yes |
 | unseen gold-answer log-prob (nats) | primary | -6.544 | -10.845 | -4.301 [-4.999, -3.653] | 0.187 | yes |
+|   of it, the answer tokens | reported | -6.161 | -10.570 | -4.408 [-5.101, -3.759] | 0.121 | yes |
+|   of it, the end token | reported | -0.383 | -0.276 | +0.107 [+0.062, +0.154] | 0.066 | yes |
 | MMLU | guard | 0.767 | 0.767 | +0.0 pt | 0.3 pt | no |
 | GSM8K | guard | 0.810 | 0.806 | -0.4 pt | 1.1 pt | no |
 | grounded_acc (judge) | reported | 0.917 | 0.907 | -0.9 pt | 2.7 pt | no |
@@ -1496,19 +1546,21 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
   entropy under a third of its start while the train reward climbed from 0.5 to 0.83), and the
   pre-registered rule kept step 25 of each.
 - **Against `dpo-strict`:**
-  - greedy closed-book accuracy is unchanged (seen −1.2 points, floor 3.6);
+  - greedy closed-book accuracy is unchanged (strict, seen −1.2 points, floor 3.6);
   - sampled pass@1 rose 3.1 points on seen items (paired CI [+1.3, +5.0]) while pass@8 fell 3.6,
     inside the noise. That is DeepSeekMath's sharpening signature;
-  - the gold answer's log-probability fell 0.67 nats on seen facts and 1.33 on unseen, beyond the
+  - the gold answer's log-probability fell 0.67 nats on seen facts and 1.33 on unseen (−0.71 and
+    −1.32 on the answer tokens; the end token barely moved), beyond the
     floor: the cost of that sharpening;
   - hallucination 3 → 1 of 76 is noise: the SFT twins sit at 4 and 1, the DPO twins at 1 and 2.
-- **The expected +3 to +8 points on seen accuracy did not happen,** so `stage5-final` stays
+- **The expected +3 to +8 points on seen accuracy (strict) did not happen,** so `stage5-final` stays
   `dpo-strict`, as the rule requires.
 - **Serving is greedy, so GRPO's only gain is one serving doesn't use.** That gain is sampled
   accuracy at T 0.7, and it cost calibration on every fact.
 - **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not clear the
   floor on the primary lines, and the pre-registered rules rejected both.
-  - Both sharpened sampled accuracy by about 3 points; DPO did so at near-zero calibration cost.
+  - Both sharpened sampled accuracy by about 3 points. DPO did so at a small calibration cost (0.11
+    / 0.38 nats on the answer tokens), GRPO at a large one (0.71 / 1.32).
   - The chain ends on `dpo-strict`, which is the SFT model within noise.
 
 Group Relative Policy Optimization from `dpo-strict`, with a fresh LoRA, on tasks the start
@@ -1610,7 +1662,8 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
 1. **Primary:**
    - Seen strict accuracy: 0.305 → 0.299 / 0.287, −1.2 points against a 3.6-point floor. No
      change.
-   - Seen gold-answer log-probability: −0.67 nats [−0.86, −0.49], beyond the floor in the wrong
+   - Seen gold-answer log-probability: −0.67 nats [−0.86, −0.49]; −0.71 [−0.89, −0.53] of it on the
+     answer tokens and +0.04 on the end token, so a calibration cost, not a format change. Beyond the floor in the wrong
      direction.
    - The expected +3 to +8 points did not come.
 2. **pass@1 against pass@8** (322 closed-book items, 8 samples at T 0.7, the strict scorer, paired
@@ -1625,10 +1678,11 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
      - sampled pass@1 rises, because sampling lands on the argmax more often;
      - pass@8 trends down, because fewer distinct answers get drawn;
      - when the top answer is wrong, the gold loses mass. On unseen items `dpo-strict`'s top
-       answer is wrong 87% of the time (`qa_unseen` 0.129), so the unseen gold log-probability
+       answer is wrong 87% of the time (`qa_unseen` 0.129 lenient; 89% strict), so the unseen gold log-probability
        falls hardest.
 3. **Unseen:** strict accuracy −1.0 point (inside the noise). Gold-answer log-probability −1.33
-   nats [−1.61, −1.08]: a cost, named as one, through the mechanism above.
+   nats [−1.61, −1.08]: −1.32 on the answer tokens, −0.01 on the end token. A cost, named as one,
+   through the mechanism above.
 4. **Guards:**
    - MMLU (0.767 / 0.767) and GSM8K are within the noise.
    - Hallucination is 1 of 76 in both seeds. It carries no headline: the start sat at 3, the SFT
@@ -1641,16 +1695,19 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
    - `grpo` meets every line.
 5. **Same verifier, two algorithms**, each measured from its own start:
 
-   | | seen pass@1 | seen pass@8 | seen gold_lp | unseen gold_lp |
-   |---|---|---|---|---|
-   | DPO (from SFT) | +3.5 [+1.2, +6.0] | −3.0, inside the noise | −0.01 | −0.27 |
-   | GRPO (from DPO) | +3.1 [+1.3, +5.0] | −3.6 [−8.1, +0.9] | −0.67 | −1.33 |
+   | | seen pass@1 | seen pass@8 | seen gold_lp, answer tokens | unseen gold_lp, answer tokens | end token (seen / unseen) |
+   |---|---|---|---|---|---|
+   | DPO (from SFT) | +3.5 [+1.2, +6.0] | −3.0, inside the noise | −0.11 [−0.20, −0.03] | −0.38 [−0.50, −0.27] | +0.10 / +0.11 |
+   | GRPO (from DPO) | +3.1 [+1.3, +5.0] | −3.6 [−8.1, +0.9] | −0.71 [−0.89, −0.53] | −1.32 [−1.58, −1.08] | +0.04 / −0.01 |
 
    The full table, with the unseen pass@k lines and the chain's cumulative change from SFT, is
    below the figures.
    - **Same gain, different price.** From their own starts, the two algorithms sharpened sampled
-     accuracy by the same amount, about 3 points. What separates them is the gold log-probability:
-     DPO paid almost nothing on seen facts and 0.27 nats on unseen; GRPO paid 0.67 and 1.33.
+     accuracy by the same amount, about 3 points. What separates them is the price on the gold
+     answer's tokens: DPO paid 0.11 nats on seen facts and 0.38 on unseen; GRPO paid 0.71 and 1.32.
+   - **DPO's composite looked near zero on seen facts** because DPO also made the end token more
+     likely (+0.10). It shifted the format toward stopping, and the composite netted that against
+     the cost. GRPO's end token barely moved, so its composite and its answer-token cost agree.
    - **At this scale offline DPO was the gentler optimiser.** GRPO's extra cost is what running
      without a brake in the objective looks like (item 6).
    - **Cumulative from SFT:** the chain reaches +6.6 points on seen pass@1 [+3.6, +9.8] with pass@8
@@ -1716,10 +1773,14 @@ The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves a
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | primary | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
 | seen gold-answer log-prob (nats) | primary | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
-| qa_acc seen (original scorer) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
+|   of it, the answer tokens | reported | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
+|   of it, the end token | reported | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
+| qa_acc seen (lenient) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
 | qa_strict unseen | reported | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
-| qa_acc unseen (original scorer) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
+| qa_acc unseen (lenient) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
 | unseen gold-answer log-prob (nats) | reported | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
+|   of it, the answer tokens | reported | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
+|   of it, the end token | reported | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
 | halluc_rate (lower is better) | guard | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
 | false_abstain (lower is better) | guard | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
 | cite_valid | guard | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
@@ -1740,8 +1801,12 @@ Rows marked primary are the pre-registered read (2026-10-09); guards must stay w
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
 | seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
+|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.143) | -0.821 [-1.072, -0.579] | yes (0.173) |
+|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.050) | +0.140 [+0.110, +0.171] | yes (0.074) |
 | qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
 | unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
+|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.121) | -1.699 [-2.063, -1.363] | yes (0.210) |
+|   of it, the end token | -0.531 | +0.110 [+0.084, +0.138] | yes (0.066) | -0.013 [-0.068, +0.031] | no (0.066) | +0.097 [+0.052, +0.136] | yes (0.048) |
 | halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
 | MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
 | GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |
@@ -1819,6 +1884,9 @@ passage in the prompt.
   the unseen half shows whether anything transfers.
 
 - **Task scores** come from the frozen eval, with judge columns scored locally:
+  - **Two scorers:** every `qa_*` column is shown lenient (`scorers.qa_correct`, what
+    `results/table.md` stores) and strict (`scorers.qa_strict`, 2026-10-09, re-scored from the saved
+    generations by `eval/qa_strict.py`). The strict column is the read from Stage 5 on.
   - `qa_num`, `qa_ident` and `qa_term` split `qa_acc` by answer kind (`eval/qa_rules.py`):
     values, identifiers (document ids and article numbers) and terms, which include everything
     else. A hand audit of 169 misses found 2 scoring errors, both fixed, so the low scores are
@@ -1834,6 +1902,11 @@ passage in the prompt.
   `eval/gold_lp.py`) is the continuous companion to `qa_acc` on the same items. Instruct and the
   SFT rows are scored in their chat format, so their values compare with each other, not with the
   base-format rows.
+  - It is the sum of two parts: the answer tokens, and the one end token the prompt expects after an
+    answer.
+  - From 2026-10-09 every `gold_lp` row shows both parts, because a stage can change the answer's
+    format (whether the model stops after the gold) without changing the fact.
+  - The composite was the right single number in Stage 3, where stopping was the failure measured.
 - **Benchmarks** are from lm-eval: 5-shot, never with the chat template.
 - **Perplexity** is from `eval/perplexity.py` (lower is better). `ppl_postcutoff` covers the 13
   federal reports published after the base model.
@@ -1843,24 +1916,24 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 
 **Closed-book knowledge: no retrieval, no passage in the prompt; questions about facts on specific pages of the manuals (gold_lp: nats per answer, higher is better)**
 
-| run | gold_lp | gold_lp_seen | gold_lp_unseen | qa_acc | qa_num | qa_ident | qa_term | qa_seen | qa_unseen |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| base-8b-hf | -6.770 | -6.722 | -6.822 | 0.121 | 0.145 | 0.078 | 0.053 | 0.126 | 0.116 |
-| instruct-8b | -8.284 | -8.008 | -8.581 | 0.099 | 0.127 | 0.031 | 0.053 | 0.114 | 0.084 |
-| cpt-8b | -6.184 | -6.237 | -6.128 | 0.146 | 0.168 | 0.125 | 0.053 | 0.156 | 0.136 |
-| cpt-8b-seed1 | -6.192 | -6.236 | -6.145 | 0.130 | 0.145 | 0.125 | 0.053 | 0.132 | 0.129 |
-| cpt-8b-replay10 | -6.260 | -6.356 | -6.157 | 0.130 | 0.145 | 0.125 | 0.053 | 0.150 | 0.110 |
-| mistral-large-3 |  |  |  | 0.280 | 0.245 | 0.453 | 0.184 | 0.275 | 0.284 |
-| sft-from-base | -6.069 | -5.409 | -6.780 | 0.180 | 0.227 | 0.125 | 0.000 | 0.245 | 0.110 |
-| sft-from-cpt-seed1 | -5.497 | -4.873 | -6.168 | 0.202 | 0.209 | 0.234 | 0.105 | 0.270 | 0.129 |
-| sft-from-cpt | -5.749 | -5.120 | -6.426 | 0.211 | 0.245 | 0.203 | 0.026 | 0.281 | 0.136 |
-| sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 |
-| dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 |
-| dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 |
-| dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 |
-| dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 |
-| grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 |
-| grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 |
+| run | gold_lp | gold_lp_seen | gold_lp_unseen | qa_acc (lenient) | qa_num (lenient) | qa_ident (lenient) | qa_term (lenient) | qa_seen (lenient) | qa_unseen (lenient) | qa_acc (strict) | qa_seen (strict) | qa_unseen (strict) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b-hf | -6.770 | -6.722 | -6.822 | 0.121 | 0.145 | 0.078 | 0.053 | 0.126 | 0.116 | 0.121 | 0.126 | 0.116 |
+| instruct-8b | -8.284 | -8.008 | -8.581 | 0.099 | 0.127 | 0.031 | 0.053 | 0.114 | 0.084 | 0.096 | 0.114 | 0.077 |
+| cpt-8b | -6.184 | -6.237 | -6.128 | 0.146 | 0.168 | 0.125 | 0.053 | 0.156 | 0.136 | 0.146 | 0.156 | 0.136 |
+| cpt-8b-seed1 | -6.192 | -6.236 | -6.145 | 0.130 | 0.145 | 0.125 | 0.053 | 0.132 | 0.129 | 0.130 | 0.132 | 0.129 |
+| cpt-8b-replay10 | -6.260 | -6.356 | -6.157 | 0.130 | 0.145 | 0.125 | 0.053 | 0.150 | 0.110 | 0.130 | 0.150 | 0.110 |
+| mistral-large-3 |  |  |  | 0.280 | 0.245 | 0.453 | 0.184 | 0.275 | 0.284 | 0.261 | 0.264 | 0.258 |
+| sft-from-base | -6.069 | -5.409 | -6.780 | 0.180 | 0.227 | 0.125 | 0.000 | 0.245 | 0.110 | 0.165 | 0.239 | 0.084 |
+| sft-from-cpt-seed1 | -5.497 | -4.873 | -6.168 | 0.202 | 0.209 | 0.234 | 0.105 | 0.270 | 0.129 | 0.186 | 0.258 | 0.110 |
+| sft-from-cpt | -5.749 | -5.120 | -6.426 | 0.211 | 0.245 | 0.203 | 0.026 | 0.281 | 0.136 | 0.205 | 0.287 | 0.116 |
+| sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 | 0.158 | 0.234 | 0.077 |
+| dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 | 0.202 | 0.287 | 0.110 |
+| dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 | 0.214 | 0.305 | 0.116 |
+| dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 | 0.196 | 0.258 | 0.129 |
+| dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 | 0.211 | 0.305 | 0.110 |
+| grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 | 0.202 | 0.299 | 0.097 |
+| grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 | 0.199 | 0.287 | 0.103 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -1905,13 +1978,16 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | dpo-strict | 0.767 | 0.730 | 0.701 | 0.861 | 0.813 | 0.809 | 0.796 | 5.81 | 6.88 | 8.06 | 6.30 |
 | grpo | 0.767 | 0.728 | 0.703 | 0.859 | 0.814 | 0.820 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
 | grpo-seed1 | 0.767 | 0.728 | 0.702 | 0.859 | 0.813 | 0.802 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
+
+qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa_* (strict) is `scorers.qa_strict` (2026-10-09, the GRPO reward's rule: the whole gold, one candidate, units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. No ordering changes between the two.
 <!-- results-table:end -->
 
 **Stage 2 (CPT) earned little.**
 - **Perplexity:** held-out perplexity fell 2.3%, and documents published in 2026 gained 0.4%.
 - **Task scores:** no pass/fail score moved outside the noise.
 - **Gold answers:** closed-book gold answers to facts from the documents it read became about 1.8x
-  more probable (`gold_lp` +0.59 nats per answer), which SFT can build on.
+  more probable (`gold_lp` +0.59 nats per answer, +0.56 of it in the answer tokens), which SFT can
+  build on.
 - **Why `cpt-8b-replay10` goes forward:** LoRA with replay costs almost nothing in forgetting.
 
 **Stage 3 (SFT):**
@@ -1919,16 +1995,27 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - The model stops: 159 ms against 1,753 ms end to end.
   - It cites better than Instruct and never refuses an answerable question.
   - The recall formats overfit in epoch 2, which the pre-registered rule caught on every run.
-- **Retention, not capability:** the seen half's closed-book score (28% from 15%; facts that were
-  in the training set) is retention. The unseen half moved inside the noise.
+- **Retention, not capability:**
+  - The seen half's closed-book score is retention: 28.7% from 15.0% on the strict checker, on
+    facts that were in the training set.
+  - The unseen half moved inside the noise.
+
+  | closed-book, strict checker | seen half (167) | unseen half (155) |
+  |---|---|---|
+  | instruct-8b | 11.4% | 7.7% |
+  | sft-from-cpt | 28.7% | 11.6% |
+
+  (Lenient, as first reported: 11.4% / 8.4% and 28.1% / 13.5%. No ordering changes.)
 - **Attribution:** SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
   knowledge. It did not generalise to unseen facts, which was never a target; only more varied CPT
   exposure acts on those.
 - **CPT's contribution survives SFT:**
-  - unseen-half `gold_lp` is +0.46 nats over the SFT-only control (arm means of two seeds each);
+  - unseen-half `gold_lp` is +0.46 nats over the SFT-only control (arm means of two seeds each),
+    +0.41 of it in the answer tokens: knowledge, not format;
   - every CPT-arm run is above every base-arm run (1 in 6 by permutation);
-  - the 3.6 SD multiple is indicative, since each arm's run variance rests on one seed pair;
-  - pass/fail closed-book accuracy doesn't resolve it.
+  - the 3.6 SD multiple is indicative: each arm's run variance rests on one seed pair (1 df per
+    arm);
+  - pass/fail closed-book accuracy doesn't resolve it, strict or lenient.
 - **Going forward:** `sft-from-cpt` (epoch 1) is the Stage 3 checkpoint; `train/configs/dpo.yaml`
   starts from it.
 
@@ -1937,11 +2024,13 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   start's own seed gap in the floor.
   - Sampled accuracy, measured after the fact (a reported line): seen pass@1 +3.1 points, pass@8
     flat.
+  - Split after the fact: on the answer tokens the unseen cost is −0.33 nats, beyond the floor; the
+    end token rose +0.12 (a format shift the composite netted against it).
   - Read as written, hallucination (4 → 1-2 of 76) and unseen gold_lp (−0.21 nats) cleared the
     noise at 1.3× and 1.1×.
   - 58 of 100 greedy answers are byte-identical to SFT's.
 - **Two epochs (`dpo-2ep`, ablation) fit the pairs and displaced the chosen answers.**
-  - seen qa_acc −4.8 points against one epoch;
+  - seen qa_acc −4.8 points against one epoch (strict and lenient alike);
   - gold-answer log-probability −3.0 nats (seen) and −4.3 nats (unseen);
   - dpo_val `rewards/chosen` −0.23.
   - That is the RLHF Book's ch. 8 preference displacement, measured on verifier-labelled pairs.
@@ -1953,7 +2042,9 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
     Stage 5's reward.
   - Retrained on strict labels, `dpo-strict` is still SFT within noise on seen accuracy and
     hallucination. Label noise was not why DPO didn't move.
-  - Its unseen gold-answer log-probability fell 0.27 nats, at the floor.
+  - Its unseen gold-answer log-probability fell 0.27 nats, at the floor. Split after the fact, that
+    is −0.38 on the answer tokens (beyond the floor) behind an end-token gain of +0.11: DPO also
+    shifted the format toward stopping.
 - **Going forward:** `dpo-strict` (seed 0, strict labels) is the Stage 4 checkpoint and
   `train/configs/grpo.yaml` starts from it. Stage 5 compares offline pairs against on-policy groups
   on the same strict verifier.
@@ -1964,7 +2055,7 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 - **Sharpening, not knowledge** (against `dpo-strict`):
   - greedy accuracy unchanged;
   - sampled pass@1 +3.1 points on seen items, with pass@8 −3.6 (inside the noise);
-  - gold-answer log-probability −0.67 nats seen and −1.33 unseen;
+  - gold-answer log-probability −0.67 nats seen and −1.33 unseen, all in the answer tokens;
   - hallucination 3 → 1 of 76 is inside what reseeding does.
 - **Why it collapsed:** the colocated loop is synchronous with one update per batch, so
   Magistral's clip-higher had no ratio to bind, and β was 0.
@@ -1977,7 +2068,8 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
   - CPT and SFT delivered; DPO and GRPO at this scale did not clear the floor on the primary lines,
     and the pre-registered rules rejected both.
   - Both sharpened sampled accuracy by about 3 points from their own starts; DPO did so at
-    near-zero calibration cost, GRPO at 0.67 and 1.33 nats.
+    a small calibration cost (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 /
+    1.32).
   - Stage 6 serves `dpo-strict`, the SFT model within noise.
 
 ### 5. Serving
@@ -2042,7 +2134,7 @@ tokens max; generated by `train/report.py` from `results/bench/`).
 **From Stage 4:**
 1. **An NLL anchor on the chosen answer before any longer preference training:** RPO,
    `loss_type: [sigmoid, sft]` with `loss_weights: [1.0, 1.0]` in TRL 0.29.1. Two epochs without
-   it cost 3-4 nats of gold-answer log-probability and 4.8 points of seen accuracy.
+   it cost 3-4 nats of gold-answer log-probability and 4.8 points of seen accuracy (strict and lenient).
 2. **Pairs at a scale where one epoch is many steps.** 484 near-duplicate pairs leave no usable
    window between no effect (31 steps) and displacement (62).
 3. **A per-claim support check as the judge:** split each answer into claims and check each against

@@ -4311,3 +4311,79 @@ accuracy by about 3 points, DPO at near-zero calibration cost.
 
 **The floor note stays:** sft-from-cpt's twin was never sampled, so the pass@k floors come from the
 DPO and GRPO pairs.
+
+## 2026-10-09: Every closed-book column strict or labelled lenient; one Stage 3 guard fails for the control arm under the strict checker (recorded as observed, user review)
+
+**The pass:**
+- Every generated table now shows each `qa_*` both ways, through `report.load_metrics`, which adds
+  the strict columns from `results/qa_strict/evals.json`:
+  - the README results table;
+  - the Stage 2, 3, 4 and 5 read tables;
+  - the Stage 3 figure's label.
+- In every table, lenient means `scorers.qa_correct`, the column `results/table.md` stores. A run
+  scored on part of the items (`cpt-8b-full`, v1 generations) gets no strict column.
+- Every hand-written closed-book number in the README is either given strict next to lenient or
+  labelled.
+- The Results summary now carries:
+  - SFT against Instruct as a small table headed "strict checker" (seen 28.7% against 11.4%, unseen
+    11.6% against 7.7%);
+  - CPT's two-arm result with "1 df per arm";
+  - DPO and GRPO as "did not clear the primary lines, both sharpened sampled accuracy ~3 points, DPO
+    at near-zero calibration cost";
+  - stage5-final = dpo-strict, and why.
+- "Where it starts" gives v3's strict 9.6% against 12.1% next to v2's lenient 9.9% against 12.0%.
+
+**What the re-score changes beyond labels: one Stage 3 guard, for the control arm.**
+- **The guard:** "no half below its start by more than the noise". Lenient, all four runs passed.
+  Strict:
+  - the base arm's unseen half is 0.084 / 0.077 against its start's 0.116, 3.2-3.9 points down
+    against a 2.7-point noise;
+  - the CPT arm (the chain) passes: 0.116 / 0.110 against 0.110.
+- **Why:** the base arm's lenient-only unseen passes were hedges, which the strict checker
+  rejects:
+  - two ranges ("12 to 18 inches" for "12 in.", "10 to 12 feet" for "10 feet");
+  - a fraction read as its first number ("1/2 inch" for "1 in.");
+  - a child section ("AASHTO LRFD Article 6.10.10.2" for "6.10.10").
+- **Where it stands:** the Stage 3 targets table now states both readings. The verdict for the
+  chain is unchanged, since the base arm is the control.
+- **Two-arm numbers on the strict checker:**
+  - unseen arm means 11.3% against 8.1% (+3.2, inside the binomial noise; +2.9 lenient);
+  - identifiers +9.4 (0.219 against 0.125; +8.6 lenient).
+  - The CPT-arm-above-base-arm ordering on identifiers holds under both.
+
+## 2026-10-09: gold_lp split into the answer tokens and the end token: GRPO's cost is calibration, DPO's composite hid a format shift (user request, post hoc, before the write-up)
+
+**Why:** `gold_lp` is the sum of the answer tokens and the one end token after them, and a stage that
+changes the format (whether the model stops after the gold) moves the end token without the fact.
+The saved generations carry both (`gold_lp_tokens`, whose last element is `gold_lp_end`). Every
+headline change was decomposed, each with an item-bootstrap 95% CI.
+
+| comparison | half | total | answer tokens | end token |
+|---|---|---|---|---|
+| grpo pair − dpo-strict | seen | −0.671 | −0.707 [−0.888, −0.531] | +0.036 |
+| grpo pair − dpo-strict | unseen | −1.333 | −1.319 [−1.579, −1.082] | −0.013 |
+| dpo-strict − sft-from-cpt | seen | −0.010 | −0.114 [−0.204, −0.026] | +0.104 [+0.084, +0.127] |
+| dpo-strict − sft-from-cpt | unseen | −0.270 | −0.380 [−0.501, −0.264] | +0.110 |
+| dpo pair − sft-from-cpt | seen | +0.021 | −0.079 [−0.169, +0.007] | +0.100 |
+| dpo pair − sft-from-cpt | unseen | −0.212 | −0.327 [−0.443, −0.215] | +0.115 |
+| CPT arm − base arm (Stage 3, chat) | unseen | +0.464 | +0.409 [+0.229, +0.606] | +0.055 |
+| cpt pair − base-8b-hf (Stage 2, all items) | all | +0.582 | +0.550 | +0.032 |
+| cpt-8b-replay10 − base-8b-hf | unseen | +0.665 | +0.660 | +0.006 |
+
+**What changes:**
+- **GRPO:** the cost is calibration, in the answer tokens; the end token barely moves. The wording
+  stands, with the split shown.
+- **Stage 2 and Stage 3:** CPT's gain and the arm difference sit in the answer tokens, which
+  strengthens both claims. One line each in the README.
+- **DPO, not foreseen:** DPO raised the end token by +0.10 to +0.12 (beyond the noise), so stopping
+  after the gold became more likely, and the composite netted that against an answer-token cost.
+  - The answer tokens fell −0.11 seen (inside the floor) and −0.38 unseen (beyond, floor 0.210) for
+    dpo-strict, and −0.08 / −0.33 (beyond the Stage 3-way floor 0.21) for the as-run pair.
+  - So "DPO at near-zero calibration cost" was wrong. It is now "DPO at a small calibration cost
+    (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 / 1.32)".
+  - "At this scale offline DPO was the gentler optimiser" stands.
+  - Stage 4's pre-registered composite lines stay as read; the split is a post-hoc reported line,
+    labelled.
+
+**From here on:** every gold_lp row in the generated tables shows both parts (`report.LP_PART`: `lp`,
+`lp_ans`, `lp_end`), with floors computed on each part. The README's metric definition gives both.
