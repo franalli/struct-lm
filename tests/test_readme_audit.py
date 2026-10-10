@@ -77,7 +77,8 @@ def test_diagram_numbers_are_checked(tmp_path):
 # Disclosures earlier reviews added on purpose; an edit for length must not drop them.
 CAVEATS = [
     "It missed its pre-registered target",  # CPT's registered perplexity line failed
-    "Hallucination is worse",  # SFT against Instruct, inside the seed spread
+    "Hallucination is worse",  # SFT against Instruct, at the seed gap
+    "not the two-arm floor added after the read",  # DPO's hallucination line depends on the floor
     "in a line added after the fact",  # DPO's pass@1 line was post hoc
     "the mean of its two seeds",  # GRPO's figures are two-seed means
     "1 df per arm",  # two seeds per arm

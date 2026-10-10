@@ -40,12 +40,15 @@ decline. DPO and GRPO sharpened sampling at a cost in calibration, without clear
     11.4% (paired 95% CI +10.8 to +24.6).
   - On unseen facts, its lead (11.6% against 7.7%) clears the 2.6-point floor, but its paired CI
     (−1.3 to +9.0) includes 0, and the untrained base also scores 11.6%.
-  - With passages, against Instruct: valid citations 100% against 83.3%, false refusals 0% against
-    7.4%, grounded accuracy level (judge-scored, 90.7% against 89.8%). Hallucination is worse, 4 of
-    76 unanswerable questions against 1, inside the seed spread: its seed twin also has 1.
-- **DPO and GRPO:** neither improved a primary line beyond its floor.
+  - With passages, against Instruct: citations only to given passages 100% against 83.3% (a
+    format check, on a format SFT trained on), false refusals 0% against 7.4%, grounded accuracy
+    level (judge-scored, 90.7% against 89.8%). Hallucination is worse, 4 of
+    76 unanswerable questions against 1, but that 3-item gap is its own two seeds' gap, so not
+    beyond the floor.
+- **DPO and GRPO:** neither improved a primary line beyond its floor. DPO's as-run pair cut
+  hallucination past the floor as first written, not the two-arm floor added after the read (part 6).
   - DPO's were greedy closed-book accuracy, gold-answer log-probability, hallucination, false
-    refusals and valid citations; GRPO's, strict seen accuracy and seen gold-answer log-probability.
+    refusals and citation format; GRPO's, strict seen accuracy and seen gold-answer log-probability.
   - Each raised seen pass@1 by about 3 points, a gain greedy serving doesn't use:
     - DPO by 3.5 [+1.2, +6.0], in a line added after the fact;
     - GRPO by 3.1 [+1.3, +5.0], the mean of its two seeds.
@@ -314,7 +317,8 @@ What the small version surfaced that gets harder at full scale:
   the run resumed to step 65.
 - **Decompose a metric before comparing it.** `gold_lp`'s end token hid DPO's shift toward stopping.
 - **Put the start's own seed gap in a two-arm floor,** and say "1 df per arm". The repo added it
-  only after Stage 4's read, which moved two lines inside the noise.
+  only after Stage 4's read, which moved two lines inside the noise: DPO's drop in hallucination and
+  its loss on unseen gold answers.
 - **Fix the eval's primary metric before the first run.** Stage 2's perplexity target (summary) was
   set for the wrong data scale.
 

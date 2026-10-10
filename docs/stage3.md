@@ -8,13 +8,14 @@ and gates that decided; gray, external models, controls and ablations.
 **Result: SFT taught the facts it showed and the behaviours, and CPT's head start survived it.**
 - **Seen facts:** strict closed-book 28.7% against stock Instruct's 11.4%, retention of facts that
   were in the training set by design.
-- **Unseen facts:** 11.6% against 7.7%. The paired 95% CI, [−1.3, +9.0], includes 0, and the
-  untrained base also scores 11.6%.
+- **Unseen facts:** 11.6% against 7.7%. The gap clears the 2.6-point floor, but its paired 95% CI,
+  [−1.3, +9.0], includes 0, and the untrained base also scores 11.6%.
 - **CPT's contribution:** in all four pairings of a CPT-start run with a base-start run, the CPT
   run's unseen gold answers are more probable. Accuracy doesn't resolve the difference at this size.
-- **With passages, against Instruct:** valid citations 100% against 83.3% and no false refusals
-  against its 7.4%, with grounded accuracy level. Hallucination is 4 of 76 against its 1 of 76,
-  inside the seed spread (the seed twin also has 1).
+- **With passages, against Instruct:** citations only to given passages 100% against 83.3% (a
+  format check, on a format SFT trained on) and no false refusals against its 7.4%, with grounded
+  accuracy level. Hallucination is 4 of 76 against its 1 of 76, the
+  same 3-item gap as between this run's two seeds, so not beyond the floor.
 - **One epoch, by rule:** the recall formats overfit in epoch 2 in all four runs.
 
 The findings, and what is weaker than this summary makes it, follow the tables.
@@ -159,8 +160,9 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - Grounded accuracy matches Instruct (90.7% vs 89.8%).
    - *(Note 2026-10-10: the first and third lines are judge-scored. From Stage 4 on, after the
      preference judge failed its benchmark, judge-scored lines are reported, not read
-     (`notes/decisions.md`, 2026-10-08). The rule-scored line agrees: valid citations 100% against
-     Instruct's 83.3%.)*
+     (`notes/decisions.md`, 2026-10-08). The rule-scored line, `cite_valid`, checks format only
+     (every citation names a given passage, 100% against Instruct's 83.3%), not whether the passage
+     backs the answer.)*
 4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
 5. **SFT repaired the passage reading that CPT eroded.**
    - Raw-text CPT cost few-shot passage reading: grounded_acc went from 0.843 for the base to 0.778

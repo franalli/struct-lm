@@ -10,7 +10,8 @@ and gates that decided; gray, external models, controls and ablations.
   definitions, unanswerable questions), written by Mistral Large 3 from the training documents and
   reviewed against their sources before any model was scored.
 - **The base model** finds grounded answers but neither cites nor declines: it cites correctly 10%
-  of the time and answers 88% of unanswerable questions with something invented.
+  of the time and answers 88% of unanswerable questions with something invented (Stage 0's row, on
+  eval v2).
 - **Stock Instruct, the bar,** has that behaviour but no more domain knowledge: 9.6% closed-book
   against the base's 12.1% (strict, 322 items; Mistral Large 3 scores 26%).
 - **So** closed-book knowledge is the gap CPT was meant to close, and SFT had to bring citation and

@@ -6,7 +6,7 @@ Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; re
 and gates that decided; gray, external models, controls and ablations.
 
 **Result: 246 public-domain documents, 20.6M tokens after cleaning and deduplication (19.4M in the
-train split), plus a FineWeb-Edu replay slice, with no unintended overlap with what is evaluated.**
+train split), plus a FineWeb-Edu replay slice, and no benchmark leak.**
 - **Benchmarks:** no GSM8K or HellaSwag item shares a 13-gram with the training text; 21 of 14,042
   MMLU items share one stock phrase.
 - **Domain val** shares 1.5% of its 13-grams with train, less than a train document shares with the
