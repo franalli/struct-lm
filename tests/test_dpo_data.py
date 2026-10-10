@@ -75,7 +75,7 @@ def test_pool_head_is_the_probe_set(pool):
     """The pre-registered probe (2026-10-06) is the first 20 prompts of the pool as it was then:
     the first 20 distinct domain prompts of the SFT train set, in its order."""
     head, seen = [], set()
-    for r in jsonl(SFT / "train.jsonl"):
+    for r in jsonl(SFT / "hosted/train.jsonl"):  # the committed copy: replay text blanked
         if r["format"] == "replay" or r["prompt"][0]["content"] in seen:
             continue
         seen.add(r["prompt"][0]["content"])
@@ -109,8 +109,11 @@ def test_pool_guard_clean(pool):
     guard = make_guard()
     for r in pool:
         assert all(guard.allowed(c) for c in r["source_chunks"]), r["id"]
-    sft_prompts = {r["prompt"][0]["content"] for r in jsonl(SFT / "train.jsonl")}
-    sft_val = {r["prompt"][0]["content"] for r in jsonl(SFT / "sft_val.jsonl")}
+    hosted = (
+        SFT / "hosted"
+    )  # the committed copies; replay records have no text, and no pool prompt is one
+    sft_prompts = {r["prompt"][0]["content"] for r in jsonl(hosted / "train.jsonl") if r["prompt"]}
+    sft_val = {r["prompt"][0]["content"] for r in jsonl(hosted / "sft_val.jsonl") if r["prompt"]}
     for r in pool:
         text = r["prompt"][0]["content"]
         assert text not in sft_val, r["id"]

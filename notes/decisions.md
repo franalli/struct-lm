@@ -14,28 +14,32 @@ read it governs:
 The entries below the index stay as written. Where this index and an entry disagree, the index
 records what happened.
 
-| date | rule | before → after | timing |
-|---|---|---|---|
-| 09-27 | Stage 2 ablation B | 3B full-parameter → 8B full-parameter on 2 H100s | before its read |
-| 09-28 | ablation A (replay) | kept although it fired on noise (MMLU +0.2 against a 0.1 seed floor); later reads use max(seed gap, the metric's SE) | after its read (the verdict stands; the floor changed for later stages) |
-| 10-04 | Stage 2 success target | −20% val perplexity → read as set for the wrong data scale | after its read |
-| 10-04 | the closed-book eval | 130 items → 325 (v2), then 322 (v3), every row rescored | after Stage 2's read, before Stage 3's |
-| 10-06 | SFT step-1 loss band; B4 checkpoint rule | band on the token mean → per format; B4 on overall val loss → on the closed-book and definition losses | after the smoke run, before its read |
-| 10-06 | B5 merge gate | ≥ 99% top-1 agreement on 295 positions → ≤ 11 added flips on 11,351, \|Δlp\| ratio ≤ 1.5, val loss within 0.5%, against an fp32 reference | after its read (the gate had failed on `sft-from-cpt`) |
-| 10-06 | Stage 3 first line | one-arm seed floor → two-arm SD; the lr2e-4 run replaced by a seed twin | after the first read, before the seed runs reported |
-| 10-08 | Stage 4 pair labels | judge-labelled, closed-book capped → verifiers and rules only, no cap | after the judge benchmark's read, before any pool sample |
-| 10-08 | Stage 4 merge gate; saves | dpo_val → sft_val positions; save_steps 25 → 10 | before its read |
-| 10-08 | Stage 4 runs | registered `dpo-lnorm` skipped; `dpo-2ep` added as an ablation | after its read |
-| 10-09 | `dpo-2ep` evaluation | evaluated despite missing the merge gate's loss line (0.58% against 0.5%) | after its read |
-| 10-09 | Stage 4 floor | max(DPO seed gap, SE) → also the start's seed gap; hallucination and unseen `gold_lp` move inside the noise | after its read |
-| 10-09 | closed-book checker | `same_fact` → `scorers.qa_strict`; every row rescored; `dpo-strict` launched at 463 pairs, under the 500 floor | after Stage 4's read, before Stage 5's |
-| 10-09 | strict checker, comma lists | phrase lines that split into several candidates fail | mid-run |
-| 10-09 | GRPO entropy stop | one step under a third of the steps 1-5 mean → the 10-step mean under a third of the steps 1-10 mean | after it fired (step 34), before the Stage 5 read |
-| 10-09 | strict checker, years | 2% relative tolerance → a bare-year gold needs the exact year | mid-run |
-| 10-09 | Stage 5 comparison | "GRPO sharpened twice as much" → each algorithm from its own start; DPO's pass@1 line added | after its read, labelled post hoc |
-| 10-09 | `gold_lp` | one composite → the answer tokens and the end token; DPO's cost "near-zero" → "small" | after its read, before the write-up |
-| 10-10 | FP8-KV gate line | re-measured and reported as spread; the registered verdict stands | not amended |
-| 10-10 | Stage 3 unseen line; "rules rejected both" | restated with both tests named; DPO's checkpoint carried forward, not rejected | after its read (the Stage 7 write-up) |
+| date | rule | before → after | reason | timing |
+|---|---|---|---|---|
+| 09-27 | Stage 2 ablation B | 3B full-parameter → 8B full-parameter on 2 H100s | the question is about this model, not a smaller one | before its read |
+| 09-28 | ablation A (replay) | kept although it fired on noise (MMLU +0.2 against a 0.1 seed floor); later reads use max(seed gap, the metric's SE) | one seed pair understates a benchmark's sampling error | after its read (the verdict stands; the floor changed for later stages) |
+| 10-04 | Stage 2 success target | −20% val perplexity → read as set for the wrong data scale | 20M tokens read once can't move perplexity that far | after its read |
+| 10-04 | the closed-book eval | 130 items → 325 (v2), then 322 (v3), every row rescored | 130 items left a floor wider than the effects | after Stage 2's read, before Stage 3's |
+| 10-06 | SFT step-1 loss band | one band on the token mean → per format (grounded and abstain < 0.5) | the mixture mean hid the formats | after the smoke run, before its read |
+| 10-06 | B4, the SFT epoch rule | epoch 2 unless the overall val loss rose → unless the closed-book or definition loss rose | the overall val loss is 83% replay tokens | after the smoke run, before its read |
+| 10-06 | B5 merge gate | ≥ 99% top-1 agreement on 295 positions → ≤ 11 added flips on 11,351, \|Δlp\| ratio ≤ 1.5, val loss within 0.5%, against an fp32 reference | 295 positions leave a 2-flip margin, and bf16 alone flips 0.5-0.65% of argmaxes at near-ties | after its read (the gate had failed on `sft-from-cpt`) |
+| 10-06 | Stage 3 first line | one-arm seed floor → two-arm SD; the lr2e-4 run replaced by a seed twin | the comparison is between arms, so both arms' variance counts | after the first read, before the seed runs reported |
+| 10-08 | Stage 4 pair labels and the closed-book cap | judge-labelled, closed-book capped → verifiers and rules only, no cap | the judge failed its benchmark (recall 0.28 / 0.09) | after the judge benchmark's read, before any pool sample |
+| 10-08 | DPO win rate | a primary line → reported only; the primary lines are verifier metrics | the same judge, failed on its benchmark, would grade it | after the judge benchmark's read, before launch |
+| 10-08 | Stage 4 merge gate; saves | dpo_val → sft_val positions; save_steps 25 → 10 | 665 dpo_val positions are too few for the 0.1% line | before its read |
+| 10-08 | Stage 4 runs | registered `dpo-lnorm` skipped; `dpo-2ep` added as an ablation | one epoch moved nothing, so test more training, not normalisation | after its read |
+| 10-09 | `dpo-2ep` evaluation | evaluated despite missing the merge gate's loss line (0.58% against 0.5%) | the merge-isolating criteria passed | after its read |
+| 10-09 | Stage 4 floor | max(DPO seed gap, SE) → also the start's seed gap; hallucination and unseen `gold_lp` move inside the noise | the start is a run too, with its own seed noise | after its read |
+| 10-09 | closed-book checker | `same_fact` → `scorers.qa_strict`; every row rescored | it passed fragments, and was about to become the GRPO reward | after Stage 4's read, before Stage 5's |
+| 10-09 | DPO pair floor | 500 pairs → `dpo-strict` launched at 463 | the strict relabel removed pairs; a user decision for this rerun only | before its read |
+| 10-09 | strict checker, comma lists | phrase lines that split into several candidates fail | found by reading the code against its one-answer rule | mid-run |
+| 10-09 | GRPO entropy stop | one step under a third of the steps 1-5 mean → the 10-step mean under a third of the steps 1-10 mean | one batch tracks its task mix, not the policy | after it fired (step 34), before the Stage 5 read |
+| 10-09 | strict checker, years | 2% relative tolerance → a bare-year gold needs the exact year | 2% of 2010 is 40 years; the hack audit found it learned | mid-run |
+| 10-09 | Stage 5 comparison | "GRPO sharpened twice as much" → each algorithm from its own start; DPO's pass@1 line added | the two had different starts | after its read, labelled post hoc |
+| 10-09 | `gold_lp` | one composite → the answer tokens and the end token; DPO's cost "near-zero" → "small" | a stage can move stopping without the fact | after its read, before the write-up |
+| 10-10 | FP8-KV gate line | registered a second generation, to report as spread; the verdict stands either way | re-measuring a failed line until it passes is the forking path | not run (the spend limit) |
+| 10-10 | Stage 3 unseen line; "rules rejected both" | restated with both tests named; DPO's checkpoint carried forward, not rejected | the old wording named no test, and the second claim was wrong | after its read (the Stage 7 write-up) |
+| 10-10 | weights release | bf16 + FP8 to Hugging Face with a model card → not at v1.0 | the licence audit found 54 replay records under non-commercial or restrictive terms | after training, before release |
 
 **Where entries disagree with this index:**
 - **The 2026-10-09 entropy entry** says "Each amendment went in before the read it governs" of four
@@ -4723,3 +4727,27 @@ The unseen +3.9 clears the Stage 3 floor (2.6 points), but its paired interval i
 untrained base scores the same 18 of 155. Stage 3's "sits inside the noise floor" named no test and
 is replaced by this reading: the unseen lead over Instruct is Instruct's deficit, not something
 training added. Both tests are named wherever the comparison appears.
+
+**Additions the same day (stranger pass, licence audit, demo; user decisions):**
+- **CPT's arm gap is about a uniform per-token gain.**
+  - The arms' train-slice perplexities: CPT arm 5.800 and 5.789, base arm 6.311 and 6.316, so
+    0.086 nats per token between the arm means.
+  - The 155 unseen gold answers average 4.69 answer tokens. 0.086 × 4.69 = 0.40 nats, against the
+    measured 0.41.
+  - The arms' strict unseen accuracy is 11.3% against 8.05%, +3.2 points, which doesn't resolve.
+  - So the README states CPT's gain as probability of the corpus's text, not recall of facts.
+- **The licence audit (after training):** 54 of the 2,516 SFT records, all replay, carry terms
+  that block publishing the weights.
+  - 8 are No Robots, CC-BY-NC-4.0.
+  - 46 are withdrawn math set, generated by another model, whose licence restricts how distributed models trained on its outputs may be named.
+  - **User decision: the weights aren't published at v1.0.** The fix is to swap the 54 records
+    (OASST1; a unrestricted math source with no GSM8K test overlap), then retrain SFT, DPO and FP8.
+  - The replay text is no longer hosted. `data/sft/hosted/` keeps the row ids, and
+    `data/scripts/sft_replay_fetch.py` rebuilds `train.jsonl` and `sft_val.jsonl` byte for byte
+    (both match `SHA256SUMS`, checked 2026-10-10).
+- **The demo's two items.**
+  - Of the 93 grounded items `dpo-strict` answered correctly with valid, judge-supported
+    citations, the three with the shortest passages were read, and `gr-0038` was kept for its
+    concrete answer.
+  - `adv-0050` is the third-shortest of the 73 adversarial items it declined.
+  - Both pass in the FP8 run's saved answers too, which are byte-identical to bf16's.

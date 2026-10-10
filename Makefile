@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data sft-data dpo-data dpo-pairs dpo-pairs-strict grpo-data cpt sft dpo grpo train serve \
+.PHONY: data sft-data sft-replay dpo-data dpo-pairs dpo-pairs-strict grpo-data cpt sft dpo grpo train serve \
 	bench-data bench report audit reproduce-score reproduce-stage0 reproduce-stage1 reproduce-stage2 \
 	reproduce-stage3 reproduce-stage4 reproduce-stage5 reproduce-stage6
 
@@ -23,6 +23,10 @@ SFT_STEPS = sft_pool sft_questions sft_filter sft_answers sft_judge sft_replay s
 sft-data:
 	for s in $(SFT_STEPS); do $(PY) data/scripts/$$s.py || exit 1; done
 	$(PY) eval/contamination.py --only sft
+	$(PY) data/scripts/sft_replay_fetch.py --strip   # -> data/sft/hosted/ (what git keeps)
+# a fresh clone: rebuild data/sft/{train,sft_val}.jsonl from data/sft/hosted/ and the Tülu 3 mixture
+sft-replay:
+	$(PY) data/scripts/sft_replay_fetch.py
 
 # --- DPO data (Stage 4) -----------------------------------------------------
 # Prompt pool + judge-benchmark prompts (Mac), then GPU sampling and API scoring in between
@@ -107,6 +111,7 @@ reproduce-stage2:  # the base re-saved through merge.py, the chain's CPT, the ma
 SFT_CHAIN = --config train/configs/sft.yaml --merge-from b4 --chat \
 	--steps train,merge,mergecheck,ppl,eval,latency,sample
 reproduce-stage3:  # both arms, two seeds each (the two-arm floor)
+	$(PY) data/scripts/sft_replay_fetch.py   # the SFT set, checked against data/sft/SHA256SUMS
 	for f in train.jsonl sft_val.jsonl SHA256SUMS; do \
 		$(MODAL) volume put --force struct-lm data/sft/$$f data/sft/$$f; done
 	$(RUN_GPU) train/modal_train.py $(SFT_CHAIN) --run-name sft-from-cpt

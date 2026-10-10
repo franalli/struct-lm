@@ -4,40 +4,27 @@ number	context	source
 20.6M	(20.6M tokens	docs/stage0.md
 19.4M	19.4M-token train split	docs/stage2.md
 19.4M	over 19.4M tokens	docs/stage2.md
-130	from 130 to 322	docs/stage0.md
-322	from 130 to 322	results/table.md
 155	On the 155	docs/results.md
 167	on the 167 seen facts	docs/results.md
 0.41	0.41 nats more probable	results/train_runs.md
 +0.23	+0.23 to +0.60	results/train_runs.md
 +0.60	+0.23 to +0.60	results/train_runs.md
-+10.8	+10.8 to +24.6	notes/decisions.md
-+24.6	+10.8 to +24.6	notes/decisions.md
 7.7%	11.6% against 7.7%	docs/stage3.md
 2.6	2.6-point floor	results/train_runs.md
-−1.3	(−1.3 to +9.0)	notes/decisions.md
-+9.0	(−1.3 to +9.0)	notes/decisions.md
-0.7	at T 0.7	eval/passk.py
 3.5	DPO by 3.5	docs/stage4.md
 3.1	GRPO by 3.1	docs/stage5.md
-0.11	DPO 0.11 nats seen	notes/decisions.md
 0.38	0.38	notes/decisions.md
-0.71	GRPO 0.71	notes/decisions.md
 1.32	1.32	notes/decisions.md
 +0.66	+0.66 nats on the answer tokens	notes/decisions.md
 16	16 req/s	DEPLOY.md
 $0.035	$0.035 per	results/train_runs.md
 1,000	per 1,000 requests	docs/stage6.md
 $0.039	$0.039 with bf16	results/train_runs.md
-$0.127	$0.127 for the same	results/train_runs.md
 8.7	above 8.7 sustained	results/train_runs.md
 22%	fell 22%	results/train_runs.md
-8%	LoRA's fell 8%	results/train_runs.md
 1.19%	rose 1.19%	results/train_runs.md
 0.40%	0.40%	results/train_runs.md
-3.0	GSM8K lost 3.0	results/train_runs.md
 1.1	against a 1.1 floor	results/train_runs.md
-0.23%	the 0.23% floor	results/train_runs.md
 10%	10% general replay	docs/stage2.md
 +10%	+10% tokens	notes/decisions.md
 +0.2	MMLU +0.2	notes/decisions.md
@@ -45,48 +32,79 @@ $0.127	$0.127 for the same	results/train_runs.md
 0.34	own 0.34 SE	notes/decisions.md
 −2.24%	−2.24% general perplexity	results/train_runs.md
 6.5	fell 6.5 points	results/train_runs.md
-3.7	against 3.7	results/train_runs.md
 28%	caught 28% of grounded	docs/stage4.md
 9%	9% of	docs/stage4.md
 0.5	a 0.5 line	docs/stage4.md
 79	79 of 458	docs/stage4.md
-79	79 wrong	docs/stage4.md
 458	79 of 458	docs/stage4.md
 0.28	ε_high 0.28	train/configs/grpo.yaml
 0.28	recall 0.28 grounded	docs/stage4.md
 0.09	0.09 definition	docs/stage4.md
-622	622	results/train_runs.md
-52	steps 52 and 65	docs/stage5.md
-65	steps 52 and 65	docs/stage5.md
 −4.2	(−4.2 against 3.5)	docs/stage6.md
 3.5	−4.2 against 3.5	docs/stage6.md
 21	21-40 against 39-76	docs/stage6.md
 40	21-40 against 39-76	docs/stage6.md
 39	21-40 against 39-76	docs/stage6.md
 76	21-40 against 39-76	docs/stage6.md
-22%	saturation (22%	docs/stage6.md
 64	64 concurrent	docs/stage6.md
-+11%	+11% tokens per second	results/train_runs.md
 2%	within 2%	notes/decisions.md
 10	10 of 16	notes/decisions.md
 16	10 of 16	notes/decisions.md
 4.8	fell 4.8 points	docs/results.md
-3.0	fell 3.0 nats seen	docs/results.md
-4.3	4.3 unseen	docs/results.md
 −6.1	GSM8K −6.1	docs/stage6.md
-−7.8	identifiers −7.8	docs/stage6.md
-512	512 domain	docs/stage6.md
 1,067	1,067 of 1,319	notes/decisions.md
 1,319	1,067 of 1,319	notes/decisions.md
 1.6	0–1.6 points	docs/results.md
 10	10-step mean	docs/stage5.md
 57%	57% of the start	docs/stage5.md
 −20%	−20% perplexity	notes/decisions.md
-10	10-20 ms	docs/stage6.md
-20	10-20 ms	docs/stage6.md
 $3.95	$3.95 per H100-hour	results/train_runs.md
-25%	25% of them	docs/reproduce.md
 500	500 general records	docs/reproduce.md
-500	the 500 records	docs/reproduce.md
-17	17 U.S.C.	docs/stage1.md
-46	46 are from withdrawn math set	docs/reproduce.md
+716	its 716 items	CLAUDE.md
+130	from 130 to	docs/stage0.md
+322	322 items	results/table.md
+0.086	0.086 nats per	notes/decisions.md
+4.69	4.69 answer tokens	notes/decisions.md
+3.2	differs by 3.2	notes/decisions.md
++10.8	+10.8	notes/decisions.md
++24.6	+24.6	notes/decisions.md
+−1.3	−1.3 to +9.0	notes/decisions.md
++9.0	−1.3 to +9.0	notes/decisions.md
+0.7	T 0.7	eval/passk.py
++1.2	[+1.2, +6.0]	docs/stage4.md
++6.0	[+1.2, +6.0]	docs/stage4.md
++1.3	[+1.3, +5.0]	docs/stage5.md
++5.0	[+1.3, +5.0]	docs/stage5.md
+0.21	its 0.21 floor	results/train_runs.md
+0.11	(0.11 on seen	notes/decisions.md
+0.71	lost 0.71	notes/decisions.md
+0.71	0.71 nats seen	notes/decisions.md
++0.45	+0.45 to +0.90	docs/results.md
++0.90	+0.45 to +0.90	docs/results.md
+$0.127	cost $0.127	results/train_runs.md
+3.7	a 3.7 floor	results/train_runs.md
+0.9	fell 0.9 and	results/train_runs.md
+4.6	4.6	results/train_runs.md
+8%	LoRA's 8%	results/train_runs.md
+0.17%	0.17% over two seeds	results/train_runs.md
+3.0	GSM8K fell 3.0	results/train_runs.md
+1.17	from 1.17 to 1.30	docs/stage3.md
+1.98	from 1.98 to 2.03	docs/stage3.md
+2.03	from 1.98 to 2.03	docs/stage3.md
++3.1	pass@1 +3.1	docs/stage5.md
+2.2	against 2.2	results/train_runs.md
+22%	serves 22%	docs/stage6.md
+11%	11% faster	results/train_runs.md
+17%	(17%)	notes/decisions.md
+1.9	Large 3 moved 1.9	docs/results.md
+3.0	fell 3.0 and 4.3	docs/results.md
+4.3	fell 3.0 and 4.3	docs/results.md
+512	512-record	docs/stage6.md
+29%	by 29%	docs/stage6.md
+40%	40% on FP8	docs/stage6.md
+54	54	notes/decisions.md
+2,516	of the 2,516	docs/stage3.md
+46	46	docs/reproduce.md
+25%	25%	docs/reproduce.md
+93	of the 93 grounded	notes/decisions.md
+73	of the 73	notes/decisions.md

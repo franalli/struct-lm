@@ -37,6 +37,11 @@ make sft-data                               # Makefile SFT_STEPS + contamination
 .venv/bin/python data/scripts/sft_audit.py sample [N]         # audit round N sample -> report -> data/sft/audit.md
 ```
 
+- Git keeps `data/sft/hosted/{train,sft_val}.jsonl`, not the built files: the 500 Tülu 3 replay
+  records carry their subsets' licences (No Robots is non-commercial), so their text is blanked
+  there and their row ids kept. `make sft-replay` (`sft_replay_fetch.py`) rebuilds
+  `data/sft/{train,sft_val}.jsonl` and checks `SHA256SUMS`; `make sft-data` ends with `--strip`,
+  which refreshes the hosted copies. Never commit the built files.
 - Every call is cached in `data/sft/.cache/llm_cache.jsonl` (gitignored, with each prompt), so a
   rerun pays only for prompts that changed. Each step writes its section of `data/sft/stats.json`.
 - `sft_pool.py --pilot N` builds the first N chunks of each kind (the head of the full pool, same

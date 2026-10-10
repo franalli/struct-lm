@@ -11,32 +11,39 @@ GRPO, then quantized behind a pre-registered quality gate and served with vLLM o
 
 **What was trained.** [`mistralai/Ministral-3-8B-Base-2512`](https://huggingface.co/mistralai/Ministral-3-8B-Base-2512)
 on 246 public-domain manuals, reports and design examples from USACE, FEMA, FHWA, NIST and NASA
-(20.6M tokens; CPT read the 19.4M-token train split once). Each stage of the shipped chain is a
-LoRA adapter (r64) trained on one H100 and merged before the next; two Stage 2 ablations used 2
-GPUs. The eval was built and reviewed before any training; its closed-book task was later grown
-from 130 to 322 items to cut noise, and every row was rescored. Each read follows a rule written
-before its data; those amended after their read are labelled as such, in the table at the top of
-[`notes/decisions.md`](notes/decisions.md). A change counts only beyond its noise floor: the
-larger of the gap between two seeds of the same run and the metric's standard error.
+(20.6M tokens; CPT read the 19.4M-token train split once).
+- **Training:** each stage of the shipped chain is a LoRA adapter (r64) on one H100, merged before
+  the next. Two Stage 2 ablations used 2 GPUs.
+- **The eval:** Mistral Large 3 generated its 716 items from the training documents, and each was
+  reviewed against its passage before any training. The closed-book task later grew from 130 to
+  322 items, and every row was rescored.
+- **The rules:** reads follow rules written before their data. Those amended after their read are
+  listed at the top of [`notes/decisions.md`](notes/decisions.md).
+- **The floor:** a change counts only beyond its noise floor, the larger of a seed-pair gap and the
+  metric's standard error. That is about one standard deviation: a screen, not a significance
+  test.
 
-**The result in one sentence:** CPT put the corpus's facts into the model, SFT taught it to answer
-from passages, cite them and decline, and the two later stages each traded some of that knowledge
-for sharper sampling without clearing their own bars.
+**In one sentence:** CPT made the corpus's text, gold answers included, more probable but not more
+recallable. SFT taught the facts it showed and the behaviours: answer from passages, cite them,
+decline. DPO and GRPO sharpened sampling at a cost in calibration, without clearing their bars.
 
-- **CPT's knowledge survives SFT.** On the 155 facts the SFT data never showed, the gold answer's
-  tokens are 0.41 nats more probable in the CPT arm than in a control arm that skipped CPT
-  (95% CI over items +0.23 to +0.60; two seeds per arm, so 1 df per arm and the margin is
-  indicative).
-- **SFT beats stock Instruct on the facts it trained on, not on the rest.** Strict closed-book
-  accuracy is 28.7% against 11.4% on the 167 seen facts (paired 95% CI +10.8 to +24.6 points).
-  - On the 155 unseen facts it is 11.6% against 7.7%. The gap clears the 2.6-point floor, but its
-    paired CI (−1.3 to +9.0) includes 0, and the untrained base also scores 11.6%.
-- **DPO and GRPO did not clear their primary lines.**
-  - Each raised seen pass@1 (8 samples at T 0.7) by about 3 points: DPO by 3.5, in a line added
-    after the fact, and GRPO by 3.1.
-  - Each paid in calibration, measured on the gold answer's tokens: DPO 0.11 nats seen and 0.38
-    unseen, GRPO 0.71 and 1.32.
-  - GRPO's checkpoint was set aside. DPO's carried forward, as the SFT model within noise.
+- **CPT's gain survives SFT as probability, not accuracy.**
+  - On the 155 facts SFT never showed, gold-answer tokens are 0.41 nats more probable in the CPT arm
+    than in a control arm without CPT (95% CI +0.23 to +0.60; 1 df per arm).
+  - That is about what CPT's general rise in corpus-text probability predicts: 0.086 nats per
+    token, over 4.69 answer tokens.
+  - The arms' strict unseen accuracy differs by 3.2 points, which doesn't resolve at this size.
+- **SFT beats stock Instruct on the facts it trained on, not on the rest.**
+  - On the 167 seen facts, strict closed-book accuracy is 28.7% against 11.4% (paired 95% CI +10.8
+    to +24.6).
+  - On the unseen facts it is 11.6% against 7.7%. That is past the 2.6-point floor, but the paired
+    CI is −1.3 to +9.0, and the untrained base also scores 11.6%.
+- **DPO and GRPO didn't clear their primary lines,** the metric each stage's pre-registered verdict
+  reads.
+  - Each raised seen pass@1 (8 samples, T 0.7) by about 3 points, a gain greedy serving doesn't
+    use: DPO by 3.5 [+1.2, +6.0], in a line added after the fact, and GRPO by 3.1 [+1.3, +5.0].
+  - Each paid in calibration on the gold answer's tokens. DPO lost 0.38 nats on unseen facts,
+    beyond its 0.21 floor (0.11 on seen, inside it). GRPO lost 0.71 on seen and 1.32 on unseen.
 
 <!-- headline-summary:start -->
 | run | what it is | closed-book seen (strict) | closed-book unseen (strict) | gold_lp answer, unseen | grounded_acc (judge) | halluc_rate ↓ | GSM8K (no BOS) |
@@ -50,31 +57,41 @@ for sharper sampling without clearing their own bars.
 |  | *floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE* | 3.5 | 2.6 | 0.21 | 2.8 | 3.9 | 2.2 |
 <!-- headline-summary:end -->
 
-**Knowledge went in once, at CPT.** CPT is the only stage that raised the probability of unseen
-gold answers: +0.66 nats on the answer tokens in Stage 2. Every later stage that can be measured
-lowered it, DPO by 0.38 and GRPO by 1.32. Each later stage bought behaviour with some of the
-knowledge, and the sharper the optimiser, the larger the trade.
+**On unseen facts, probability went up once, at CPT:** +0.66 nats on the answer tokens for
+`cpt-8b-replay10` (95% CI +0.45 to +0.90). Every later stage that can be measured lowered it,
+DPO by 0.38 and GRPO by 1.32. On the facts SFT showed, SFT added accuracy in both arms: from 12.6%
+to 23.9% without CPT, and from 15.0% to 28.7% with it.
 
-**Serving.** FP8 (W8A8) passed the pre-registered quality gate. bf16 serves up to the measured
-16 req/s, with a faster first token; FP8 serves near saturation. At peak goodput one H100 costs
-$0.035 per 1,000 requests with FP8 ($0.039 with bf16), against $0.127 for the same tokens through
-Mistral Small 4's API. The GPU is the cheaper option above 8.7 sustained requests per second
-([`DEPLOY.md`](DEPLOY.md)).
+**Serving:** FP8 (W8A8) passed the pre-registered quality gate.
+- **Which variant:** bf16 serves up to the measured 16 req/s, with a faster first token; FP8
+  serves near saturation.
+- **Cost:** at peak goodput one H100 costs $0.035 per 1,000 requests with FP8 ($0.039 with bf16).
+  The same tokens cost $0.127 through Mistral Small 4's API. That compares cost only, since
+  Small 4 is a 119B MoE. The GPU is cheaper above 8.7 sustained req/s.
+- **Bench numbers** are means of two runs ([`DEPLOY.md`](DEPLOY.md)).
 
-**Final checkpoint: `dpo-strict`** (stage5-final, served bf16 or FP8). The chain carries each
-stage's checkpoint forward unless a rule sets it aside. `dpo-strict` is the SFT model within noise
-on every primary line, at one measured cost: its unseen answer tokens are 0.38 nats less probable.
+**Final checkpoint: `dpo-strict`.**
+- **How it was picked:** Stage 4's pre-registration made the DPO run's checkpoint final, with no
+  fall-back to SFT. The move to strict labels was a user decision, and Stage 5's rule kept it
+  when GRPO missed.
+- **What it is:** the SFT model within noise on every primary line, with one cost beyond its
+  floor: unseen answer tokens −0.38 nats. So `sft-from-cpt` would serve as well.
+- **[Demo](#demo).**
 
 ## 2. Lifecycle
 
 Row names are the tables' `run` column. Each arrow is labelled with the rule that picked the
 checkpoint; dashed arrows are ablations and controls, which inform the chain but don't feed it.
+The rule names are the pre-registration's:
+- **ablation A** is the replay ablation;
+- **B4** is the SFT rule that picks an epoch on the closed-book and definition losses;
+- **stage5-final** is the checkpoint Stage 5 hands on.
 
 ```mermaid
 flowchart LR
   base["base-8b-hf<br/>Ministral 3 8B Base"]
   cpt["cpt-8b-replay10<br/>CPT, LoRA r64, + 10% general replay"]
-  sft["sft-from-cpt<br/>SFT, 2,436 teacher-written records"]
+  sft["sft-from-cpt<br/>SFT, 2,436 records, 1,778 teacher-written"]
   dpo["dpo-strict<br/>DPO, 445 verifier-labelled pairs"]
   served["served: dpo-strict bf16 to 16 req/s,<br/>dpo-strict-fp8 near saturation"]
   sftb["sft-from-base<br/>control arm: the same SFT, no CPT"]
@@ -99,20 +116,25 @@ The stage write-ups, each with its curves, tables and what I'd do differently:
 
 ## 3. Results
 
-Every stage and ablation, base first. How to read the tables:
-- **Units:** rates are in %, and `gold_lp` is nats per gold answer (higher is better); ↓ marks
-  lower is better.
+Every stage and ablation, base first. Rates are in %, `gold_lp` is nats per gold answer (higher
+is better), and ↓ marks lower is better.
 - **Floors:** a difference counts only beyond the floor row of its format group. Base-format and
-  chat-format `gold_lp` don't compare.
-- **Scorers:** closed-book accuracy is scored by the strict checker. Judge columns are Mistral
-  Large 3 at temperature 0, with rules deciding first. `cite_supported` is reported, not read
-  ([why](docs/verifiers.md)).
-- **No BOS:** lm-eval ran 5-shot without the chat template and, since Stage 0, without a BOS token.
-  Comparisons between rows stand, but absolute scores don't compare with published ones.
-
-Seen and unseen are fixed per fact before SFT. Half the eval's source passages may feed SFT
-synthesis and half may not, so knowledge injection and transfer are read apart. This follows
-Tülu 3's split between development and unseen evaluations.
+  chat-format `gold_lp` don't compare. Single-seed rows are read against the same floor.
+- **Scorers:**
+  - Closed-book accuracy uses the strict checker.
+  - Judge columns are Mistral Large 3 at temperature 0, after rules. That judge was hand-checked,
+    not benchmarked, and `cite_supported` is reported, not read ([why](docs/verifiers.md)).
+  - Large 3 also wrote the eval and the SFT data, which could favour SFT on the seen half.
+- **Benchmarks:** lm-eval, 5-shot, with no chat template and, since Stage 0, no BOS token. Rows
+  compare with each other, not with published scores. Stage 6's GSM8K gate ran with one BOS
+  ([docs/stage6.md](docs/stage6.md)).
+- **Latency:** compare rows within one source only, either Stage 6's pinned-H100 bench or the
+  earlier single samples.
+- **Seen and unseen** are fixed per fact before SFT:
+  - about half the eval's source passages may feed SFT synthesis, and half may not;
+  - every eval fact comes from a document CPT read, so unseen means unseen by SFT;
+  - this follows Tülu 3's development/unseen split (§7), here by fact within one eval.
+- **`cpt-8b-full`** has no closed-book numbers: its weights were deleted before the task grew.
 
 **Knowledge (closed-book: no retrieval, no passage in the prompt)**
 
@@ -207,113 +229,138 @@ the Stage 0 `base-8b` row are in [`docs/results.md`](docs/results.md).
 
 ## 4. Decisions and trade-offs
 
-- **LoRA, not full-parameter CPT.** Full-parameter on 2 GPUs memorised and forgot more for the same
-  domain gain. Train-slice perplexity fell 22% (LoRA's fell 8%), general perplexity rose 1.19%
-  against LoRA's 0.40%, and GSM8K lost 3.0 points against a 1.1 floor. LoRA isn't free either: its
-  0.40% is past the 0.23% floor. Row: `cpt-8b-full`.
-- **10% general replay, kept on thin evidence.** The adoption rule fired on MMLU +0.2 against a 0.1
-  seed floor, inside MMLU's own 0.34 SE. Its −2.24% general perplexity is in-distribution (FineWeb-Edu
-  is both the replay and the general val), and grounded accuracy fell 6.5 points against 3.7. It was
-  kept because it is cheap (+10% tokens) and SFT restored the citations. Row: `cpt-8b-replay10`.
-- **SFT data as teacher distillation, split by fact.** Mistral Large 3 wrote the questions and,
-  with Medium 3.5, the completions, from the passages; every domain record was reviewed against its
-  source. No training set holds Claude-written text, so the result measures the method and
-  Mistral's teachers, not a third model's style. Rows: `sft-from-cpt` against `sft-from-base`.
-- **DPO labels from verifiers, not a judge.** The judge caught 28% of grounded and 9% of
-  definition defects against a 0.5 line, so pairs come from verifiers and rules. Relabelling with
-  the strict checker (79 of 458 closed-book labels wrong) made `dpo-strict`. Row: `dpo-strict`.
-- **GRPO on Magistral's recipe, whose brake never engaged.** DAPO loss, ε_high 0.28, no KL term,
-  8 samples on 622 tasks the start solves 1-7 times in 8. With one update per batch the policy
-  ratio stays at 1, so clip-higher never bound (`clip_ratio/high` 0 at every step), and entropy
-  collapsed by steps 52 and 65. Row: `grpo`.
-- **FP8 shipped on a gate, bf16 by load.** FP8 moved no gated line past its Stage 3 floor. FP8 with
-  an FP8 KV cache failed on strict seen accuracy (−4.2 against 3.5), and INT4 failed broadly. bf16
-  leads on first token up to 16 req/s (21-40 against 39-76 ms p50); FP8 leads at saturation (22%
-  more requests per second at 64 concurrent). Row: `dpo-strict-fp8`.
+Each decision is listed with the alternative it beat, and the row that shows the alternative's
+number:
+- **10% general replay, kept on thin evidence** (against no replay, `cpt-8b`).
+  - The rule fired on MMLU +0.2 against a 0.1 seed floor, inside MMLU's own 0.34 SE.
+  - Its −2.24% general perplexity is in-distribution: FineWeb-Edu is both the replay and the
+    general val.
+  - Grounded accuracy fell 6.5 points against a 3.7 floor; the runs without replay fell 0.9 and
+    4.6.
+  - Kept as cheap (+10% tokens), and SFT restored the citations. Row: `cpt-8b-replay10`.
+- **LoRA, not full-parameter CPT,** which memorised more for the same domain gain.
+  - Train-slice perplexity fell 22%, against LoRA's 8%.
+  - General perplexity rose 1.19%, against LoRA's 0.40% and 0.17% over two seeds.
+  - GSM8K fell 3.0 points against a 1.1 floor, though grounded and vocab rose (one run).
+  - Row: `cpt-8b-full`.
+- **SFT stopped at epoch 1** by the pre-registered rule B4, which takes epoch 2 unless the
+  closed-book or definition validation loss rises in it.
+  - On `sft-from-cpt` they rose from 1.17 to 1.30 and from 1.98 to 2.03.
+  - All four runs did the same.
+  - Row: `sft-from-cpt`.
+- **DPO labels from verifiers, not the judge.** The judge caught 28% of grounded and 9% of
+  definition defects, against a 0.5 line. Relabelling with the strict checker (79 of 458
+  closed-book labels wrong) made `dpo-strict`. Row: `dpo-strict`.
+- **GRPO rejected.**
+  - Its gain, seen pass@1 +3.1, is one greedy serving doesn't use. Greedy accuracy didn't move.
+  - Calibration cost 0.71 nats seen and 1.32 unseen, beyond its floors.
+  - On Magistral's recipe (DAPO loss, ε_high 0.28, no KL term) with one update per batch,
+    clip-higher never bound (`clip_ratio/high` 0).
+  - Row: `grpo`.
+- **FP8 (W8A8), not INT4 or an FP8 KV cache.** FP8 moved no gated line past its Stage 3 floor.
+  - FP8-KV failed strict seen accuracy (−4.2 against 3.5).
+  - INT4 failed three gated lines: GSM8K −6.1 against 2.2, and answer-token log-probability at
+    about twice the floor on both halves.
+  - bf16 stays the default up to 16 req/s (first token 21-40 against 39-76 ms p50); FP8 serves 22%
+    more requests per second at 64 concurrent.
+  - Row: `dpo-strict-fp8`.
 
 ## 5. What changes at Forge scale
 
 Forge's announcement names the same stages in its own words: pre-training on internal data
-(continued pre-training, CPT, here), post-training with SFT and DPO, and reinforcement learning,
-measured by KPI-aligned evaluation and regression suites.
+(continued pre-training, CPT, here), post-training, reinforcement learning, and evaluation
+frameworks.
 
 | | This repo, measured | [Forge](https://mistral.ai/news/forge/), as announced (17 March 2026) |
 |---|---|---|
 | Data | 246 public PDFs, 20.6M tokens after cleaning and deduplication | "large volumes of internal documentation, codebases, structured data, and operational records" |
+| Data licences | audited after training: 54 of the 2,516 SFT records under non-commercial or restrictive terms | not stated |
 | Pre-training | LoRA r64 on the 19.4M-token train split, read once, + 10% general replay | "build domain-aware models by learning from large internal datasets" |
-| SFT | 2,436 teacher-written records, every domain record reviewed | "SFT and DPO to encode standards and preferences", with synthetic data generation |
-| Preferences | 445 verifier-labelled DPO pairs | (as above) |
-| RL | 622 verifiable tasks, synchronous GRPO, stopped by step 65 | RL to "align models and agents with internal policies, evaluation criteria"; RLHF with distillation |
-| Evaluation | a frozen 716-item KPI eval, a regression suite, seed floors | "KPI-aligned evaluation", "regression suites", "drift detection" |
-| Compute | one H100: 8.8 GPU-hours, $35 of training | not stated |
+| Post-training | SFT on 2,436 records (1,778 teacher-written); DPO on 445 verifier-labelled pairs | "post-training methods allow teams to refine model behavior" |
+| RL | 622 verifiable tasks, synchronous GRPO, stopped by step 65 | "align models and agents with internal policies, evaluation criteria" |
+| Evaluation | a 716-item KPI eval (fixed from Stage 3), a regression suite, seed floors | "test models against internal benchmarks, compliance rules, and domain-specific tasks" |
+| Compute | H100s, one per run except two 2-GPU ablations: 8.8 GPU-hours, $35 of training | not stated |
 
 What the small version surfaced that gets harder at full scale:
-1. **The judge comes back.** Here a judge that failed its benchmark could be replaced by verifiers,
-   because the tasks had exact answers. Open-ended client tasks don't, so calibrating a judge
-   against subject-matter experts' labels becomes the core work.
-2. **Verifiers are adversarial objects.** Three holes surfaced in one day, and one was learned. At
-   scale every reward needs its fixture suite and an audit of what it rewards before training.
-3. **Synchronous GRPO has no brake.** Clip-higher acts on the gap that asynchronous generators open
-   between the sampling and the trained policy. Without that gap it did nothing, and both runs
-   collapsed.
-4. **Replay needs lineage.** The replay data was a public mixture with its Claude-written subsets
-   removed by hand. Once replay is client data, which records went into which run has to be
-   tracked.
-5. **The eval's seen/unseen split needs an owner.** Which facts training may see is a governance
-   decision. Here one script enforced it, and a guard test checked it.
-6. **Distributed full-parameter CPT is the part this repo didn't do.** It ran one 2-GPU run, at
-   +11% tokens per second per GPU over one GPU, with the cause not isolated.
+1. **The judge comes back.** Verifiers replaced a failed judge here because the tasks had exact
+   answers. Open-ended client tasks don't, so calibrating a judge against subject-matter experts'
+   labels becomes the main work.
+2. **Verifiers are adversarial objects.** Three holes in one day, and one was learned. Every reward
+   needs a fixture suite and an audit of what it rewards before training.
+3. **Synchronous GRPO had no working brake.** Clip-higher acts on the policy gap that asynchronous
+   generators open; here the gap was zero, and both runs collapsed. Whether a brake would have
+   stopped that is untested.
+4. **Replay needs lineage.** Here an exclusion list kept Claude-written subsets out of a public
+   mix. With client data, which records went into which run has to be tracked.
+5. **The seen/unseen split needs an owner.** Which facts training may see is a governance decision;
+   here one script enforced it, and a guard test checked it.
+6. **Licences get checked at intake.** Here the audit ran after training and found records that
+   block publishing the weights. At scale, lineage is checked before any GPU time.
+7. **Multi-node full-parameter CPT wasn't done.** There was one 2-GPU full-parameter run, and one
+   2-GPU LoRA run, which was 11% faster per GPU with the cause not isolated.
 
 ## 6. What went wrong, and what next
 
-**Failures, the costliest first:**
+**Failures:**
 1. **The judge failed its benchmark** (recall 0.28 grounded, 0.09 definition), so Stage 4's
-   registered design, judge-labelled pairs, couldn't run.
-2. **Three verifier holes:**
-   - fragments, found by auditing the labeller's passes;
-   - comma lists, found by reading the strict checker's code;
-   - years within 2%, found by the hack audit, and the only one learned (10 of 16 late rollouts on
-     one task).
-3. **Two epochs of DPO displaced the chosen answers:** seen accuracy fell 4.8 points, and the gold
-   answer's log-probability fell 3.0 nats seen and 4.3 unseen (`dpo-2ep`).
-4. **GRPO collapsed** on entropy, with the imported clip inert (above).
-5. **INT4 failed broadly:** GSM8K −6.1 and identifiers −7.8. GPTQ was calibrated on 512 domain
-   records only; that this caused the failure is a hypothesis.
-6. **lm-eval has sent no BOS since Stage 0,** found in Stage 6. Comparisons hold: GSM8K with one BOS
-   is 1,067 of 1,319, the same as without.
-7. **Generous scorers ran longer than they should have.** The substring labeller passed 79 wrong
-   DPO chosen answers. The eval's lenient scorer read Stages 0 to 4; re-scored strict, rows moved
-   0–1.6 points with no change in ordering.
+   registered design couldn't run.
+2. **The substring labeller passed wrong answers:** 79 of 458 closed-book chosen answers (17%).
+   - The strict checker relabelled DPO and re-scored every row. The 8B rows moved 0–1.6 points
+     and Large 3 moved 1.9.
+   - Five pairs of rows less than a point apart swapped order. None of them is a comparison any
+     read makes.
+3. **Four rules sat on point readings where a window was meant:** the merge gate, the step-1 loss
+   band, the DPO checkpoint rule, and entropy on one batch. Three were amended, two of them after
+   their read (index in `notes/decisions.md`).
+4. **Three verifier holes:**
+   - fragments, found by auditing passes;
+   - comma lists, found by reading the code;
+   - years within 2%, found by the hack audit. It was the only one learned: 10 of 16 late
+     rollouts on one task.
+5. **Two DPO epochs displaced the chosen answers:** seen accuracy fell 4.8 points, and gold
+   log-probability fell 3.0 and 4.3 nats (`dpo-2ep`, one run).
+6. **GRPO collapsed on entropy in both runs,** with the clip inert.
+7. **INT4 failed three gated lines.** Its 512-record, domain-only calibration is the hypothesis,
+   untested.
+8. **FP8 doubles first-token time at low load** (17.9 to 35.2 ms p50), still unexplained. The two
+   slow GEMM paths vLLM's docs name are ruled out.
+9. **Prefix caching cut grounded first-token time by 29%,** not the half predicted. Only the
+   prompt-length part is cacheable, and that is 40% on FP8.
+10. **lm-eval has sent no BOS since Stage 0.** Rows still compare with each other: GSM8K with one
+    BOS scored the same 1,067 of 1,319 on bf16 `dpo-strict`.
+11. **The licence audit ran after training.** 54 of the 2,516 SFT records (8 non-commercial, 46
+    restrictive) block publishing the weights ([Weights](#weights)).
 
-The verifier story, end to end, with the fixtures, is in [`docs/verifiers.md`](docs/verifiers.md):
-how the judge was benchmarked, how each hole was found, and the rule the repo ended with. Every
-rule now gets an adversarial fixture suite before it becomes a reward. Its passes are read before
-its scores are believed.
+The verifier story, with each hole's fixture and the rule the repo ended with, is in
+[`docs/verifiers.md`](docs/verifiers.md). A verifier gets an adversarial fixture suite before it
+becomes a reward, and its passes are read before its scores are believed.
 
 **Method lessons:**
-- **Write stop rules on windows, not points.** One batch's entropy stopped `grpo-seed1` at step 34
-  while its 10-step mean sat at 57% of the start.
+- **Stop rules on windows, not points.** One batch's entropy stopped `grpo-seed1` at step 34 with
+  its 10-step mean at 57% of the start. The rule was rewritten after it fired, and the run resumed
+  to step 65.
 - **Decompose a metric before comparing it.** `gold_lp`'s end token hid DPO's shift toward
-  stopping inside an unchanged total.
-- **Put the start's own seed gap into a two-arm floor.** Adding it moved Stage 4's hallucination
-  and unseen `gold_lp` lines inside the noise. That amendment came after the read, and is
-  labelled so.
-- **Say "1 df per arm" out loud.** Two seeds per arm make any SD multiple indicative.
+  stopping.
+- **The start's own seed gap belongs in a two-arm floor.** Adding it, after the read, moved Stage
+  4's hallucination line and the as-run unseen `gold_lp` inside the noise.
+- **Say "1 df per arm" out loud.**
 - **Fix the eval's primary metric before the first training run.** Stage 2's −20% perplexity
-  target was set for the wrong data scale, and the seen/unseen split that makes Stage 3 readable
-  arrived after Stage 2.
+  target was set for the wrong data scale, and the seen/unseen split arrived after Stage 2.
 
 **Next, ranked:**
-1. **Compute tasks for GRPO:** a formula from a passage, sampled inputs and a checked answer. That
-   is a skill RL can sharpen and that transfers; closed-book recall can only be reweighted.
-2. **Two updates per batch (μ = 2),** so clip-higher has a ratio to bind; then a KL term if needed.
-3. **An NLL anchor on DPO's chosen answers (RPO)** before any longer preference training.
-4. **A per-claim support check as the grounded judge,** benchmarked on the same labels first.
-5. **INT4 with mixed calibration** (domain plus general records) or AWQ, through the same gate.
-6. **A profiler trace of FP8's first token,** which costs 10-20 ms more per request at low load.
-7. **A third seed per arm,** to turn indicative margins into intervals.
-8. **More varied CPT exposure:** paraphrased restatements of the facts that matter, since one pass
-   over 19.4M tokens moved probabilities more than answers.
+1. **A licence-clean SFT set:** OASST1 for No Robots, and a unrestricted math source with no GSM8K
+   test overlap. Then SFT, DPO and FP8 again, the gate rows, and the weights.
+2. **Compute tasks for GRPO** (a formula from a passage, sampled inputs, a checked answer): a
+   skill RL could sharpen, untested here.
+3. **Two updates per batch (μ = 2),** so clip-higher can bind; then a KL term if needed.
+4. **An NLL anchor on DPO's chosen answers (RPO).**
+5. **A per-claim support check as the grounded judge,** benchmarked first.
+6. **Diagnose FP8's first token, and run Stage 6's unrun rows:** FP8-KV's GSM8K and second seen
+   line, and n-gram speculative decoding.
+7. **INT4 with mixed calibration, or AWQ.**
+8. **A third seed per arm.**
+9. **Varied CPT exposure** (paraphrased restatements). One pass over 19.4M tokens raised gold
+   answers' probability without making them answerable.
 
 ## 7. Reproduce
 
@@ -340,32 +387,66 @@ judge verdicts are committed. `make reproduce-score` rescores them, re-runs the 
 pass@k, and regenerates every table and figure. `make audit` checks that each number in this
 README's prose appears in a generated table or a named file.
 
-## Who wrote what, and licences
+## Who wrote the data, licences, weights
 
-**Who wrote the training data:**
-- **SFT:** Mistral Large 3 (`mistral-large-2512`) wrote the questions. It wrote the completions
-  with Mistral Medium 3.5 (`mistral-medium-2604`, 25% of them), except the abstain records' fixed
-  refusal sentence. 500 general records come from the Tülu 3 SFT mixture, without its three
-  Claude-written subsets.
-- **DPO:** the pairs are `sft-from-cpt`'s own samples, labelled by verifiers and rules; no judge.
+**Who wrote the data:**
+- **The eval items:** generated by Mistral Large 3. Each was reviewed against its source passage,
+  with keep or reject verdicts ([rubric](notes/eval_review_rubric.md)).
+- **SFT:** Large 3 (`mistral-large-2512`) wrote the domain questions and, with Medium 3.5
+  (`mistral-medium-2604`, 25%), the completions. The abstain records use one fixed sentence.
+  - 500 general records come from the Tülu 3 SFT mixture, minus its Claude-written subsets.
+  - Those records' own generators are GPT-4o, GPT-3.5/4, Mixtral and people.
+- **DPO pairs:** `sft-from-cpt`'s own samples, labelled by verifiers and rules.
 - **GRPO:** the policy's own rollouts, scored by rules.
-- **Claude:** through Claude Code, it built the tooling and reviewed generated records against
-  their source passages, with keep or drop verdicts only. No training record contains text Claude
-  wrote. The hand-written answers in `tests/` are fixtures and are never trained on.
+- **Claude**, through Claude Code, built the tooling and reviewed generated records with keep or
+  drop verdicts only. No training set contains text Claude wrote. The answers in `tests/` are
+  fixtures and are never trained on.
 
 **Licences:**
-- **Code:** Apache-2.0 ([`LICENSE`](LICENSE)).
-- **Corpus:** works of the US federal government, in the public domain under 17 U.S.C. § 105. The
-  PDFs aren't redistributed; [`data/sources.csv`](data/sources.csv) gives each one's URL and
-  sha256. ASCE 7, the AISC manual and other copyrighted standards are excluded.
-- **Base model:** Ministral 3 8B Base is Apache 2.0, per its model card.
-- **Teacher outputs:** Mistral's Commercial Terms of Service assign API output to the customer
-  (§3.1). The records are labelled as model-written, as §3.2 asks.
-- **Tülu 3 SFT mixture** (Ai2, Lambert et al. 2024): the 500 records in `data/sft/` are ODC-BY-1.0
-  as a collection, but its subsets carry their own licences and terms.
-  - 8 records are from No Robots, CC-BY-NC-4.0, which is non-commercial.
-  - 46 are from withdrawn math set, CC-BY-4.0, generated by another model, whose licence has terms
-    for models trained on its outputs.
-  - The per-subset counts are in [`docs/reproduce.md`](docs/reproduce.md).
-- **FineWeb-Edu** (the CPT replay, ODC-By) isn't redistributed.
-- **The fine-tuned weights** are on the Modal volume and not published.
+
+| what | licence | in this repo |
+|---|---|---|
+| code | Apache-2.0 ([`LICENSE`](LICENSE)) | all of it |
+| the corpus: 246 US federal documents | public domain (17 U.S.C. § 105); ASCE 7, the AISC manual and other copyrighted standards excluded | URLs and sha256 in [`data/sources.csv`](data/sources.csv); the PDFs aren't redistributed |
+| FineWeb-Edu (CPT replay, general val) | ODC-By | not redistributed |
+| Mistral Large 3 / Medium 3.5 output (eval items, SFT records) | assigned to the customer by Mistral's Commercial Terms (§3.1), labelled as model-written (§3.2) | committed |
+| Tülu 3 SFT mixture, 500 replay records | ODC-BY-1.0 as a collection; subsets below | row ids only (`data/sft/hosted/`); `data/scripts/sft_replay_fetch.py` rebuilds the set and checks its sha256 |
+| Ministral 3 8B Base | Apache 2.0 (model card) | not redistributed |
+
+The replay records by subset, with the licence the mixture's card gives each:
+
+| subset | records | licence |
+|---|---|---|
+| Evol CodeAlpaca, NuminaMath-TIR, WildGuardMix, OASST | 97, 58, 46, 4 | Apache 2.0 |
+| WildJailbreak, Persona GSM, WildChat (GPT-4), Persona Algebra, CoCoNot, SciRIFF | 46, 46, 36, 18, 10, 7 | ODC-BY-1.0 |
+| TableGPT | 4 | MIT |
+| FLAN v2 | 74 | not given on the card |
+| withdrawn math set (GSM8K) | 46 | withdrawn after training |
+| No Robots | 8 | CC-BY-NC-4.0 (non-commercial) |
+
+### Weights
+
+**Not published at v1.0.**
+- **Why:** they were trained on the last two subset rows above. No Robots is non-commercial, so
+  an Apache-2.0 release would misstate the licence. Its licence restricts how models trained on its outputs may be named, so a non-commercial licence alone
+  doesn't cover it.
+- **The fix:** swap those 54 records (OASST1 for No Robots; a unrestricted math source with no GSM8K
+  test overlap). Then retrain SFT, DPO and FP8 and rerun the gate rows.
+- **Until then:** the checkpoints stay on the Modal volume, rebuildable from the adapters.
+
+### Demo
+
+`serve/modal_demo.py` serves `dpo-strict-fp8` on one H100, and `serve/demo.py` sends it two eval
+prompts, built as the eval builds them. Both items are hand-picked, so they show the behaviour;
+the rates are in the tables.
+- **`gr-0038`:** of the 93 grounded items `dpo-strict` answered correctly with valid,
+  judge-supported citations, the three with the shortest passages were read. This one was kept for
+  its concrete answer.
+- **`adv-0050`:** the third-shortest of the 73 unanswerable items it declined, kept as the clearest
+  question out of context.
+
+In both the bf16 and the FP8 run's saved answers:
+- `gr-0038` passes every rule: its one citation is the gold passage, the strict grounded check
+  GRPO's reward uses, and the judge marked it correct and supported.
+- `adv-0050` gives the exact abstain sentence.
+- The closed-book strict checker doesn't apply to either.

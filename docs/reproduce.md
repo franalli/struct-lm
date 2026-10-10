@@ -26,7 +26,7 @@ Ablations and probes beyond the chain (LR-up, the 2-GPU LoRA run, the memorisati
 | set | `SHA256SUMS` hash | files |
 |---|---|---|
 | CPT corpus, `data/processed` | 966d1e0c | train, val, replay, general_val (gitignored; rebuilt by `make data`; the hashes match the Modal volume's copies, checked 2026-10-10) |
-| SFT, `data/sft` | 70f47740 | train (2,436 records), sft_val (80) |
+| SFT, `data/sft` | 70f47740 | train (2,436 records), sft_val (80); git keeps `data/sft/hosted/` (the Tülu 3 replay text blanked, row ids kept), and `make sft-replay` rebuilds both files and checks them |
 | DPO as run, `data/dpo` | a899f7d2 | train, val (506 pairs) |
 | DPO strict, `data/dpo/strict` | 5e3effaf | train (445 pairs), val (18) |
 | GRPO, `data/grpo` | 4db8f7a6 | tasks, train (622), val (50) |
@@ -59,8 +59,8 @@ The 246 source PDFs are re-fetched from `data/sources.csv` (URL and sha256 per d
 | the CPT corpus files, LoRA adapters (`checkpoints/_train/<run>`), merged and quantized checkpoints | the Modal volume `struct-lm` (merged checkpoints rebuild from the adapters with `--steps merge`) |
 | the base and instruct models | Hugging Face (`mistralai/Ministral-3-8B-Base-2512`, `-Instruct-2512-BF16`) |
 
-**The Tülu 3 replay records** (`data/sft/`, 500: 475 train, 25 val) by subset, with the licence the
-mixture's card gives each:
+**The Tülu 3 replay records** (500: 475 train, 25 val; git holds their row ids only) by subset,
+with the licence the mixture's card gives each:
 
 | subset | records | licence |
 |---|---|---|

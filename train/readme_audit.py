@@ -118,18 +118,26 @@ def audit(path: Path = README) -> list[str]:
             problems.append(f"{SIDECAR.name}: {r['number']}: no file {r['source']}")
         elif not num or not matches(num[0][1], num[0][2], values_in(src.read_text())):
             problems.append(f"{SIDECAR.name}: {r['number']} not in {r['source']}")
+    used = set()
     for n, line in prose_lines(text):
         for written, value, decimals, _ in numbers(line):
             if significant(written) >= 3 and matches(value, decimals, block_pool):
                 continue
-            covered = any(
-                numbers(f" {r['number']} ")[:1]
+            hits = [
+                k
+                for k, r in enumerate(rows)
+                if numbers(f" {r['number']} ")[:1]
                 and numbers(f" {r['number']} ")[0][1:3] == (value, decimals)
                 and r["context"].lower() in line.lower()
-                for r in rows
-            )
-            if not covered:
+            ]
+            used.update(hits)
+            if not hits:
                 problems.append(f"README.md:{n}: {written}  | {line.strip()[:90]}")
+    problems += [  # a row that covers nothing is a number the README no longer states
+        f"{SIDECAR.name}: unused row {r['number']} ({r['context']})"
+        for k, r in enumerate(rows)
+        if k not in used
+    ]
     return problems
 
 

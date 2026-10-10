@@ -148,7 +148,8 @@ Build (`make sft-data`), the full-passage read loop and its rules: `data/CLAUDE.
 
 ```bash
 M=.venv/bin/modal
-# data on the volume after any SFT data change (the run refuses files that don't match SHA256SUMS)
+# data on the volume after any SFT data change (the run refuses files that don't match SHA256SUMS);
+# in a fresh clone, rebuild the files first: make sft-replay (git keeps data/sft/hosted/ only)
 for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
 $M volume put --force struct-lm data/dpo/prompts.jsonl data/dpo/prompts.jsonl   # the eos and dpo_probe sample jobs
 # smoke: no-op control, 1 step on 32 records, merge, merge check, vLLM template prompt ids
