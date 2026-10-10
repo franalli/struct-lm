@@ -217,6 +217,10 @@ def test_collator_builds_prompt_plus_completion(pairs):
 
 
 @pytest.mark.skipif(not (DPO / "strict/train.jsonl").exists(), reason="no data/dpo/strict")
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "data/sft/work/judged.jsonl").exists(),
+    reason="data/sft/work/ is the SFT builder's gitignored output (make sft-data)",
+)
 def test_strict_labels():
     """dpo-strict's closed-book labels are the strict checker's: every chosen answer passes it
     (one line, scorers.qa_strict), every rejected one fails it."""

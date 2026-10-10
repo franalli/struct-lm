@@ -54,6 +54,10 @@ def test_tasks_are_pool_prompts(tasks):
 
 
 @TASKS
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "data/sft/work/judged.jsonl").exists(),
+    reason="data/sft/work/ is the SFT builder's gitignored output (make sft-data)",
+)
 def test_verifiers_rebuild_from_the_records(tasks):
     sys.path.append(str(REPO / "train"))
     from grpo_rewards import verifier_for

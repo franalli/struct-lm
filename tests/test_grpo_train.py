@@ -33,6 +33,7 @@ def grpo():
     m = sys.modules.get("common")
     if m is not None and "data/scripts" in (getattr(m, "__file__", "") or ""):
         del sys.modules["common"]
+    pytest.importorskip("torch")  # the train extra
     import grpo
 
     return grpo

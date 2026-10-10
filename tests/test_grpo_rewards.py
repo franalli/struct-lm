@@ -136,6 +136,10 @@ def test_verifier_for():
     not (REPO / "results/runs/sft-from-cpt/samples/dpo_pool.jsonl").exists(),
     reason="no pool samples",
 )
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "data/sft/work/judged.jsonl").exists(),
+    reason="data/sft/work/ is the SFT builder's gitignored output (make sft-data)",
+)
 def test_stage4_pool_characterisation():
     """The reward's closed-book verdicts on Stage 4's pool samples (sft-from-cpt, T 0.7, 4 per prompt),
     pinned: a change to the verifier shows here (1,299 correct; 1,305 before the 2026-10-09 comma

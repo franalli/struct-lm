@@ -79,6 +79,7 @@ def test_rag_shares_contexts_and_stays_answerable(sets):
 
 def test_ignore_list_keeps_the_tower_projector_and_lm_head():
     """llm-compressor's "re:" targets are matched from the start of the module name."""
+    pytest.importorskip("torch")  # serve/quantize.py imports it (the train extra)
     from quantize import IGNORE
 
     pats = [re.compile(p.removeprefix("re:")) for p in IGNORE]
@@ -130,6 +131,7 @@ def w4_names(extra: tuple[str, ...] = ()) -> list[str]:
 
 
 def test_check_quantized(tmp_path):
+    pytest.importorskip("torch")
     from quantize import check_quantized
 
     src = tmp_path / "src"

@@ -18,7 +18,8 @@ import sys
 from pathlib import Path
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")  # the train extra; `--extra data --extra dev` alone skips
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "train"))
