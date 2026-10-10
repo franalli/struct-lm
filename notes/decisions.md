@@ -4615,3 +4615,69 @@ cache binds. The crossover between 16 req/s and saturation is unmeasured.
   - vLLM's greedy output can vary with batch composition within one server.
   The line says that instead, and that the seed floors were measured the same way, so they include
   this noise.
+
+## 2026-10-10: Stage 7 (write-up) plan: decisions, corrections to the plan as pasted, and one claim re-tested (user decisions)
+
+**User decisions:**
+- **The $20 Stage 6 completion runs** (FP8-KV's GSM8K and second seen-line generation, n-gram
+  speculative decoding) are not run before the tag; the write-up states them as not run. None can
+  change a verdict.
+- **Demo:** an ephemeral Modal endpoint serving `dpo-strict-fp8`, recorded by the user.
+- **Hugging Face:** `dpo-strict` bf16 and FP8 with a model card, after the base licence and
+  Mistral's API output terms are checked at the source.
+- **Spend:** stated from the training logs only. The training runs total about 8.8 GPU-h, about
+  $35 at $3.95/GPU-h (Stage 2 $21.32, Stage 3 $7.76, Stage 4 $1.49, Stage 5 $4.28); evals,
+  sampling, the Stage 6 bench and API calls aren't totalled anywhere.
+- **Code licence:** Apache-2.0.
+- **Structure:** the README holds the seven parts; the stage write-ups moved verbatim to
+  `docs/stage0.md` … `docs/stage6.md`, `docs/results.md` and `docs/reproduce.md`.
+
+**Corrections to the plan as pasted, from the repo:**
+- **DPO was not rejected.** `dpo-strict` is stage4-final, stage5-final and the served model. Neither
+  DPO nor GRPO cleared its primary line; GRPO's checkpoint was set aside, DPO's carried forward as
+  the SFT model within noise. `dpo` → `dpo-strict` was a user decision after the label audit, not a
+  pre-registered pick. The source of the error was the write-up's own "the pre-registered rules
+  rejected both" (Results and Stage 5), corrected in place.
+- **"About 3 points of sampled accuracy" is seen pass@1** (8 samples at T 0.7, strict): DPO +3.5
+  [+1.2, +6.0] for `dpo-strict` (a reported line added after the fact), GRPO +3.1 [+1.3, +5.0]. The
+  calibration cost is on the answer tokens, seen / unseen: DPO 0.11 / 0.38 (the unseen one beyond
+  its 0.210 floor), GRPO 0.71 / 1.32.
+- **+0.41 nats** [+0.23, +0.60] is the arm difference on unseen answer tokens (the CPT arm's two
+  SFT runs minus the base arm's two, 1 df per arm), not a part of Stage 2's +0.66 that survived:
+  base-format and chat-format log-probabilities don't subtract.
+- **Full-parameter CPT's −22% is the train-slice perplexity** (memorisation). Its general val is
+  +1.19% against LoRA's +0.40%; GSM8K −3.0 against a 1.1 floor. LoRA (`cpt-8b`) is not "within
+  noise" either: general val +0.40% against a 0.23% floor, MMLU −0.4 against 0.3.
+- **Replay's −2.24% general perplexity is in-distribution** (FineWeb-Edu is both the replay and the
+  general val), the adoption fired on MMLU noise (2026-09-28), and replay cost grounded_acc −6.5
+  against a 3.7 floor. The Results summary's "costs almost nothing in forgetting" is corrected in
+  place.
+- **"LoRA throughout, one H100"** holds for the shipped chain only: `cpt-8b-full` (full-parameter)
+  and `cpt-8b-fsdp2` ran on 2 GPUs.
+- **$0.035 per 1,000 requests is FP8 at 32 concurrent requests**, near saturation; bf16 there is
+  $0.039. The 8.7 req/s break-even holds for both. bf16 is served up to the measured 16 req/s.
+- **"~$120 total" has no source** (see Spend above).
+- **"The lenient checker scored four stages before it was audited":** the fragment holes were in
+  `same_fact`, the DPO labeller (79 of 458 closed-book chosen labels wrong under the strict rule).
+  The eval scorer `qa_correct` had milder holes; the strict re-score moved rows 0–1.6 points with no
+  change in ordering.
+- **Sizes:** corpus 20.6M tokens, train split 19.4M; SFT 2,436 train records (2,516 in all); DPO
+  strict 463 pairs (445 train); GRPO 622 train tasks (+50 val).
+- **"Every amendment preceded the read it governed" doesn't hold.** The Stage 4 floor (2026-10-09),
+  the B5 merge gate (swapped after it failed), the entropy stop rule (changed after it fired) and
+  dpo-2ep's evaluation past a failed gate came after their reads. The amendments table at the top
+  of this file records the timing as it happened.
+
+**One claim re-tested: SFT against Instruct on the unseen half** (strict, paired by item, 10,000
+item-bootstrap draws, seed 0):
+
+| comparison | seen (167) | unseen (155) |
+|---|---|---|
+| sft-from-cpt − instruct-8b | 48 vs 19, +17.4 [+10.8, +24.6] | 18 vs 12, +3.9 [−1.3, +9.0] |
+| sft-from-cpt-seed1 − instruct-8b | 43 vs 19, +14.4 [+7.2, +21.6] | 17 vs 12, +3.2 [−1.9, +8.4] |
+| base-8b-hf − instruct-8b | 21 vs 19, +1.2 [−3.6, +6.0] | 18 vs 12, +3.9 [+0.0, +8.4] |
+
+The unseen +3.9 clears the Stage 3 floor (2.6 points), but its paired interval includes 0, and the
+untrained base scores the same 18 of 155. Stage 3's "sits inside the noise floor" named no test and
+is replaced by this reading: the unseen lead over Instruct is Instruct's deficit, not something
+training added. Both tests are named wherever the comparison appears.

@@ -398,6 +398,10 @@ BLOCK_FILES = {
     "stage6-tables": "docs/stage6.md",
     "serving-table": "docs/stage6.md",
     "results-table": "docs/results.md",
+    "headline-summary": "README.md",
+    "headline-knowledge": "README.md",
+    "headline-behaviour": "README.md",
+    "headline-general": "README.md",
 }
 
 
@@ -486,14 +490,23 @@ def results_table(path: Path = Path("results/table.md")) -> str:
         idx = [head.index(n) for n in names if n in head]
         rows = [[row[0], *(row[i] for i in idx)] for row in cells]
         if "qa_acc" in names:  # the strict checker beside the lenient columns of table.md
-            keys = ("qa_strict", "seen_strict", "unseen_strict")
+            keys = {"qa_acc": "qa_strict", "qa_num": "number_strict",
+                    "qa_ident": "identifier_strict", "qa_term": "term_strict",
+                    "qa_seen": "seen_strict", "qa_unseen": "unseen_strict"}  # fmt: skip
+            # gold_lp's two parts per half (the answer tokens, the end token), from the
+            # generations: a stage can move the end token (stopping) without the fact
+            parts = [(p, h) for p in ("answer", "end") for h in (None, "seen", "unseen")]
             rows[0] = [*(f"{c} (lenient)" if c.startswith("qa_") else c for c in rows[0]),
-                       "qa_acc (strict)", "qa_seen (strict)", "qa_unseen (strict)"]  # fmt: skip
-            rows[1] = [*rows[1], "---", "---", "---"]
+                       *(f"{k} (strict)" for k in keys),
+                       *(f"gold_lp {p}{f' {h}' if h else ''}" for p, h in parts)]  # fmt: skip
+            rows[1] = [*rows[1], *["---"] * (len(keys) + len(parts))]
             for r in rows[2:]:
                 st = strict.get(r[0], {})
                 ok = st and not st.get("partial")
-                r += [f"{st[k]:.3f}" if ok and st.get(k) is not None else "" for k in keys]
+                r += [f"{st[k]:.3f}" if ok and st.get(k) is not None else "" for k in keys.values()]
+                for p, h in parts:
+                    v = item_lp(r[0], h, p)
+                    r.append(f"{statistics.fmean(v.values()):.3f}" if v else "")
         rows = [rows[0], rows[1]] + [r for r in rows[2:] if any(r[1:])]  # rows with numbers here
         if len(rows) == 2:
             continue
@@ -2401,6 +2414,162 @@ def stage6_md(usd: float) -> str:
     return md
 
 
+# ------------------------------------------------------------------------- README headline ---
+# Every stage and ablation with a row, in lifecycle order (base first), and what each row is. The
+# Stage 0 base-8b (vLLM's Mistral-native path) is superseded by base-8b-hf; it stays in
+# docs/results.md. cpt-8b-lr2x and cpt-8b-fsdp2 were training-only runs (docs/stage2.md).
+HEADLINE_ROWS = [
+    ("base-8b-hf", "Ministral 3 8B Base"),
+    ("instruct-8b", "stock Instruct: the bar"),
+    ("mistral-large-3", "frontier reference (API, closed-book only)"),
+    ("cpt-8b", "CPT"),
+    ("cpt-8b-seed1", "CPT, seed 1"),
+    ("cpt-8b-replay10", "CPT + 10% replay: the chain's"),
+    ("cpt-8b-full", "CPT full-parameter (ablation)"),
+    ("sft-from-base", "SFT on the base: control arm"),
+    ("sft-from-base-seed1", "control arm, seed 1"),
+    ("sft-from-cpt", "SFT on CPT: the chain's"),
+    ("sft-from-cpt-seed1", "SFT on CPT, seed 1"),
+    ("dpo", "DPO, as-run labels"),
+    ("dpo-seed1", "DPO, seed 1"),
+    ("dpo-2ep", "DPO 2 epochs (ablation, failed merge gate)"),
+    ("dpo-strict", "DPO, strict labels: final, served bf16"),
+    ("grpo", "GRPO checkpoint-25 (rejected)"),
+    ("grpo-seed1", "GRPO, seed 1"),
+    ("dpo-strict-fp8", "served FP8 (passed the gate)"),
+    ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (failed the gate)"),
+    ("dpo-strict-w4a16", "INT4 W4A16 (failed the gate)"),
+]
+BASE_FORMAT = {"base-8b-hf", "cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"}
+FLOOR_ROWS = [  # (label, the seed pair whose gap, or the metric's SE, sets each column's floor)
+    ("floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE", ("cpt-8b", "cpt-8b-seed1")),
+    ("floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE", SFT_SEED_PAIR),
+]
+HEADLINE = {  # block -> [(header, metrics key, kind, noise() extra)]; rates in %, gold_lp in nats
+    "headline-knowledge": [
+        ("closed-book seen (strict)", "qa_strict_seen", "kpi", "qa_seen"),
+        ("closed-book unseen (strict)", "qa_strict_unseen", "kpi", "qa_unseen"),
+        ("identifiers (strict)", "qa_strict_ident", "kpi", "qa_identifier"),
+        ("gold_lp answer, seen", "gold_lp_ans_seen", "lp_ans", "seen"),
+        ("gold_lp answer, unseen", "gold_lp_ans_unseen", "lp_ans", "unseen"),
+        ("gold_lp end, seen", "gold_lp_end_seen", "lp_end", "seen"),
+        ("gold_lp end, unseen", "gold_lp_end_unseen", "lp_end", "unseen"),
+    ],
+    "headline-behaviour": [
+        ("grounded_acc (judge)", "grounded_acc", "kpi", "grounded"),
+        ("cite_valid", "cite_valid", "kpi", "grounded"),
+        ("cite_supported (judge, reported)", "cite_supported", "kpi", "grounded"),
+        ("halluc_rate ↓", "halluc_rate", "kpi", "adversarial"),
+        ("false_abstain ↓", "false_abstain", "kpi", "grounded"),
+        ("vocab_recall (judge)", "vocab_recall", "kpi", "vocab"),
+    ],
+    "headline-general": [
+        ("MMLU (no BOS)", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
+        ("GSM8K (no BOS)", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
+        ("HellaSwag (no BOS)", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
+        ("ppl domain val ↓", "ppl_domain_val", "ppl", None),
+        ("ppl general val ↓", "ppl_general_val", "ppl", None),
+    ],
+}
+SUMMARY = [  # the README's first table: the chain's checkpoints against the base and the bar
+    ("base-8b-hf", "base"),
+    ("instruct-8b", "stock Instruct"),
+    ("sft-from-base", "SFT on the base (control)"),
+    ("sft-from-cpt", "CPT → SFT"),
+    ("dpo-strict", "→ DPO: final, served"),
+    ("grpo", "→ GRPO (rejected)"),
+]
+SUMMARY_COLS = [
+    *HEADLINE["headline-knowledge"][:2],
+    HEADLINE["headline-knowledge"][4],
+    HEADLINE["headline-behaviour"][0],
+    HEADLINE["headline-behaviour"][3],
+    HEADLINE["headline-general"][1],
+]
+
+
+def headline_latency(run: str) -> tuple[str, str, str]:
+    """(TTFT p50, ITL p50 at one request, source). Stage 6 measured dpo-strict (bf16) and its
+    variants on a pinned H100 (results/serve/bench, mean of the repeats); earlier rows come from
+    serve/bench_latency.py, one sample on an unrecorded GPU (results/bench). The two benches send
+    different prompts, so compare rows within a source only."""
+    variant = {r: v for v, r in S6_RUN.items()}.get(run)
+    if variant and (reps := s6_reps(variant, "c1")):
+        ttft, itl = s6_mean(reps, "median_ttft_ms"), s6_mean(reps, "median_itl_ms")
+        return f1(ttft), f1(itl, "{:.2f}"), "H100, Stage 6 bench"
+    f = Path("results/bench") / f"{run}.json"
+    if f.exists():
+        d = {x["concurrency"]: x for x in json.loads(f.read_text())}[1]
+        return f"{d['ttft_p50_ms']:.1f}", f"{d['itl_p50_ms']:.2f}", "1 sample, GPU not recorded"
+    return "", "", ""
+
+
+def headline_cell(m: dict, key: str, kind: str) -> str:
+    v = m.get(key)
+    if v is None:
+        return ""
+    if kind in LP_PART:
+        return f"{v:.2f}"
+    return f"{v:.2f}" if kind == "ppl" else f"{v * 100:.1f}"
+
+
+def headline_floor(m: dict, pair: tuple[str, str], key: str, kind: str, extra, sizes) -> str:
+    """noise() for every kind but perplexity, whose floor is the seed pair's relative gap in %."""
+    if kind == "ppl":
+        a, b = (m.get(r, {}).get(key) for r in pair)
+        return "" if a is None or b is None else f"{abs(a / b - 1) * 100:.2f}%"
+    n = noise(m, pair, key, kind, extra, sizes)
+    return "" if n is None else (f"{n:.2f}" if kind in LP_PART else f"{n:.1f}")
+
+
+def headline_tables() -> dict[str, str]:
+    """The README's results: three tables with the same rows (knowledge, behaviour, general and
+    serving), each followed by one floor row per format group (base-format and chat-format gold_lp
+    don't compare, so no pooled floor), and the summary table of part 1. Strict closed-book only:
+    the lenient columns are in docs/results.md."""
+    m = {r: v for r, _ in HEADLINE_ROWS if (v := load_metrics(r)) is not None}
+    sizes = half_sizes()
+
+    def table(rows, cols, latency: bool) -> str:
+        head = ["run", "what it is", *(c[0] for c in cols)]
+        if latency:
+            head += ["TTFT p50 @1 (ms)", "ITL p50 @1 (ms)", "latency source"]
+        lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+        empty = [r for r, _ in rows if r not in m]
+        for run, what in rows:
+            if run not in m:
+                continue
+            fmt = " [base format]" if run in BASE_FORMAT else ""
+            values = [headline_cell(m[run], k, kind) for _, k, kind, _ in cols]
+            if latency:
+                values += headline_latency(run)
+            if not any(values):  # a row with no number in this table (left out, named below)
+                empty.append(run)
+                continue
+            lines.append("| " + " | ".join([f"`{run}`", what + fmt, *values]) + " |")
+        for label, pair in FLOOR_ROWS:
+            if rows is SUMMARY and pair != SFT_SEED_PAIR:
+                continue
+            cells = [
+                "",
+                f"*{label}*",
+                *(headline_floor(m, pair, k, kind, x, sizes) for _, k, kind, x in cols),
+            ]
+            if latency:
+                cells += ["", "", ""]
+            lines.append("| " + " | ".join(cells) + " |")
+        if empty:
+            lines.append(f"\nNo numbers in this table: {', '.join(f'`{r}`' for r in empty)}.")
+        return "\n".join(lines)
+
+    blocks = {
+        name: table(HEADLINE_ROWS, cols, name == "headline-general")
+        for name, cols in HEADLINE.items()
+    }
+    blocks["headline-summary"] = table(SUMMARY, SUMMARY_COLS, False)
+    return blocks
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
@@ -2471,6 +2640,7 @@ def main() -> None:
             "stage6-tables": md6,
             "results-table": results_table(),
             "serving-table": serving_table(),
+            **headline_tables(),
         }
         for name, block in blocks.items():
             if block:

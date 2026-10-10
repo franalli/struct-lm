@@ -10,8 +10,8 @@ saved generations. The earlier tables are frozen:
   the 130-item set.
 
 Stage 2 rows are base models, scored without `--chat`; Instruct and the SFT rows are chat models,
-scored with it. `qa_term` covers 38 items (2.6 points each), so read it as counts (Stage 3's
-section gives them).
+scored with it. `qa_term` covers 38 items (2.6 points each), so read it as counts
+([Stage 3](stage3.md) gives them).
 
 **Reading the closed-book numbers.** The `qa_*` and `gold_lp` columns ask for facts from specific
 pages of the manuals (a value, a document or article number, a term) with no retrieval and no
@@ -71,27 +71,27 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 
 **Closed-book knowledge: no retrieval, no passage in the prompt; questions about facts on specific pages of the manuals (gold_lp: nats per answer, higher is better)**
 
-| run | gold_lp | gold_lp_seen | gold_lp_unseen | qa_acc (lenient) | qa_num (lenient) | qa_ident (lenient) | qa_term (lenient) | qa_seen (lenient) | qa_unseen (lenient) | qa_acc (strict) | qa_seen (strict) | qa_unseen (strict) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| base-8b-hf | -6.770 | -6.722 | -6.822 | 0.121 | 0.145 | 0.078 | 0.053 | 0.126 | 0.116 | 0.121 | 0.126 | 0.116 |
-| instruct-8b | -8.284 | -8.008 | -8.581 | 0.099 | 0.127 | 0.031 | 0.053 | 0.114 | 0.084 | 0.096 | 0.114 | 0.077 |
-| cpt-8b | -6.184 | -6.237 | -6.128 | 0.146 | 0.168 | 0.125 | 0.053 | 0.156 | 0.136 | 0.146 | 0.156 | 0.136 |
-| cpt-8b-seed1 | -6.192 | -6.236 | -6.145 | 0.130 | 0.145 | 0.125 | 0.053 | 0.132 | 0.129 | 0.130 | 0.132 | 0.129 |
-| cpt-8b-replay10 | -6.260 | -6.356 | -6.157 | 0.130 | 0.145 | 0.125 | 0.053 | 0.150 | 0.110 | 0.130 | 0.150 | 0.110 |
-| mistral-large-3 |  |  |  | 0.280 | 0.245 | 0.453 | 0.184 | 0.275 | 0.284 | 0.261 | 0.264 | 0.258 |
-| sft-from-base | -6.069 | -5.409 | -6.780 | 0.180 | 0.227 | 0.125 | 0.000 | 0.245 | 0.110 | 0.165 | 0.239 | 0.084 |
-| sft-from-cpt-seed1 | -5.497 | -4.873 | -6.168 | 0.202 | 0.209 | 0.234 | 0.105 | 0.270 | 0.129 | 0.186 | 0.258 | 0.110 |
-| sft-from-cpt | -5.749 | -5.120 | -6.426 | 0.211 | 0.245 | 0.203 | 0.026 | 0.281 | 0.136 | 0.205 | 0.287 | 0.116 |
-| sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 | 0.158 | 0.234 | 0.077 |
-| dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 | 0.202 | 0.287 | 0.110 |
-| dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 | 0.214 | 0.305 | 0.116 |
-| dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 | 0.196 | 0.258 | 0.129 |
-| dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 | 0.211 | 0.305 | 0.110 |
-| grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 | 0.202 | 0.299 | 0.097 |
-| grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 | 0.199 | 0.287 | 0.103 |
-| dpo-strict-fp8 | -5.898 | -5.141 | -6.715 | 0.208 | 0.241 | 0.172 | 0.079 | 0.293 | 0.116 | 0.199 | 0.293 | 0.097 |
-| dpo-strict-fp8kv | -5.957 | -5.194 | -6.780 | 0.202 | 0.236 | 0.172 | 0.053 | 0.264 | 0.136 | 0.193 | 0.264 | 0.116 |
-| dpo-strict-w4a16 | -6.211 | -5.421 | -7.061 | 0.183 | 0.223 | 0.109 | 0.079 | 0.270 | 0.090 | 0.183 | 0.275 | 0.084 |
+| run | gold_lp | gold_lp_seen | gold_lp_unseen | qa_acc (lenient) | qa_num (lenient) | qa_ident (lenient) | qa_term (lenient) | qa_seen (lenient) | qa_unseen (lenient) | qa_acc (strict) | qa_num (strict) | qa_ident (strict) | qa_term (strict) | qa_seen (strict) | qa_unseen (strict) | gold_lp answer | gold_lp answer seen | gold_lp answer unseen | gold_lp end | gold_lp end seen | gold_lp end unseen |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base-8b-hf | -6.770 | -6.722 | -6.822 | 0.121 | 0.145 | 0.078 | 0.053 | 0.126 | 0.116 | 0.121 | 0.145 | 0.078 | 0.054 | 0.126 | 0.116 | -6.324 | -6.278 | -6.356 | -0.453 | -0.444 | -0.466 |
+| instruct-8b | -8.284 | -8.008 | -8.581 | 0.099 | 0.127 | 0.031 | 0.053 | 0.114 | 0.084 | 0.096 | 0.123 | 0.031 | 0.054 | 0.114 | 0.077 | -7.496 | -7.313 | -7.709 | -0.775 | -0.695 | -0.872 |
+| cpt-8b | -6.184 | -6.237 | -6.128 | 0.146 | 0.168 | 0.125 | 0.053 | 0.156 | 0.136 | 0.146 | 0.168 | 0.125 | 0.054 | 0.156 | 0.136 | -5.764 | -5.838 | -5.677 | -0.422 | -0.399 | -0.450 |
+| cpt-8b-seed1 | -6.192 | -6.236 | -6.145 | 0.130 | 0.145 | 0.125 | 0.053 | 0.132 | 0.129 | 0.130 | 0.145 | 0.125 | 0.054 | 0.132 | 0.129 | -5.773 | -5.838 | -5.697 | -0.420 | -0.397 | -0.447 |
+| cpt-8b-replay10 | -6.260 | -6.356 | -6.157 | 0.130 | 0.145 | 0.125 | 0.053 | 0.150 | 0.110 | 0.130 | 0.145 | 0.125 | 0.054 | 0.150 | 0.110 | -5.821 | -5.931 | -5.697 | -0.440 | -0.425 | -0.460 |
+| mistral-large-3 |  |  |  | 0.280 | 0.245 | 0.453 | 0.184 | 0.275 | 0.284 | 0.261 | 0.232 | 0.406 | 0.189 | 0.264 | 0.258 |  |  |  |  |  |  |
+| sft-from-base | -6.069 | -5.409 | -6.780 | 0.180 | 0.227 | 0.125 | 0.000 | 0.245 | 0.110 | 0.165 | 0.209 | 0.109 | 0.000 | 0.239 | 0.084 | -5.562 | -4.973 | -6.197 | -0.507 | -0.436 | -0.583 |
+| sft-from-cpt-seed1 | -5.497 | -4.873 | -6.168 | 0.202 | 0.209 | 0.234 | 0.105 | 0.270 | 0.129 | 0.186 | 0.186 | 0.234 | 0.108 | 0.258 | 0.110 | -5.083 | -4.524 | -5.684 | -0.414 | -0.349 | -0.484 |
+| sft-from-cpt | -5.749 | -5.120 | -6.426 | 0.211 | 0.245 | 0.203 | 0.026 | 0.281 | 0.136 | 0.205 | 0.236 | 0.203 | 0.027 | 0.287 | 0.116 | -5.273 | -4.697 | -5.895 | -0.475 | -0.423 | -0.531 |
+| sft-from-base-seed1 | -5.967 | -5.249 | -6.741 | 0.168 | 0.196 | 0.141 | 0.053 | 0.234 | 0.097 | 0.158 | 0.182 | 0.141 | 0.054 | 0.234 | 0.077 | -5.509 | -4.869 | -6.199 | -0.458 | -0.380 | -0.542 |
+| dpo-seed1 | -5.935 | -5.196 | -6.731 | 0.211 | 0.250 | 0.172 | 0.053 | 0.287 | 0.129 | 0.202 | 0.236 | 0.172 | 0.054 | 0.287 | 0.110 | -5.538 | -4.848 | -6.282 | -0.397 | -0.348 | -0.449 |
+| dpo | -5.745 | -5.003 | -6.544 | 0.227 | 0.264 | 0.203 | 0.053 | 0.311 | 0.136 | 0.214 | 0.245 | 0.203 | 0.054 | 0.305 | 0.116 | -5.406 | -4.705 | -6.161 | -0.339 | -0.298 | -0.383 |
+| dpo-2ep | -9.376 | -8.012 | -10.845 | 0.199 | 0.236 | 0.141 | 0.079 | 0.264 | 0.129 | 0.196 | 0.232 | 0.141 | 0.081 | 0.258 | 0.129 | -9.142 | -7.816 | -10.570 | -0.234 | -0.196 | -0.276 |
+| dpo-strict | -5.883 | -5.130 | -6.695 | 0.217 | 0.255 | 0.188 | 0.053 | 0.299 | 0.129 | 0.211 | 0.245 | 0.188 | 0.054 | 0.305 | 0.110 | -5.516 | -4.811 | -6.274 | -0.368 | -0.319 | -0.421 |
+| grpo | -6.829 | -5.784 | -7.956 | 0.205 | 0.227 | 0.203 | 0.079 | 0.293 | 0.110 | 0.202 | 0.223 | 0.203 | 0.081 | 0.299 | 0.097 | -6.491 | -5.517 | -7.541 | -0.338 | -0.267 | -0.415 |
+| grpo-seed1 | -6.917 | -5.819 | -8.101 | 0.199 | 0.223 | 0.188 | 0.079 | 0.281 | 0.110 | 0.199 | 0.223 | 0.188 | 0.081 | 0.287 | 0.103 | -6.543 | -5.519 | -7.647 | -0.374 | -0.299 | -0.454 |
+| dpo-strict-fp8 | -5.898 | -5.141 | -6.715 | 0.208 | 0.241 | 0.172 | 0.079 | 0.293 | 0.116 | 0.199 | 0.227 | 0.172 | 0.081 | 0.293 | 0.097 | -5.519 | -4.818 | -6.274 | -0.380 | -0.323 | -0.441 |
+| dpo-strict-fp8kv | -5.957 | -5.194 | -6.780 | 0.202 | 0.236 | 0.172 | 0.053 | 0.264 | 0.136 | 0.193 | 0.223 | 0.172 | 0.054 | 0.264 | 0.116 | -5.571 | -4.867 | -6.330 | -0.386 | -0.327 | -0.450 |
+| dpo-strict-w4a16 | -6.211 | -5.421 | -7.061 | 0.183 | 0.223 | 0.109 | 0.079 | 0.270 | 0.090 | 0.183 | 0.223 | 0.109 | 0.081 | 0.275 | 0.084 | -5.879 | -5.118 | -6.699 | -0.332 | -0.304 | -0.362 |
 
 **With the passages: grounded answers and citations (4 passages given), abstention when the passages lack the answer (halluc_rate, lower is better), and definitions**
 
@@ -149,7 +149,11 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
 - **Gold answers:** closed-book gold answers to facts from the documents it read became about 1.8x
   more probable (`gold_lp` +0.59 nats per answer, +0.56 of it in the answer tokens), which SFT can
   build on.
-- **Why `cpt-8b-replay10` goes forward:** LoRA with replay costs almost nothing in forgetting.
+- **Why `cpt-8b-replay10` goes forward:** ablation A's rule adopted replay on MMLU +0.2 against a
+  0.1 seed floor, which is noise (MMLU's own SE is 0.34). Its general-perplexity gain (−2.24%) is
+  in-distribution, since the general val is FineWeb-Edu, the replay's source, and it cost
+  grounded_acc −6.5 against a 3.7 floor. Kept: cheap, and matching the main run elsewhere.
+  *(Corrected 2026-10-10: this read "LoRA with replay costs almost nothing in forgetting".)*
 
 **Stage 3 (SFT):**
 - **Holds:**
@@ -227,8 +231,10 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
   - years within 2%, by the hack audit.
   - Only the last was learned, on one task.
 - **Going forward:** `stage5-final` stays `dpo-strict`.
-  - CPT and SFT delivered; DPO and GRPO at this scale did not clear the floor on the primary lines,
-    and the pre-registered rules rejected both.
+  - CPT and SFT delivered; DPO and GRPO at this scale did not clear the floor on the primary lines.
+    GRPO's checkpoint was set aside; DPO's carried forward as the SFT model within noise.
+    *(Corrected 2026-10-10: this read "the pre-registered rules rejected both"; no rule set
+    DPO's checkpoint aside.)*
   - Both sharpened sampled accuracy by about 3 points from their own starts; DPO did so at
     a small calibration cost (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 /
     1.32).

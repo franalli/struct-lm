@@ -13,7 +13,10 @@ blame, and the judge's failure, which is why every pair carries a verifier or ru
   - seen pass@1 +3.1 points [+1.0, +5.5] for `dpo` and `dpo-seed1`, and +3.5 [+1.2, +6.0] for
     `dpo-strict`;
   - pass@8 flat (−3.0, inside the noise).
-- DPO sharpened sampled accuracy at almost no cost to the gold answer's log-probability.
+- DPO sharpened sampled accuracy at a small calibration cost: `dpo-strict`'s gold-answer tokens
+  fell 0.11 nats seen (inside the floor) and 0.38 unseen (beyond its 0.210 floor), while the end
+  token rose about 0.10, which the composite netted out. *(Corrected 2026-10-10: this line read
+  "almost no cost", written before `gold_lp` was split, `notes/decisions.md` 2026-10-09.)*
 
 **Amended 2026-10-09: 79 of the 458 closed-book chosen labels were wrong.** The audit was made when
 the closed-book verifier was about to become Stage 5's reward. Retrained on strict labels

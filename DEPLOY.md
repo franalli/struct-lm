@@ -1,7 +1,7 @@
 # Deploying struct-lm
 
 The served model is `stage5-final` = `checkpoints/dpo-strict`: Ministral 3 8B after CPT, SFT and
-DPO on verifiable preferences (README, Stages 2-5), served text-only. The quality gate, benchmark
+DPO on verifiable preferences ([`docs/`](docs/), Stages 2-5), served text-only. The quality gate, benchmark
 and cost lines are Stage 6's (`notes/decisions.md`, 2026-10-09, pre-registered before any
 quantized checkpoint existed). Every latency number here was measured on one H100 80GB HBM3 (SXM),
 pinned with Modal's `gpu="H100!"` and checked at runtime.

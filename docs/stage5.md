@@ -17,7 +17,9 @@
 - **Serving is greedy, so GRPO's only gain is one serving doesn't use.** That gain is sampled
   accuracy at T 0.7, and it cost calibration on every fact.
 - **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not clear the
-  floor on the primary lines, and the pre-registered rules rejected both.
+  floor on the primary lines. GRPO's checkpoint was set aside; DPO's carried forward as the SFT
+  model within noise. *(Corrected 2026-10-10: this read "the pre-registered rules rejected
+  both"; no rule set DPO's checkpoint aside.)*
   - Both sharpened sampled accuracy by about 3 points. DPO did so at a small calibration cost (0.11
     / 0.38 nats on the answer tokens), GRPO at a large one (0.71 / 1.32).
   - The chain ends on `dpo-strict`, which is the SFT model within noise.

@@ -189,7 +189,7 @@ def generate(
         for it, o in zip(batch, outs):
             it["output"] = o.outputs[0].text
             # "stop" (EOS or a stop string) or "length" (hit max_tokens): whether the model ends
-            # its answers, which Stage 2's CPT weakened (README, Serving)
+            # its answers, which Stage 2's CPT weakened (docs/stage6.md)
             it["finish_reason"] = o.outputs[0].finish_reason
             if chat and task in CHAT_GEN:  # no "\n" stop was used: keep the answer line only
                 it["raw_output"], it["output"] = it["output"], answer_line(it["output"])

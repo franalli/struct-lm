@@ -79,3 +79,18 @@ def test_links_resolve():
                 elif anchor and dest.suffix == ".md" and anchor not in slugs(dest):
                     bad.append(f"{f.name}: {target} (no heading)")
     assert not bad, "\n".join(bad)
+
+
+def test_headline_tables_share_rows_and_floors():
+    """README part 3: the three tables list their runs in one order (HEADLINE_ROWS', with rows
+    that have no number in a table left out), and each carries both format groups' floor rows."""
+    text = (REPO / "README.md").read_text()
+    order = None
+    for name in ("headline-knowledge", "headline-behaviour", "headline-general"):
+        block = text.split(f"<!-- {name}:start -->")[1].split(f"<!-- {name}:end -->")[0]
+        runs = re.findall(r"^\| `([^`]+)` \|", block, re.MULTILINE)
+        floors = re.findall(r"^\|  \| \*floor, ([a-z-]+) rows", block, re.MULTILINE)
+        assert floors == ["base-format", "chat"], name
+        order = order or runs
+        assert [r for r in order if r in runs] == [r for r in runs if r in order], name
+        assert runs[0] == "base-8b-hf", name

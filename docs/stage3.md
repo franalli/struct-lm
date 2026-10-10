@@ -216,8 +216,12 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
      about 2.5x Instruct (strict: 28.7% against 11.4%). It matches Mistral Large 3's 26.3% on the
      same items (lenient: 28.1% against 27.5%). These are facts that were in the training set, and
      Large 3 never saw them.
-   - **Unseen half:** 11.6% against Instruct's 7.7% (strict; lenient 13.5% against 8.4%) sits inside
-     the noise floor. Every unseen identifier it gets right, its CPT start already had.
+   - **Unseen half:** 11.6% against Instruct's 7.7% (strict, 18 against 12 of 155; lenient 13.5%
+     against 8.4%). The +3.9 points clear the Stage 3 floor (2.6), but the paired item-bootstrap
+     95% CI, [−1.3, +9.0], includes 0, and the untrained `base-8b-hf` also gets 18 of 155. The lead
+     is Instruct's deficit, not something training added. Every unseen identifier it gets right,
+     its CPT start already had. *(Corrected 2026-10-10: this line read "sits inside the noise
+     floor" and named no test.)*
 2. **Replay carried the gradient.**
    - 500 general Tulu 3 answers are 20% of the records, but their long completions are 75% of the
      token-weighted loss. The closed-book and definition records the seen half measures are 9%.
