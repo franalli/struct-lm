@@ -13,7 +13,8 @@ checks, is `docs/stageN.md`, linked in [part 2](#2-lifecycle).
 ## 1. Summary
 
 **The answer.** With the passages in the prompt, stock Ministral 3 8B Instruct was already about as
-accurate as any model tuned here (89.8% grounded against 90.7% after SFT, inside the noise). What
+accurate as the shipped models (grounded, judge-scored: 89.8% against 90.7% after SFT and 92.6%
+served, neither beyond the floor; single other runs reach 93.5%). What
 fine-tuning bought is behaviour and the facts it trained on: every answer cites only the passages
 it was given, in the required format (100% against Instruct's 83.3%), it refuses no answerable
 question (Instruct refuses 7.4%), and closed-book recall of the facts SFT trained on rose to 28.7%
