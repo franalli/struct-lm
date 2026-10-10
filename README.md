@@ -233,6 +233,10 @@ the Stage 0 `base-8b` row are in [`docs/results.md`](docs/results.md).
 
 ## 5. What changes at Forge scale
 
+Forge's announcement names the same stages in its own words: pre-training on internal data
+(continued pre-training, CPT, here), post-training with SFT and DPO, and reinforcement learning,
+measured by KPI-aligned evaluation and regression suites.
+
 | | This repo, measured | [Forge](https://mistral.ai/news/forge/), as announced (17 March 2026) |
 |---|---|---|
 | Data | 246 public PDFs, 20.6M tokens after cleaning and deduplication | "large volumes of internal documentation, codebases, structured data, and operational records" |

@@ -100,16 +100,24 @@ set -a; . ./.env; set +a
 - If the output reports `judge_failed` (Mistral 429s), rerun the same command: failed verdicts
   aren't cached, and cached ones are free.
 - Never delete `results/judge_cache.jsonl`. Editing a rubric re-judges everything it grades.
-- **Then update the README's figures and tables every time new results land:** rerun the stage's
-  report (Stage 2: `train/report.py` -> `results/curves/cpt.png`, `cpt_ppl.png`,
-  `results/train_runs.md`), which overwrites the plots in place and rewrites the README's generated
-  blocks (`<!-- stage2-tables:... -->` in Training, `<!-- results-table:... -->` in Results,
-  `<!-- serving-table:... -->` in Serving: never edit inside them by hand). Embed any new figure in the README's write-up and update the prose
-  findings next to it. Every stage shows its train/val loss curves and its headline metric
-  (perplexity for CPT) as plots, not only tables.
+- **Then update the write-up's figures and tables every time new results land:** rerun
+  `train/report.py` (`make report`). It overwrites the plots in `results/curves/` and
+  `results/train_runs.md`, and rewrites every generated block where `report.BLOCK_FILES` puts it:
+  the README's `headline-*` tables, each stage's `<!-- stageN-tables -->` in `docs/stageN.md`,
+  `results-table` in `docs/results.md`, `serving-table` in `docs/stage6.md`, and DEPLOY.md's
+  `deploy-*`. Never edit inside a block by hand; a missing marker stops the report. Embed any new
+  figure in its stage doc and update the prose findings next to it. Every stage shows its
+  train/val loss curves and its headline metric (perplexity for CPT) as plots, not only tables.
+- **The README** (Stage 7) holds seven parts in under 3,000 prose words; the stage write-ups live
+  in `docs/`. Every number in its prose must trace: `make audit` (`train/readme_audit.py`) passes
+  a number with 3+ significant digits found in a generated block, anything else only through a row
+  of `notes/readme_numbers.tsv` naming a file that contains it. Add the row when you add the
+  number.
+- **`make reproduce-score`** checks every committed number with no GPU and no API key:
+  `eval/rescore_all.py` rescores each `results/table.md` row in `results/_rescore/` and compares,
+  then the strict checker, pass@k and the report rerun, and `git diff` must be clean.
 
-Smoke test: `--which kpi --limit 5 --no-judge`. Don't use `make eval`: that target is stale (it
-passes flags `run_eval.py` doesn't have).
+Smoke test: `--which kpi --limit 5 --no-judge`.
 
 ### Stage 2: CPT (Modal)
 
@@ -199,7 +207,7 @@ $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name 
 # pull runs/<run>, ppl, lm_eval, bench; score with --chat --ppl-dir results/ppl; then
 .venv/bin/python eval/diversity.py score dpo
 .venv/bin/python eval/winrate.py dpo sft-from-cpt                 # reported only (the judge failed its benchmark)
-.venv/bin/python train/report.py                                  # dpo.png, the Stage 4 read table, README blocks
+.venv/bin/python train/report.py                                  # dpo.png, the Stage 4 read table, the docs' blocks
 # dpo-strict (2026-10-09): closed-book labels by scorers.qa_strict -> data/dpo/strict/ (463 pairs:
 # dpo_pairs.py exits 1 under the 500 floor, overridden for this rerun only)
 make dpo-pairs-strict
@@ -254,7 +262,7 @@ $M run --detach eval/modal_app.py --which sample --model /vol/checkpoints/<row> 
 .venv/bin/python eval/qa_strict.py                                # strict closed-book column for every table row
 .venv/bin/python eval/passk.py grpo grpo-seed1                    # pass@1 / maj@8 / pass@8 -> results/passk/
 .venv/bin/python data/scripts/grpo_audit.py grpo                  # the 50 top-reward rollouts, rule flags; read, verdicts only
-.venv/bin/python train/report.py                                  # grpo.png, passk.png, the Stage 5 tables, README blocks
+.venv/bin/python train/report.py                                  # grpo.png, passk.png, the Stage 5 tables, the docs' blocks
 ```
 
 - **The reward** (`train/grpo_rewards.py`): format 0.1 (a gate), correctness 0.9 (closed-book by
@@ -292,7 +300,7 @@ for v in fp8 w4a16; do for f in config.json quantize_meta.json; do
 set -a; . ./.env; set +a
 .venv/bin/python eval/run_eval.py --run-name dpo-strict-fp8 --rescore --chat --model /vol/checkpoints/dpo-strict-fp8
 .venv/bin/python eval/qa_strict.py && .venv/bin/python -m pytest tests/test_serve.py tests/test_template.py
-.venv/bin/python train/report.py          # the Stage 6 tables, serve_latency.png, serve_load.png, README blocks
+.venv/bin/python train/report.py          # the Stage 6 tables, serve_latency.png, serve_load.png, the docs' blocks
 ```
 
 - **The bench runs on `gpu="H100!"`** (a plain "H100" may run on an H200) and aborts on any other
