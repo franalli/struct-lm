@@ -72,3 +72,26 @@ def test_diagram_numbers_are_checked(tmp_path):
         {"number": "445", "context": "445 train", "source": "x"},
     ]
     assert readme_audit.check("stage9.json", lines, [], rows) == []
+
+
+# Disclosures earlier reviews added on purpose; an edit for length must not drop them.
+CAVEATS = [
+    "in a line added after the fact",  # DPO's pass@1 line was post hoc
+    "the mean of its two seeds",  # GRPO's figures are two-seed means
+    "1 df per arm",  # two seeds per arm
+    "grew from 130 to 322 items after Stage 2",  # the eval changed after a read
+    "includes 0",  # the unseen SFT-vs-Instruct CI
+    "the untrained base also scores",  # the unseen lead is the base's too
+    "the highest open-loop rate measured",  # 16 req/s is not a measured limit
+    "Single-seed rows are read against the same floor",
+    "rewritten after it fired",  # the entropy stop rule was post hoc
+    "only after Stage 4's read",  # the two-arm floor change was post hoc
+    "are fixtures and are never trained on",  # rule 13
+    "commits before `653f932` still hold the text",  # the Tülu history
+]
+
+
+def test_readme_keeps_its_caveats():
+    text = " ".join((REPO / "README.md").read_text().split())  # line wrapping doesn't matter
+    missing = [c for c in CAVEATS if c not in text]
+    assert not missing, missing
