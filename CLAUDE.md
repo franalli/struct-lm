@@ -113,7 +113,9 @@ set -a; . ./.env; set +a
 - **The README** (Stage 7) holds seven parts in under 3,000 prose words; the stage write-ups live
   in `docs/`. Every number in its prose must trace: `make audit` (`train/readme_audit.py`) passes
   a number with 3+ significant digits found in a generated block, anything else only through a row
-  of `notes/readme_numbers.tsv` naming a file that contains it. The stage diagrams' labels
+  of `notes/readme_numbers.tsv` naming a file that contains it. That file must be data (`results/`,
+  the data sets, `eval/tasks/`, often via `eval/summary_stats.py`), code or a config, or the
+  decision log for a registered rule or a reading ruling; never the docs, this file or DEPLOY.md. The stage diagrams' labels
   (`docs/diagrams/src/*.json`) are checked the same way, with rows whose `in` column names the
   diagram. Add the row when you add the number.
 - **`make reproduce-score`** checks every committed number with no GPU and no API key:

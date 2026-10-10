@@ -3,7 +3,7 @@
 > Independent project, using only public documents, open weights and open-source tools. Forge is
 > described from Mistral AI's public announcement.
 
-The post-training lifecycle a Forge engagement runs, at roughly 1% scale (part 5): Ministral 3 8B Base
+The post-training lifecycle a Forge engagement runs, at small scale (part 5): Ministral 3 8B Base
 adapted to US federal structural-engineering documents by continued pre-training (CPT), SFT, DPO and
 GRPO, then quantized behind a pre-registered quality gate and served with vLLM on one H100.
 
@@ -290,8 +290,8 @@ What the small version surfaced that gets harder at full scale:
 6. **INT4 failed its gate** (part 4). Its calibration used 512 domain records only, which may be
    the cause.
 7. **FP8 doubles first-token time at low load** (17.9 to 35.2 ms p50), still unexplained.
-8. **Prefix caching cut grounded first-token time by 29%,** not the half predicted. Only the
-   prompt-length part of first-token time is cacheable, and that is 40% on FP8.
+8. **Prefix caching cut grounded first-token time by 28.5%,** not the half predicted. Only the
+   prompt-length part of first-token time is cacheable, and on FP8 that is about two fifths.
 9. **lm-eval has sent no BOS since Stage 0.** Rows still compare with each other: GSM8K with one BOS
    scored the same 1,067 of 1,319 on `dpo-strict`.
 10. **The licence audit ran after training,** so the weights can't be published ([Weights](#weights)).
@@ -341,7 +341,8 @@ dataset hashes.
 - **Checking the numbers needs no GPU and no API key:**
   - `make reproduce-score` rescores every row from the committed generations and judge verdicts,
     and regenerates every table and figure.
-  - `make audit` traces every number in this README and the stage diagrams to a file.
+  - `make audit` traces every number in this README and the stage diagrams to a results or data
+    file, a config or the code, or, for a registered rule or a reading ruling, the decision log.
 
 ## Who wrote the data, licences, weights
 

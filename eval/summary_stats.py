@@ -284,6 +284,81 @@ def main() -> None:
         s["task"] == "adversarial" and s["abstained"] == 1 for s in fp8
     )
 
+    # the eval's size, and the rest of the README's computed lines
+    tasks = {
+        f: count(f"eval/tasks/{f}.jsonl") for f in ("domain_qa", "grounded", "vocab", "adversarial")
+    }
+    res["eval"] = {"docs": count("eval/tasks/eval_docs.txt"), "items": sum(tasks.values()), **tasks}
+    for halves_ in res["against_instruct"].values():
+        for v in halves_.values():
+            v["pct"] = [100 * c / v["n"] for c in v["correct"]]
+    ev = json.loads((REPO / "results/qa_strict/evals.json").read_text())
+    shift = {r: 100 * (v["qa_acc"] - v["qa_strict"]) for r, v in ev.items() if not v.get("partial")}
+    res["strict_rescore_shift_pt"] = {
+        "max_8b": max(v for r, v in shift.items() if r != "mistral-large-3"),
+        "mistral_large_3": shift["mistral-large-3"],
+    }
+    dp = json.loads((REPO / "results/qa_strict/dpo_pairs.json").read_text())
+    res["licence_audit"]["dpo_labels_failing_strict_pct"] = (
+        100 * dp["chosen_wrong_total"] / dp["pairs"]
+    )
+
+    # calibration on the gold answer's tokens, seen half: DPO from its start, GRPO's two seeds from theirs
+    res["calibration_seen_nats"] = {
+        "dpo_strict_vs_sft_from_cpt": ans("dpo-strict", "seen") - ans("sft-from-cpt", "seen"),
+        "grpo_pair_vs_dpo_strict": statistics.fmean(ans(r, "seen") for r in ("grpo", "grpo-seed1"))
+        - ans("dpo-strict", "seen"),
+    }
+
+    # ablation A's MMLU reading as the rule applied it (three-decimal accuracies), and MMLU's SE
+    def mmlu(run: str) -> tuple[float, float]:
+        f = max((REPO / "results/lm_eval" / run).glob("**/results*.json"))
+        m = json.loads(f.read_text())["results"]["mmlu"]
+        return m["acc,none"], m["acc_stderr,none"]
+
+    acc = {r: round(mmlu(r)[0], 3) for r in ("cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10")}
+    res["replay_rule_mmlu_pt"] = {
+        "replay_minus_main": 100 * (acc["cpt-8b-replay10"] - acc["cpt-8b"]),
+        "seed_floor": 100 * abs(acc["cpt-8b"] - acc["cpt-8b-seed1"]),
+        "mmlu_se": 100 * mmlu("cpt-8b")[1],
+        "replay_tokens_pct_of_train": 100 * s["replay"]["tokens"] / s["split"]["train"]["tokens"],
+    }
+
+    # GSM8K with one BOS (the Stage 6 gate) against the frozen no-BOS row, as correct counts
+    def gsm8k(path: Path) -> tuple[int, int]:
+        r = json.loads(path.read_text())
+        n = r["n-samples"]["gsm8k"]["effective"] if "n-samples" in r else 1319
+        return round(r["results"]["gsm8k"]["exact_match,strict-match"] * n), n
+
+    gate = max((REPO / "results/serve/gate/lm_eval/dpo-strict").glob("results_*.json"))
+    frozen = max((REPO / "results/lm_eval/dpo-strict").glob("**/results*.json"))
+    res["gsm8k_bos"] = {"one_bos": gsm8k(gate), "no_bos": gsm8k(frozen)}
+
+    # Stage 6 bench: FP8 against bf16 at 64 concurrent; the prefix cache; FP8's cacheable share
+    def bench(variant: str, name: str, key: str) -> float:
+        reps = sorted((REPO / "results/serve/bench" / variant).glob(f"{name}-rep*.json"))
+        return statistics.fmean(json.loads(f.read_text())[key] for f in reps)
+
+    res["serving"] = {
+        "fp8_vs_bf16_c64_req_per_s_pct": 100
+        * (
+            bench("fp8", "c64", "request_throughput") / bench("bf16", "c64", "request_throughput")
+            - 1
+        ),
+        "prefix_cache_ttft_cut_pct": 100
+        * (
+            1
+            - bench("fp8", "grounded-rag-c8", "median_ttft_ms")
+            / bench("fp8", "grounded-unique-c8", "median_ttft_ms")
+        ),
+        "fp8_prompt_length_share_of_ttft_pct": 100
+        * (
+            1
+            - bench("fp8", "closedbook-c1", "median_ttft_ms")
+            / bench("fp8", "grounded-unique-c1", "median_ttft_ms")
+        ),
+    }
+
     OUT.write_text(json.dumps(res, indent=2) + "\n")
     print(f"-> {OUT.relative_to(REPO)}")
 

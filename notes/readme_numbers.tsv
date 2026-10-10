@@ -1,8 +1,7 @@
 number	context	source	in
-1%	roughly 1% scale	docs/stage0.md	README.md
 246	trained on 246	results/summary_stats.json	README.md
 20.6M	(20.6M tokens)	results/summary_stats.json	README.md
-716	716-item eval	CLAUDE.md	README.md
+716	716-item eval	results/summary_stats.json	README.md
 155	the 155 facts	results/summary_stats.json	README.md
 0.41	0.41 nats more probable	results/train_runs.md	README.md
 +0.23	+0.23 to +0.60	results/train_runs.md	README.md
@@ -10,65 +9,62 @@ number	context	source	in
 167	the 167 facts	results/summary_stats.json	README.md
 +10.8	CI +10.8	results/summary_stats.json	README.md
 +24.6	+10.8 to +24.6	results/summary_stats.json	README.md
-7.7%	against 7.7%	docs/stage3.md	README.md
+7.7%	against 7.7%	results/summary_stats.json	README.md
 0.38	DPO 0.38 nats	results/train_runs.md	README.md
 1.32	GRPO 1.32	results/train_runs.md	README.md
-16	up to 16 req/s	DEPLOY.md	README.md
+16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	README.md
 $0.035	$0.035 per	results/train_runs.md	README.md
-1,000	per 1,000 requests	docs/stage6.md	README.md
 $0.127	against $0.127	results/train_runs.md	README.md
-10%	10% general replay	docs/stage2.md	README.md
-+0.2	MMLU +0.2	notes/decisions.md	README.md
-0.1	against a 0.1 seed floor	notes/decisions.md	README.md
-0.34	own 0.34	notes/decisions.md	README.md
+10%	10% general replay	results/summary_stats.json	README.md
++0.2	MMLU +0.2	results/summary_stats.json	README.md
+0.1	against a 0.1 seed floor	results/summary_stats.json	README.md
+0.34	own 0.34	results/summary_stats.json	README.md
 −2.24%	The −2.24% general	results/train_runs.md	README.md
 6.5	fell 6.5 points	results/train_runs.md	README.md
-10%	only 10% more tokens	docs/stage2.md	README.md
+10%	only 10% more tokens	results/summary_stats.json	README.md
 −22%	perplexity −22%	results/train_runs.md	README.md
 −8%	LoRA's −8%	results/train_runs.md	README.md
 +1.19%	perplexity +1.19%	results/train_runs.md	README.md
 +0.40%	against +0.40%	results/train_runs.md	README.md
 −3.0	GSM8K −3.0	results/train_runs.md	README.md
 1.1	a 1.1 floor	results/train_runs.md	README.md
-1.17	from 1.17 to 1.30	docs/stage3.md	README.md
+1.17	from 1.17 to 1.30	results/train_runs.md	README.md
 28%	caught 28% of grounded	results/dpo/judge_bench.json	README.md
 9%	9% of definition	results/dpo/judge_bench.json	README.md
-0.5	a 0.5 line	docs/stage4.md	README.md
-−4.2	(−4.2 against 3.5)	docs/stage6.md	README.md
-3.5	−4.2 against 3.5	docs/stage6.md	README.md
-−6.1	GSM8K −6.1	docs/stage6.md	README.md
+0.5	a 0.5 line	data/scripts/dpo_judge_bench.py	README.md
+−4.2	(−4.2 against 3.5)	results/train_runs.md	README.md
+3.5	−4.2 against 3.5	results/train_runs.md	README.md
+−6.1	GSM8K −6.1	results/train_runs.md	README.md
 2.2	against 2.2	results/train_runs.md	README.md
-22%	serves 22% more	docs/stage6.md	README.md
-64	per second at 64	docs/stage6.md	README.md
+22%	serves 22% more	results/summary_stats.json	README.md
+64	per second at 64	results/serve/bench/fp8/c64-rep0.json	README.md
 246	246 public PDFs	results/summary_stats.json	README.md
 20.6M	20.6M tokens after	results/summary_stats.json	README.md
 54	54 of the 2,516	results/summary_stats.json	README.md
 2,516	of the 2,516	results/summary_stats.json	README.md
 19.4M	19.4M-token train split	results/summary_stats.json	README.md
-10%	+ 10% general replay	docs/stage2.md	README.md
+10%	+ 10% general replay	results/summary_stats.json	README.md
 2,436	SFT on 2,436	results/summary_stats.json	README.md
 1,778	(1,778 teacher-written)	results/summary_stats.json	README.md
 445	DPO on 445	results/summary_stats.json	README.md
 622	622 verifiable tasks	results/summary_stats.json	README.md
-716	a 716-item KPI eval	CLAUDE.md	README.md
+716	a 716-item KPI eval	results/summary_stats.json	README.md
 8.8	8.8 GPU-hours	results/summary_stats.json	README.md
 $35	$35 of training	results/summary_stats.json	README.md
 11%	11% faster per GPU	results/train_runs.md	README.md
 80	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
 458	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
-17%	(17%)	notes/decisions.md	README.md
-79	79 are wrong	docs/stage4.md	README.md
-1.6	0–1.6 points	docs/results.md	README.md
-1.9	Large 3 moved 1.9	docs/results.md	README.md
-2%	within 2%	notes/decisions.md	README.md
+17%	(17%)	results/summary_stats.json	README.md
+79	79 are wrong	notes/decisions.md	README.md
+1.6	0–1.6 points	results/summary_stats.json	README.md
+1.9	Large 3 moved 1.9	results/summary_stats.json	README.md
+2%	within 2%	eval/scorers.py	README.md
 4.8	fell 4.8 points	results/summary_stats.json	README.md
 3.1	fell 3.1 nats	results/summary_stats.json	README.md
 4.4	and 4.4 unseen	results/summary_stats.json	README.md
-512	used 512 domain	docs/stage6.md	README.md
-29%	by 29%	docs/stage6.md	README.md
-40%	40% on FP8	docs/stage6.md	README.md
-1,067	1,067 of 1,319	notes/decisions.md	README.md
-1,319	1,067 of 1,319	notes/decisions.md	README.md
+512	used 512 domain	results/serve/quantize/w4a16/quantize_meta.json	README.md
+1,067	1,067 of 1,319	results/summary_stats.json	README.md
+1,319	1,067 of 1,319	results/summary_stats.json	README.md
 57%	57% of the steps	results/summary_stats.json	README.md
 −20%	−20% perplexity	notes/decisions.md	README.md
 $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
@@ -76,7 +72,6 @@ $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 1,778	415 of the 1,778	results/summary_stats.json	README.md
 500	500 general records	results/summary_stats.json	README.md
 246	246 US federal documents	results/summary_stats.json	README.md
-17	(17 U.S.C.	docs/stage1.md	README.md
 27	§ 105); 27 reproduce	results/summary_stats.json	README.md
 251	the 251 candidates	results/summary_stats.json	README.md
 500	500 replay records	results/summary_stats.json	README.md
@@ -89,10 +84,10 @@ $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 72	(72 in FP8)	results/summary_stats.json	README.md
 246	246 public-domain	results/summary_stats.json	docs/diagrams/src/lifecycle.json
 20.6M	20.6M tokens	results/summary_stats.json	docs/diagrams/src/lifecycle.json
-10%	+ 10% replay	docs/stage2.md	docs/diagrams/src/lifecycle.json
-16	up to 16 req/s	DEPLOY.md	docs/diagrams/src/lifecycle.json
-234	234 training documents	docs/stage0.md	docs/diagrams/src/stage0.json
-716	716 items	CLAUDE.md	docs/diagrams/src/stage0.json
+10%	+ 10% replay	results/summary_stats.json	docs/diagrams/src/lifecycle.json
+16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/lifecycle.json
+234	234 training documents	results/summary_stats.json	docs/diagrams/src/stage0.json
+716	716 items	results/summary_stats.json	docs/diagrams/src/stage0.json
 322	closed-book 322	results/table.md	docs/diagrams/src/stage0.json
 108	grounded 108	results/table.md	docs/diagrams/src/stage0.json
 210	vocabulary 210	results/table.md	docs/diagrams/src/stage0.json
@@ -126,18 +121,18 @@ $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 445	445 train	results/summary_stats.json	docs/diagrams/src/stage4.json
 18	18 val	results/summary_stats.json	docs/diagrams/src/stage4.json
 0.1	β 0.1	train/configs/dpo.yaml	docs/diagrams/src/stage4.json
-1.0	T 1.0	CLAUDE.md	docs/diagrams/src/stage5.json
+1.0	T 1.0	eval/sample.py	docs/diagrams/src/stage5.json
 622	622 train tasks	results/summary_stats.json	docs/diagrams/src/stage5.json
 50	50 val tasks	results/summary_stats.json	docs/diagrams/src/stage5.json
 0.1	format 0.1	train/grpo_rewards.py	docs/diagrams/src/stage5.json
 0.9	correctness 0.9	train/grpo_rewards.py	docs/diagrams/src/stage5.json
 0.28	ε_high 0.28	train/configs/grpo.yaml	docs/diagrams/src/stage5.json
-65	steps 52, 65	docs/stage5.md	docs/diagrams/src/stage5.json
-64	concurrency 1-64	docs/stage6.md	docs/diagrams/src/stage6.json
-16	Poisson 1-16 req/s	docs/stage6.md	docs/diagrams/src/stage6.json
-16	bf16 up to 16 req/s	DEPLOY.md	docs/diagrams/src/stage6.json
-0.71	0.71 nats on seen gold	notes/decisions.md	README.md
-130	from 130 to 322	docs/stage0.md	README.md
+65	steps 52, 65	results/runs/grpo-seed1/train_summary.json	docs/diagrams/src/stage5.json
+64	concurrency 1-64	results/serve/bench/fp8/c64-rep0.json	docs/diagrams/src/stage6.json
+16	Poisson 1-16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
+16	bf16 up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
+0.71	0.71 nats on seen gold	results/summary_stats.json	README.md
+130	from 130 to 322	results/table_v1.md	README.md
 322	from 130 to 322	results/table.md	README.md
 3.2	differs by 3.2	results/summary_stats.json	README.md
 2.6	the 2.6-point floor	results/train_runs.md	README.md
@@ -150,6 +145,7 @@ $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 +1.3	[+1.3, +5.0]	results/train_runs.md	README.md
 +5.0	[+1.3, +5.0]	results/train_runs.md	README.md
 0.21	its 0.21 floor	results/train_runs.md	README.md
-0.11	(0.11 on seen facts	notes/decisions.md	README.md
+0.11	(0.11 on seen facts	results/summary_stats.json	README.md
 3.7	a 3.7 floor	results/train_runs.md	README.md
 0.23%	the 0.23% floor	results/train_runs.md	README.md
+28.5%	by 28.5%	results/summary_stats.json	README.md

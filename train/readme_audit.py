@@ -24,6 +24,7 @@ import argparse
 import csv
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -76,6 +77,8 @@ def numbers(line: str) -> list[tuple[str, float, int, str]]:
             continue
         if SKIP_BEFORE.search(line[: m.start()]) or CONFIDENCE.match(line, m.start()):
             continue
+        if re.search(r"\bper\s*$", line[: m.start()]) or line[m.end() :].startswith(" U.S.C"):
+            continue  # a unit ("per 1,000 requests") or a legal citation
         whole, frac, unit = m.group(1), m.group(2) or "", m.group(3) or ""
         value = float(whole.replace(",", "") + frac)
         if not frac and not unit and value < 10:
@@ -108,6 +111,18 @@ def sidecar() -> list[dict]:
         return []
     with SIDECAR.open() as f:
         return [r for r in csv.DictReader(f, delimiter="\t") if r.get("number")]
+
+
+def source_kind(path: str) -> str:
+    """data (results/, the data sets, eval/tasks/), code (scripts and configs), the decision log
+    (registered rules and reading rulings only), or prose: the docs, CLAUDE.md, DEPLOY.md and the
+    README restate numbers rather than compute them, so no row may point at them."""
+    data = ("results/", "data/processed/", "data/sft/", "data/dpo/", "data/grpo/", "eval/tasks/")
+    if path.startswith(data):
+        return "data"
+    if path.endswith((".py", ".yaml", ".yml")):
+        return "code"
+    return "decision log" if path == "notes/decisions.md" else "prose"
 
 
 DIAGRAMS = REPO / "docs/diagrams/src"  # the stage diagrams' IR (make diagrams renders them)
@@ -153,8 +168,12 @@ def audit(path: Path = README) -> list[str]:
     """The README's prose and every stage diagram's labels, against the sidecar."""
     rows = sidecar()
     problems = []
-    for r in rows:  # every sidecar row's number must be in its source
+    for r in rows:  # every sidecar row's number must be in its source, and the source must be data
         src = REPO / r["source"]
+        if source_kind(r["source"]) == "prose":
+            problems.append(
+                f"{SIDECAR.name}: {r['number']} ({r['context']}) points at prose: {r['source']}"
+            )
         num = numbers(f" {r['number']} ")
         if not src.exists():
             problems.append(f"{SIDECAR.name}: {r['number']}: no file {r['source']}")
@@ -184,9 +203,11 @@ def main() -> None:
         print(word_count())
         return
     problems = audit()
-    print(
-        "\n".join(problems) or "every number in the README and the stage diagrams traces to a file"
+    kinds = Counter(source_kind(r["source"]) for r in sidecar())
+    done = "every number in the README and the stage diagrams traces to a file: " + ", ".join(
+        f"{n} to {k}" for k, n in kinds.most_common()
     )
+    print("\n".join(problems) or done)
     raise SystemExit(1 if problems else 0)
 
 
