@@ -78,7 +78,7 @@ to 23.9% without CPT, and from 15.0% to 28.7% with it.
   when GRPO missed.
 - **What it is:** the SFT model within noise on every primary line, with one cost beyond its
   floor: unseen answer tokens −0.38 nats. So `sft-from-cpt` would serve as well.
-- **[Demo](#demo).**
+- **[Demo](#demo):** a grounded answer with its citation, then a declined unanswerable question.
 
 ## 2. Lifecycle
 
@@ -457,16 +457,20 @@ The replay records by subset, with the licence the mixture's card gives each:
 
 ### Demo
 
-`serve/modal_demo.py` serves `dpo-strict-fp8` on one H100; `serve/demo.py` sends it two eval prompts
-as the eval builds them. Both items are hand-picked: they show the behaviour, the tables the rates.
+![The served FP8 model answers a grounded question with its citation, then declines an unanswerable one](docs/demo.gif)
+
+A live run on 2026-10-10: `serve/demo.py` against the FP8 server (`serve/modal_demo.py`, one H100),
+captured as it streamed and replayed with its real timing by `serve/demo_render.py`. Both answers
+match the FP8 run's saved generations exactly. The two items are hand-picked, so they show the
+behaviour; the tables give the rates.
 - **`gr-0038`:** of the 93 grounded items `dpo-strict` answered correctly with valid,
-  judge-supported citations (92 in the FP8 run), the three with the shortest passages were read.
-  This one was kept for its concrete answer.
+  judge-supported citations (92 in FP8), the three with the shortest passages were read; this one
+  was kept for its concrete answer.
 - **`adv-0050`:** the third-shortest of the 73 unanswerable items it declined (72 in FP8), kept as
   the clearest question out of context.
 
-In both the bf16 and the FP8 run's saved answers:
-- `gr-0038` passes every rule: its one citation is the gold passage, the strict grounded check
+What they pass, in both runs' saved answers:
+- **`gr-0038`** passes every rule. Its one citation is the gold passage, the strict grounded check
   GRPO's reward uses, and the judge marked it correct and supported.
-- `adv-0050` gives the exact abstain sentence.
-- The closed-book strict checker doesn't apply to either.
+- **`adv-0050`** gives the exact abstain sentence.
+- The closed-book strict checker applies to neither.

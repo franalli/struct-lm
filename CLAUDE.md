@@ -306,6 +306,9 @@ set -a; . ./.env; set +a
 .venv/bin/python train/report.py          # the Stage 6 tables, serve_latency.png, serve_load.png, the docs' blocks
 ```
 
+- **The README demo:** `DEMO_API_KEY=... modal serve serve/modal_demo.py` (a GPU launch: ask), then
+  `serve/demo.py` with `DEMO_URL` / `DEMO_API_KEY` in the environment, captured and rendered to
+  `docs/demo.gif` by `serve/demo_render.py`; stop the ephemeral app by id (`modal app stop -y ap-...`).
 - **The bench runs on `gpu="H100!"`** (a plain "H100" may run on an H200) and aborts on any other
   device; every result records GPU, driver, CUDA, vLLM and torch. All variants share one container.
 - **Gate GSM8K goes to `results/serve/gate/lm_eval/`**, never `results/lm_eval/`: it runs with

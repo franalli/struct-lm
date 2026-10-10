@@ -135,5 +135,5 @@ $35	$35 of training	results/summary_stats.json
 27	material 27 of them	results/summary_stats.json
 251	all 251 candidate sources	results/summary_stats.json
 74	FLAN v2's 74 records	results/summary_stats.json
-92	(92 in the FP8 run)	results/summary_stats.json
+92	(92 in FP8)	results/summary_stats.json
 72	(72 in FP8)	results/summary_stats.json
