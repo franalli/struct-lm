@@ -42,11 +42,7 @@ class Judge:
     rescore bursts into the limit and spends its retries on 429s (8 verdicts failed at Stage 0)."""
 
     def __init__(self, cache_path: str | os.PathLike, rpm: int = 30):
-        from mistralai.client import Mistral  # lazy, so --no-judge runs need no API client
-
-        self.client = Mistral(
-            api_key=os.environ["MISTRAL_API_KEY"], timeout_ms=120_000
-        )  # no default timeout: one dead socket hung a run for hours
+        self._client = None  # built on the first cache miss: a fully cached rescore needs no key
         self.cache_path = pathlib.Path(cache_path)
         # key -> verdict. Later lines win if a key repeats (they don't in normal use).
         self.cache: dict[str, dict] = {}
@@ -59,6 +55,16 @@ class Judge:
         self.failures = 0
         self.last_error = ""
         self.interval, self.next_start = 60 / rpm * 1.03, 0.0
+
+    @property
+    def client(self):
+        if self._client is None:
+            from mistralai.client import Mistral  # lazy, so --no-judge runs need no API client
+
+            self._client = Mistral(
+                api_key=os.environ["MISTRAL_API_KEY"], timeout_ms=120_000
+            )  # no default timeout: one dead socket hung a run for hours
+        return self._client
 
     def __call__(self, rubric: str, prompt: str) -> dict | None:
         """Return {"score": 0|1, "reason": str} for one answer, or None if the judge failed.
@@ -76,11 +82,12 @@ class Judge:
         key = hashlib.sha256(json.dumps([JUDGE_MODEL, rubric, prompt]).encode()).hexdigest()
         if key in self.cache:
             return self.cache[key]
+        client = self.client  # outside the retries: a missing key fails at once
         for attempt in range(7):  # backoff totals ~127 s, past a per-minute rate-limit window
             time.sleep(max(0.0, self.next_start - time.monotonic()))
             self.next_start = time.monotonic() + self.interval
             try:
-                r = self.client.chat.complete(
+                r = client.chat.complete(
                     model=JUDGE_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,

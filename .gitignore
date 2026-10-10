@@ -7,6 +7,8 @@ data/interim/
 data/processed/*
 !data/processed/stats.json
 !data/processed/tokenizer_coverage.md
+# the CPT corpus files' hashes, checked against the Modal volume copies (2026-10-10)
+!data/processed/SHA256SUMS
 data/packed/
 # memorisation probe: post-cutoff PDFs (re-fetched from eval/exposure_sources.csv) and docs.jsonl
 data/exposure/
@@ -29,6 +31,8 @@ wandb/
 # judge_cache.jsonl and lm_eval/ let anyone `run_eval.py --rescore --lm-eval-dir results/lm_eval`
 # with no GPU or API key; bench/ holds the latency summaries. Smoke runs are throwaway.
 results/runs/smoke/
+# eval/rescore_all.py's scratch rescore of every row
+results/_rescore/
 
 # Python
 __pycache__/

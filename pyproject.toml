@@ -3,6 +3,7 @@ name = "struct-lm"
 version = "0.1.0"
 description = "Domain adaptation of an open LLM: CPT -> SFT -> DPO -> GRPO, with KPI evals and served latency."
 requires-python = ">=3.11,<3.14"
+license = "Apache-2.0"
 dependencies = [
     "requests>=2.32",       # data/scripts/download.py
     "pymupdf>=1.24",        # data/scripts/extract.py

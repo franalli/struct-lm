@@ -1,5 +1,88 @@
 # Reproduce
 
+## At a glance
+
+**Check the numbers, no GPU and no API key** (about two minutes on a laptop):
+
+```bash
+uv sync --extra data --extra dev
+make reproduce-score   # every row of results/table.md rescored from its committed generations
+                       # and compared (eval/rescore_all.py), then the strict checker, pass@k and
+                       # every table and figure regenerated; ends with `git diff --exit-code`
+make audit             # each number in the README's prose against a generated table or a named file
+```
+
+The judge's verdicts are in `results/judge_cache.jsonl`, so a rescore makes no API call; a miss
+would need `MISTRAL_API_KEY`, and `rescore_all.py` fails if the judge is called at all.
+
+**Rebuild a stage** (`make reproduce-stage0` … `reproduce-stage6`, Modal GPU jobs, run in order
+with `.env` loaded): each target puts the committed data set on the volume and launches the chain's
+runs with the commands below. Pull, score and report as in [Evaluate](#evaluate-repeat-per-stage-including-the-base-and-instruct-baselines).
+Ablations and probes beyond the chain (LR-up, the 2-GPU LoRA run, the memorisation probe) are in
+`.claude/skills/stage2-cpt/SKILL.md` and `CLAUDE.md`.
+
+**Data sets** (sha256 of each `SHA256SUMS`, which lists every file's own hash):
+
+| set | `SHA256SUMS` hash | files |
+|---|---|---|
+| CPT corpus, `data/processed` | 966d1e0c | train, val, replay, general_val (gitignored; rebuilt by `make data`; the hashes match the Modal volume's copies, checked 2026-10-10) |
+| SFT, `data/sft` | 70f47740 | train (2,436 records), sft_val (80) |
+| DPO as run, `data/dpo` | a899f7d2 | train, val (506 pairs) |
+| DPO strict, `data/dpo/strict` | 5e3effaf | train (445 pairs), val (18) |
+| GRPO, `data/grpo` | 4db8f7a6 | tasks, train (622), val (50) |
+| Stage 6 bench sets | `serve/bench_manifest.json` | unique, grounded_unique, grounded_rag, closedbook |
+
+The 246 source PDFs are re-fetched from `data/sources.csv` (URL and sha256 per document).
+
+**Pinned versions, per Modal image:**
+
+| image | used for | pins |
+|---|---|---|
+| `train/modal_train.py` `image` | CPT, SFT, DPO, merge | torch 2.13.0, transformers 5.16.1, TRL 0.29.1, PEFT 0.21.0, accelerate 1.15.0, mistral-common 1.12.0 |
+| `train/modal_train.py` `grpo_image` | GRPO (colocated rollouts) | the above plus vLLM 0.30.0 |
+| `eval/modal_app.py` `image` | KPI generations, lm-eval, latency, the Stage 6 gate and bench | vLLM 0.29.0 (recorded with torch 2.13.0+cu130), lm-eval ≥ 0.4.13 (0.4.13 recorded); transformers < 5.17 and mistral-common ≥ 1.8.6 are ranges, not pins |
+| `serve/modal_serve.py` `quant_image` | FP8 and INT4 quantization | llmcompressor 0.14.0 (writes compressed-tensors 0.19.0; vLLM 0.29 reads it with 0.17.0) |
+
+- **Every merged config carries `"apply_yarn_scaling": false`** (`train/merge.py`). Without it,
+  vLLM 0.29 applies YaRN attention scaling the model doesn't use: perplexity 7.23 against 6.89
+  (`notes/contributions.md`).
+- **Every eval loads with** `tokenizer_mode=mistral`, `config_format=hf` and
+  `limit_mm_per_prompt={"image": 0}`.
+- **The Stage 6 bench runs on `gpu="H100!"`** and aborts on any other device; each result records
+  the GPU, driver, CUDA, vLLM and torch.
+
+**Where things live:**
+
+| what | where |
+|---|---|
+| code, eval tasks, SFT / DPO / GRPO data, every generation, lm-eval output, judge verdict, perplexity, bench and training log | git (this repo) |
+| the CPT corpus files, LoRA adapters (`checkpoints/_train/<run>`), merged and quantized checkpoints | the Modal volume `struct-lm` (merged checkpoints rebuild from the adapters with `--steps merge`) |
+| the base and instruct models | Hugging Face (`mistralai/Ministral-3-8B-Base-2512`, `-Instruct-2512-BF16`) |
+
+**The Tülu 3 replay records** (`data/sft/`, 500: 475 train, 25 val) by subset, with the licence the
+mixture's card gives each:
+
+| subset | records | licence |
+|---|---|---|
+| Evol CodeAlpaca | 97 | Apache 2.0 |
+| FLAN v2 | 74 | not given on the card |
+| NuminaMath-TIR | 58 | Apache 2.0 |
+| withdrawn math set (GSM8K, 50k) | 46 | withdrawn after training; not in the card's list |
+| WildJailbreak | 46 | ODC-BY-1.0 |
+| WildGuardMix | 46 | Apache 2.0 |
+| Persona GSM | 46 | ODC-BY-1.0 |
+| WildChat (GPT-4) | 36 | ODC-BY-1.0 |
+| Persona Algebra | 18 | ODC-BY-1.0 |
+| CoCoNot | 10 | ODC-BY-1.0 |
+| No Robots | 8 | CC-BY-NC-4.0 (non-commercial) |
+| SciRIFF | 7 | ODC-BY-1.0 |
+| TableGPT | 4 | MIT |
+| OASST | 4 | Apache 2.0 |
+
+The mixture as a whole is ODC-BY-1.0, and its card notes that "different licenses apply to subsets
+of the data" and that some outputs come "from third party models that are subject to separate terms".
+The three Claude-written Persona subsets are excluded (`data/scripts/sft_replay.py`, `EXCLUDED`).
+
 ## Pipeline
 
 ```
