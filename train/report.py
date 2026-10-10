@@ -2444,6 +2444,46 @@ HEADLINE_ROWS = [
     ("dpo-strict-w4a16", "INT4 W4A16 (failed the gate)"),
 ]
 BASE_FORMAT = {"base-8b-hf", "cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"}
+BLANKS = {  # block -> (runs, why their cells are blank), printed under the table
+    "headline-knowledge": [
+        (
+            "cpt-8b-full",
+            (
+                "has no numbers: its weights were deleted before the closed-book task grew, "
+                "and full-parameter weights can't be rebuilt from an adapter"
+            ),
+        ),
+        (
+            "mistral-large-3",
+            (
+                "has no `gold_lp`, which is computed on the weights in the generation engine; "
+                "Large 3 ran through the API"
+            ),
+        ),
+    ],
+    "headline-behaviour": [
+        ("mistral-large-3", "has no numbers: it is an API reference, run closed-book only")
+    ],
+    "headline-general": [
+        ("mistral-large-3", "has no numbers: it is an API reference, run closed-book only"),
+        ("instruct-8b", "has no perplexity: it wasn't measured"),
+        (
+            "dpo-strict-fp8, dpo-strict-fp8kv, dpo-strict-w4a16",
+            (
+                "have no lm-eval or perplexity run with the "
+                "frozen flags; their gate GSM8K (one BOS) and perplexity are in "
+                "[`docs/stage6.md`](docs/stage6.md)"
+            ),
+        ),
+        (
+            "",
+            (
+                "latency is measured per deployed checkpoint, not per seed or ablation; FP8-KV's and "
+                "INT4's bench rows weren't run (Modal spend limit)"
+            ),
+        ),
+    ],
+}
 FLOOR_ROWS = [  # (label, the seed pair whose gap, or the metric's SE, sets each column's floor)
     ("floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE", ("cpt-8b", "cpt-8b-seed1")),
     ("floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE", SFT_SEED_PAIR),
@@ -2533,7 +2573,7 @@ def headline_tables() -> dict[str, str]:
     m = {r: v for r, _ in HEADLINE_ROWS if (v := load_metrics(r)) is not None}
     sizes = half_sizes()
 
-    def table(rows, cols, latency: bool) -> str:
+    def table(rows, cols, latency: bool, name: str = "") -> str:
         head = ["run", "what it is", *(c[0] for c in cols)]
         if latency:
             head += ["TTFT p50 @1 (ms)", "ITL p50 @1 (ms)", "latency source"]
@@ -2561,12 +2601,22 @@ def headline_tables() -> dict[str, str]:
             if latency:
                 cells += ["", "", ""]
             lines.append("| " + " | ".join(cells) + " |")
-        if empty:
-            lines.append(f"\nNo numbers in this table: {', '.join(f'`{r}`' for r in empty)}.")
+        notes = BLANKS.get(name, [])
+        named = {r for runs, _ in notes for r in runs.split(", ")}
+        if missing := [r for r in empty if r not in named]:
+            notes = [
+                *notes,
+                (", ".join(missing), "have no numbers" if len(missing) > 1 else "has no numbers"),
+            ]
+        if notes:
+            lines.append("\n**Blank cells:**")
+            for runs, why in notes:
+                who = ", ".join(f"`{r}`" for r in runs.split(", ")) if runs else ""
+                lines.append(f"- {who} {why}." if who else f"- {why[0].upper()}{why[1:]}.")
         return "\n".join(lines)
 
     blocks = {
-        name: table(HEADLINE_ROWS, cols, name == "headline-general")
+        name: table(HEADLINE_ROWS, cols, name == "headline-general", name)
         for name, cols in HEADLINE.items()
     }
     blocks["headline-summary"] = table(SUMMARY, SUMMARY_COLS, False)
@@ -2608,15 +2658,15 @@ REPLAY_LICENCES = {  # Tülu 3 subset -> (name, the licence the mixture's card g
 
 
 def reproduce_table() -> str:
-    """One row per stage: its make target, its training GPU-hours and dollars (summed from the
-    training-run tables by eval/summary_stats.py) and its data set's hash, read live: the sha256 of
-    the set's SHA256SUMS, which lists every file's own."""
+    """One row per stage: its make target, its training GPU-hours (summed from the training-run
+    tables by eval/summary_stats.py) and its data set's hash, read live: the sha256 of the set's
+    SHA256SUMS, which lists every file's own."""
     if not SUMMARY_STATS.exists():
         return ""
     cost = json.loads(SUMMARY_STATS.read_text())["training_cost"]
     lines = [
-        "| stage | command | training GPU-h | training $ | data (sha256 of its `SHA256SUMS`) |",
-        "|---|---|---|---|---|",
+        "| stage | command | training GPU-h | data (sha256 of its `SHA256SUMS`) |",
+        "|---|---|---|---|",
     ]
     for stage, target, section, data in REPRODUCE:
         c = cost.get(section) if section else None
@@ -2624,10 +2674,8 @@ def reproduce_table() -> str:
         if sums.exists():
             data = f"`{data}`: {hashlib.sha256(sums.read_bytes()).hexdigest()[:8]}"
         gpu = f"{c['gpu_h']:.2f}" if c else ("not totalled" if stage.startswith("6") else "")
-        usd = f"{c['usd']:.2f}" if c else ""
-        lines.append(f"| {stage} | `make {target}` | {gpu} | {usd} | {data} |")
-    t = cost["all training"]
-    lines.append(f"| all training | | {t['gpu_h']:.2f} | {t['usd']:.2f} | |")
+        lines.append(f"| {stage} | `make {target}` | {gpu} | {data} |")
+    lines.append(f"| all training | | {cost['all training']['gpu_h']:.2f} | |")
     return "\n".join(lines)
 
 

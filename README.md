@@ -73,8 +73,6 @@ decline. DPO and GRPO sharpened sampling at a cost in calibration, without clear
   to SFT. `sft-from-cpt` would serve as well.
 - **Precision:** FP8 (W8A8) passed the quality gate. bf16 serves up to 16 req/s, the highest
   open-loop rate measured; FP8 serves near saturation.
-- **Cost:** $0.035 per 1,000 requests at peak goodput, against $0.127 for the same tokens through
-  Mistral Small 4's API, a larger model, so this compares cost only.
 - **Bench numbers** are means of two runs ([`DEPLOY.md`](DEPLOY.md)).
 
 The [demo](#demo) shows a cited grounded answer and a declined unanswerable question.
@@ -146,7 +144,9 @@ is better), and ↓ marks lower is better.
 |  | *floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE* | 2.8 | 2.7 | 4.1 | 0.03 | 0.03 | 0.01 | 0.01 |
 |  | *floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE* | 3.5 | 2.6 | 5.0 | 0.17 | 0.21 | 0.07 | 0.05 |
 
-No numbers in this table: `cpt-8b-full`.
+**Blank cells:**
+- `cpt-8b-full` has no numbers: its weights were deleted before the closed-book task grew, and full-parameter weights can't be rebuilt from an adapter.
+- `mistral-large-3` has no `gold_lp`, which is computed on the weights in the generation engine; Large 3 ran through the API.
 <!-- headline-knowledge:end -->
 
 **Behaviour (with passages: grounded answers, citations, abstention, definitions)**
@@ -176,7 +176,8 @@ No numbers in this table: `cpt-8b-full`.
 |  | *floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE* | 3.7 | 4.6 | 3.7 | 3.3 | 0.0 | 3.1 |
 |  | *floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE* | 2.8 | 1.8 | 3.3 | 3.9 | 0.9 | 2.6 |
 
-No numbers in this table: `mistral-large-3`.
+**Blank cells:**
+- `mistral-large-3` has no numbers: it is an API reference, run closed-book only.
 <!-- headline-behaviour:end -->
 
 **General capability and serving**
@@ -204,7 +205,11 @@ No numbers in this table: `mistral-large-3`.
 |  | *floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE* | 0.3 | 1.1 | 0.4 | 0.02% | 0.23% |  |  |  |
 |  | *floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE* | 0.4 | 2.2 | 0.6 | 0.08% | 0.07% |  |  |  |
 
-No numbers in this table: `mistral-large-3`, `dpo-strict-fp8kv`, `dpo-strict-w4a16`.
+**Blank cells:**
+- `mistral-large-3` has no numbers: it is an API reference, run closed-book only.
+- `instruct-8b` has no perplexity: it wasn't measured.
+- `dpo-strict-fp8`, `dpo-strict-fp8kv`, `dpo-strict-w4a16` have no lm-eval or perplexity run with the frozen flags; their gate GSM8K (one BOS) and perplexity are in [`docs/stage6.md`](docs/stage6.md).
+- Latency is measured per deployed checkpoint, not per seed or ablation; FP8-KV's and INT4's bench rows weren't run (Modal spend limit).
 <!-- headline-general:end -->
 
 [`docs/results.md`](docs/results.md) also has:
@@ -213,7 +218,26 @@ No numbers in this table: `mistral-large-3`, `dpo-strict-fp8kv`, `dpo-strict-w4a
 - the train-slice and 2026-report perplexities;
 - the Stage 0 `base-8b` row.
 
-`cpt-8b-full` has no closed-book rows because its weights were deleted before that task grew.
+**Training curves:** train loss or reward as moving averages, validation at checkpoints.
+
+![Stage 2 CPT: train loss and validation loss per run](results/curves/cpt.png)
+
+*CPT: validation loss falls in every run and flattens by the end of the one epoch.*
+
+![Stage 3 SFT: train loss and sft_val loss per run, with the end of epoch 1 marked](results/curves/sft.png)
+
+*SFT: validation loss is lowest at the end of epoch 1 in all four runs and rises in epoch 2
+(part 4).*
+
+![Stage 4 DPO: loss, reward margin and reward accuracy for train and dpo_val, and the chosen and rejected log-probabilities](results/curves/dpo.png)
+
+*DPO: one epoch moves the loss little from no preference; the two-epoch ablation fits the training
+pairs while its validation loss stalls.*
+
+![Stage 5 GRPO: train reward, validation pass@1 and pass@8, completion length, entropy, groups with identical rewards, and the vLLM-policy log-prob gap](results/curves/grpo.png)
+
+*GRPO: the train reward climbs while entropy collapses and validation pass@8 falls; the rule kept
+step 25 of each seed (part 4).*
 
 ## 4. Decisions and trade-offs
 
@@ -264,7 +288,7 @@ here), post-training, reinforcement learning, and evaluation frameworks.
 | Post-training | SFT on 2,436 records (1,778 teacher-written); DPO on 445 verifier-labelled pairs | "post-training methods allow teams to refine model behavior" |
 | RL | 622 verifiable tasks, synchronous GRPO, stopped by step 65 | "align models and agents with internal policies, evaluation criteria" |
 | Evaluation | a 716-item KPI eval (fixed from Stage 3), a regression suite, seed floors | "test models against internal benchmarks, compliance rules, and domain-specific tasks" |
-| Compute | H100s, one per run except two 2-GPU ablations: 8.8 GPU-hours, $35 of training | not stated |
+| Compute | H100s, one per run except two 2-GPU ablations: 8.8 GPU-hours of training | not stated |
 
 What the small version surfaced that gets harder at full scale:
 1. **The judge comes back.** Exact answers let verifiers replace the failed judge here. Open-ended
@@ -340,20 +364,19 @@ What the small version surfaced that gets harder at full scale:
 dataset hashes.
 
 <!-- reproduce-table:start -->
-| stage | command | training GPU-h | training $ | data (sha256 of its `SHA256SUMS`) |
-|---|---|---|---|---|
-| 0: the eval and baselines | `make reproduce-stage0` |  |  | `eval/tasks/` (committed, reviewed) |
-| 1: the corpus | `make reproduce-stage1` |  |  | `data/processed`: 966d1e0c |
-| 2: CPT | `make reproduce-stage2` | 5.40 | 21.32 | the corpus |
-| 3: SFT | `make reproduce-stage3` | 1.97 | 7.76 | `data/sft`: 70f47740 |
-| 4: DPO | `make reproduce-stage4` | 0.37 | 1.49 | `data/dpo/strict`: 5e3effaf |
-| 5: GRPO | `make reproduce-stage5` | 1.08 | 4.28 | `data/grpo`: 4db8f7a6 |
-| 6: serving | `make reproduce-stage6` | not totalled |  | `serve/bench_manifest.json` |
-| all training | | 8.82 | 34.85 | |
+| stage | command | training GPU-h | data (sha256 of its `SHA256SUMS`) |
+|---|---|---|---|
+| 0: the eval and baselines | `make reproduce-stage0` |  | `eval/tasks/` (committed, reviewed) |
+| 1: the corpus | `make reproduce-stage1` |  | `data/processed`: 966d1e0c |
+| 2: CPT | `make reproduce-stage2` | 5.40 | the corpus |
+| 3: SFT | `make reproduce-stage3` | 1.97 | `data/sft`: 70f47740 |
+| 4: DPO | `make reproduce-stage4` | 0.37 | `data/dpo/strict`: 5e3effaf |
+| 5: GRPO | `make reproduce-stage5` | 1.08 | `data/grpo`: 4db8f7a6 |
+| 6: serving | `make reproduce-stage6` | not totalled | `serve/bench_manifest.json` |
+| all training | | 8.82 | |
 <!-- reproduce-table:end -->
 
-- **Cost:** dollars are at $3.95 per H100-hour (Modal's list price, checked 2026-10-09). Evals,
-  sampling, the bench and API calls aren't totalled.
+- **GPU-hours** count training only; evals, sampling and the bench aren't totalled.
 - **Checking the numbers needs no GPU and no API key:**
   - `make reproduce-score` rescores every row from the committed generations and judge verdicts,
     and regenerates every table and figure.

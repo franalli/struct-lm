@@ -13,8 +13,6 @@ number	context	source	in
 0.38	DPO 0.38 nats	results/train_runs.md	README.md
 1.32	GRPO 1.32	results/train_runs.md	README.md
 16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	README.md
-$0.035	$0.035 per	results/train_runs.md	README.md
-$0.127	against $0.127	results/train_runs.md	README.md
 10%	10% general replay	results/summary_stats.json	README.md
 +0.2	MMLU +0.2	results/summary_stats.json	README.md
 0.1	against a 0.1 seed floor	results/summary_stats.json	README.md
@@ -50,7 +48,6 @@ $0.127	against $0.127	results/train_runs.md	README.md
 622	622 verifiable tasks	results/summary_stats.json	README.md
 716	a 716-item KPI eval	results/summary_stats.json	README.md
 8.8	8.8 GPU-hours	results/summary_stats.json	README.md
-$35	$35 of training	results/summary_stats.json	README.md
 11%	11% faster per GPU	results/train_runs.md	README.md
 80	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
 458	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
@@ -66,7 +63,6 @@ $35	$35 of training	results/summary_stats.json	README.md
 1,067	1,067 of 1,319	results/summary_stats.json	README.md
 1,319	1,067 of 1,319	results/summary_stats.json	README.md
 57%	57% of the steps	results/summary_stats.json	README.md
-$3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 415	415 of the 1,778	results/summary_stats.json	README.md
 1,778	415 of the 1,778	results/summary_stats.json	README.md
 500	500 general records	results/summary_stats.json	README.md
