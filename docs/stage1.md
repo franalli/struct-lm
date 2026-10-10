@@ -5,6 +5,15 @@
 Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
 and gates that decided; gray, external models, controls and ablations.
 
+**Result: 246 public-domain documents, 20.6M tokens after cleaning and deduplication (19.4M in the
+train split), plus a FineWeb-Edu replay slice, with no unintended overlap with what is evaluated.**
+- **Benchmarks:** no GSM8K or HellaSwag item shares a 13-gram with the training text; 21 of 14,042
+  MMLU items share one stock phrase.
+- **Domain val** shares 1.5% of its 13-grams with train, less than a train document shares with the
+  rest (median 2.0%). No 2026 report is a revision of a corpus document.
+- **By design,** the closed-book eval items come from training documents: they measure recall of
+  what CPT read ([contamination checks](#contamination-checks)).
+
 The corpus card in [`notes/decisions.md`](../notes/decisions.md) ("Stage 1 corpus card") has every
 number, generated from [`data/processed/stats.json`](../data/processed/stats.json) by `stats.py`:
 documents and pages per publisher, pages dropped, paragraphs dropped per filter rule, exact and

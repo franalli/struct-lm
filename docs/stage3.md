@@ -5,6 +5,20 @@
 Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
 and gates that decided; gray, external models, controls and ablations.
 
+**Result: SFT taught the facts it showed and the behaviours, and CPT's head start survived it.**
+- **Seen facts:** strict closed-book 28.7% against stock Instruct's 11.4%, retention of facts that
+  were in the training set by design.
+- **Unseen facts:** 11.6% against 7.7%. The paired 95% CI, [−1.3, +9.0], includes 0, and the
+  untrained base also scores 11.6%.
+- **CPT's contribution:** in all four pairings of a CPT-start run with a base-start run, the CPT
+  run's unseen gold answers are more probable. Accuracy doesn't resolve the difference at this size.
+- **With passages, against Instruct:** valid citations 100% against 83.3% and no false refusals
+  against its 7.4%, with grounded accuracy level. Hallucination is 4 of 76 against its 1 of 76,
+  inside the seed spread (the seed twin also has 1).
+- **One epoch, by rule:** the recall formats overfit in epoch 2 in all four runs.
+
+The findings, and what is weaker than this summary makes it, follow the tables.
+
 Supervised fine-tuning on a synthetic, fully read instruction set: the CPT checkpoint
 (`cpt-8b-replay10`) and, as the control for what CPT bought, the base (`base-8b-hf`), each with
 the same set, config and data order, and each run twice (seeds 0 and 1) so the noise floor is
@@ -143,6 +157,10 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - Cited answers backed by the cited passages: 86.1% against Instruct's 78.7%.
    - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
    - Grounded accuracy matches Instruct (90.7% vs 89.8%).
+   - *(Note 2026-10-10: the first and third lines are judge-scored. From Stage 4 on, after the
+     preference judge failed its benchmark, judge-scored lines are reported, not read
+     (`notes/decisions.md`, 2026-10-08). The rule-scored line agrees: valid citations 100% against
+     Instruct's 83.3%.)*
 4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
 5. **SFT repaired the passage reading that CPT eroded.**
    - Raw-text CPT cost few-shot passage reading: grounded_acc went from 0.843 for the base to 0.778
@@ -258,7 +276,7 @@ targets and are marked as such.
 | CPT's advantage survives SFT (unseen `gold_lp` beyond the floor) | +0.46 nats, all four pairings positive | pass; the SD multiple rests on one seed pair per arm |
 | beat Instruct on identifiers | 0.203 vs 0.031 (strict and lenient agree) | pass |
 | beat Instruct on vocab | 0.833 vs 0.786 | pass, narrowly (1.5x the noise) |
-| match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation |
+| match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation (both judge-scored: the note under What holds, 3) |
 | guards: no half below its start by more than the noise; MMLU and GSM8K within noise + 1 point | lenient (as scored then): all four runs (the base arm's unseen half 0.110 / 0.097 against its start's 0.116). Strict (2026-10-09): the CPT arm passes, but the base arm's unseen half is 0.084 / 0.077 against 0.116, 3.2-3.9 points down against a 2.7-point noise | pass as scored then; under the strict checker it fails for the base arm, the control (its unseen hedges, above), not for the chain |
 | abstain: > 80% on unanswerable, < 5% false refusals | 94.7%; 0% | pass |
 | diversity within 10% of Instruct | distinct-4 −4.7%, entropy −8.0% | pass, length-confounded |

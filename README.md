@@ -7,6 +7,9 @@ The post-training lifecycle a Forge engagement runs, at small scale (part 5): Mi
 adapted to US federal structural-engineering documents by continued pre-training (CPT), SFT, DPO and
 GRPO, then quantized behind a pre-registered quality gate and served with vLLM on one H100.
 
+This README is the summary. Each stage's full write-up, with its loss curves, read tables and
+checks, is `docs/stageN.md`, linked in [part 2](#2-lifecycle).
+
 ## 1. Summary
 
 **Setup:**
@@ -27,6 +30,7 @@ GRPO, then quantized behind a pre-registered quality gate and served with vLLM o
 recallable. SFT taught the facts it showed and the behaviours: answer from passages, cite them,
 decline. DPO and GRPO sharpened sampling at a cost in calibration, without clearing their bars.
 - **CPT:**
+  - It missed its pre-registered target: domain validation perplexity fell 2.33%, not 20%.
   - On the 155 facts SFT never showed, gold-answer tokens are 0.41 nats more probable with CPT
     than in a control arm without it (95% CI +0.23 to +0.60; two seeds per arm, so 1 df per arm).
   - That is about what CPT's general rise on corpus text predicts ([`docs/results.md`](docs/results.md)).
@@ -36,7 +40,12 @@ decline. DPO and GRPO sharpened sampling at a cost in calibration, without clear
     11.4% (paired 95% CI +10.8 to +24.6).
   - On unseen facts, its lead (11.6% against 7.7%) clears the 2.6-point floor, but its paired CI
     (−1.3 to +9.0) includes 0, and the untrained base also scores 11.6%.
-- **DPO and GRPO:** neither cleared its primary line.
+  - With passages, against Instruct: valid citations 100% against 83.3%, false refusals 0% against
+    7.4%, grounded accuracy level (judge-scored, 90.7% against 89.8%). Hallucination is worse, 4 of
+    76 unanswerable questions against 1, inside the seed spread: its seed twin also has 1.
+- **DPO and GRPO:** neither improved a primary line beyond its floor.
+  - DPO's were greedy closed-book accuracy, gold-answer log-probability, hallucination, false
+    refusals and valid citations; GRPO's, strict seen accuracy and seen gold-answer log-probability.
   - Each raised seen pass@1 by about 3 points, a gain greedy serving doesn't use:
     - DPO by 3.5 [+1.2, +6.0], in a line added after the fact;
     - GRPO by 3.1 [+1.3, +5.0], the mean of its two seeds.
@@ -100,6 +109,9 @@ is better), and ↓ marks lower is better.
 - **Seen and unseen** are fixed per fact before SFT. About half the eval's source passages may feed
   SFT synthesis; the rest may not. Every eval fact comes from a document CPT read, so unseen means
   unseen by SFT. This is Tülu 3's development/unseen split (§7), applied by fact.
+- **Contamination:** 13-gram overlap (GPT-3's method) finds no GSM8K or HellaSwag item in the
+  training text, and 21 of 14,042 MMLU items sharing one stock phrase. No eval question is copied
+  into the SFT, DPO or GRPO data ([checks](docs/stage1.md#contamination-checks)).
 - **lm-eval** ran 5-shot with no chat template and no BOS token. Rows compare with each other, not
   with published scores. Stage 6's GSM8K gate ran with one BOS. Latency compares only within one
   source.
@@ -303,8 +315,8 @@ What the small version surfaced that gets harder at full scale:
 - **Decompose a metric before comparing it.** `gold_lp`'s end token hid DPO's shift toward stopping.
 - **Put the start's own seed gap in a two-arm floor,** and say "1 df per arm". The repo added it
   only after Stage 4's read, which moved two lines inside the noise.
-- **Fix the eval's primary metric before the first run.** Stage 2's −20% perplexity target was set
-  for the wrong data scale.
+- **Fix the eval's primary metric before the first run.** Stage 2's perplexity target (summary) was
+  set for the wrong data scale.
 
 **Next, ranked:**
 1. A licence-clean SFT set, then retraining and the weights ([Weights](#weights)).

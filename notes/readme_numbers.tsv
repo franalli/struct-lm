@@ -66,7 +66,6 @@ $35	$35 of training	results/summary_stats.json	README.md
 1,067	1,067 of 1,319	results/summary_stats.json	README.md
 1,319	1,067 of 1,319	results/summary_stats.json	README.md
 57%	57% of the steps	results/summary_stats.json	README.md
-−20%	−20% perplexity	notes/decisions.md	README.md
 $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 415	415 of the 1,778	results/summary_stats.json	README.md
 1,778	415 of the 1,778	results/summary_stats.json	README.md
@@ -149,3 +148,11 @@ $3.95	$3.95 per H100-hour	results/train_runs.md	README.md
 3.7	a 3.7 floor	results/train_runs.md	README.md
 0.23%	the 0.23% floor	results/train_runs.md	README.md
 28.5%	by 28.5%	results/summary_stats.json	README.md
+2.33%	fell 2.33%	results/train_runs.md	README.md
+20%	not 20%	notes/decisions.md	README.md
+0%	false refusals 0%	results/table.md	README.md
+7.4%	against 7.4%	results/table.md	README.md
+76	4 of 76	results/summary_stats.json	README.md
+13	13-gram overlap	eval/contamination.py	README.md
+21	21 of 14,042	results/contamination.md	README.md
+14,042	21 of 14,042	results/contamination.md	README.md

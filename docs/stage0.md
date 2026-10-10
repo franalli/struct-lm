@@ -5,6 +5,17 @@
 Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
 and gates that decided; gray, external models, controls and ablations.
 
+**Result: the eval every later stage is read against, and the bar it sets.**
+- **The eval:** 716 items in four tasks (closed-book questions, grounded answers with citations,
+  definitions, unanswerable questions), written by Mistral Large 3 from the training documents and
+  reviewed against their sources before any model was scored.
+- **The base model** finds grounded answers but neither cites nor declines: it cites correctly 10%
+  of the time and answers 88% of unanswerable questions with something invented.
+- **Stock Instruct, the bar,** has that behaviour but no more domain knowledge: 9.6% closed-book
+  against the base's 12.1% (strict, 322 items; Mistral Large 3 scores 26%).
+- **So** closed-book knowledge is the gap CPT was meant to close, and SFT had to bring citation and
+  refusal at least to Instruct's level ([where it starts](#where-it-starts)).
+
 ## The problem
 
 Engineering organisations sit on decades of internal documents: design manuals, inspection

@@ -5,6 +5,22 @@
 Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
 and gates that decided; gray, external models, controls and ablations.
 
+**Result: CPT missed its pre-registered target, and made the documents it read more probable, not
+more answerable.**
+- **The target:** domain val perplexity was to fall at least 20%. It fell 2.33% in the main run and
+  between 2.15% and 2.42% in the others (the rules table below).
+- **What it learned:** at 20M tokens and one epoch, CPT learns the documents it reads (-8%
+  perplexity) and almost nothing that transfers to documents it hasn't seen (-0.4% on reports
+  published in 2026). It does make the facts in the documents it read more likely: closed-book
+  gold answers become about 1.8x more probable (+0.59 nats per answer, both seeds; +0.56 of it in
+  the answer tokens, +0.03 in the end token), a gain pass/fail accuracy is too coarse to resolve
+  at this size.
+- **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
+  documents harder, with 2-4x the forgetting and no held-out gain.
+- **What goes forward.** LoRA with 10% replay is the carried-forward checkpoint. A pre-registered
+  rule chose it, the rule fired at the edge of the noise, and that is recorded.
+- **Why the eval harness matters.** It found a serving bug larger than any training effect.
+
 One epoch of plain next-token training on the 19.4M-token train split, starting from
 `Ministral-3-8B-Base-2512`: LoRA r=64 (alpha 128) on all seven projections of the language model,
 LR 1e-4 with a cosine schedule, 32 windows of 4,096 tokens per optimizer step, so 149 steps (the
@@ -89,18 +105,6 @@ $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09); wall 
 
 lm-eval rows run 5-shot without a BOS token (the frozen flags send none, found in Stage 6): the changes stand, absolute values aren't comparable with published scores. Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 322-item domain_qa (eval v3; Stage 2 was first read on v2's 325, results/table_v2.md), so cpt-8b-full, whose weights were deleted, has none.
 <!-- stage2-tables:end -->
-
-**Bottom line.** At 20M tokens and one epoch, CPT learns the documents it reads (-8% perplexity) and
-almost nothing that transfers to documents it hasn't seen (-0.4% on reports published in 2026).
-It does make the facts in the documents it read more likely: closed-book gold answers become about
-1.8x more probable (+0.59 nats per answer, both seeds; +0.56 of it in the answer tokens, +0.03 in the end token), a gain pass/fail accuracy is too coarse to
-resolve at this size.
-
-- **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
-  documents harder, with 2-4x the forgetting and no held-out gain.
-- **What goes forward.** LoRA with 10% replay is the carried-forward checkpoint. A pre-registered
-  rule chose it, the rule fired at the edge of the noise, and that is recorded.
-- **Why the eval harness matters.** It found a serving bug larger than any training effect.
 
 Every delta below is against `base-8b-hf`, the base evaluated through the same vLLM path as the
 fine-tuned checkpoints. Each is read against its noise: the larger of the seed gap (`cpt-8b` vs
