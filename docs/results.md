@@ -242,16 +242,24 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
     passed the pre-registered quality gate on every line; INT4 and an FP8 KV cache did not
     ([Serving](stage6.md)).
 
-**What the whole chain shows: knowledge went in once, at CPT.** Every number in this paragraph is
+**What the whole chain shows: on unseen facts, probability went up once, at CPT.** Every number in
+this paragraph is
 on the gold answer's tokens alone (the end token excluded), unseen half, with item-bootstrap 95%
 CIs.
 - **CPT is the only stage that raised the probability of unseen gold answers:**
   - +0.66 nats in Stage 2 (`cpt-8b-replay10`, the chain's CPT, [+0.45, +0.90]; +0.56 over all
     items for `cpt-8b`);
-  - +0.41 [+0.23, +0.60] across the Stage 3 arms, CPT's knowledge surviving SFT.
+  - +0.41 [+0.23, +0.60] across the Stage 3 arms, CPT's gain surviving SFT.
+- **That gain is text familiarity, not recall:**
+  - It is about what CPT's rise on all corpus text predicts: 0.086 nats per token over 4.69
+    answer tokens (`results/summary_stats.json`).
+  - The arms' strict unseen accuracy differs by 3.2 points, which doesn't resolve.
 - **Every stage after it that can be measured lowered them:**
   - DPO by 0.38 [0.27, 0.50];
   - GRPO by 1.32 [1.08, 1.58].
   - SFT's own change can't be read, since it moves the model from base format to chat format.
-- **The trade:** each later stage bought behaviour with a little of the knowledge, and the sharper
-  the optimiser, the larger the trade.
+- **The trade:** each later stage bought behaviour with some of that probability. The on-policy
+  optimiser cost more than the offline one, on one run pair each.
+
+*(Corrected 2026-10-10: this paragraph read "knowledge went in once, at CPT" before the per-token
+check, notes/decisions.md, Stage 7.)*
