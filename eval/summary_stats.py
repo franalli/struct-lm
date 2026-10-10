@@ -213,6 +213,32 @@ def main() -> None:
     res["licence_audit"]["source_rows"] = len(rows) - 1  # the header
     res["training_cost"] = stage_costs()
 
+    # the corpus and set sizes the stage diagrams state (docs/diagrams/src), from the data files
+    s = stats
+    res["corpus"] = {
+        "sources": s["download"]["sources"],
+        "pdf_gb": s["download"]["bytes"] / 1e9,
+        "tokens_extracted_m": s["filter"]["tokens_in"] / 1e6,
+        "docs_after_filter": s["filter"]["docs_out"],
+        "docs": s["dedup"]["docs_out"],
+        "tokens_m": s["dedup"]["tokens_out"] / 1e6,
+        "train_tokens_m": s["split"]["train"]["tokens"] / 1e6,
+        "val_token_pct": 100 * s["split"]["val_token_frac"],
+        "replay_tokens_m": s["replay"]["tokens"] / 1e6,
+    }
+    count = lambda f: len((REPO / f).read_text().splitlines())
+    res["set_sizes"] = {
+        "sft_val_records": count("data/sft/hosted/sft_val.jsonl"),
+        "dpo_prompt_pool": count("data/dpo/prompts.jsonl"),
+        "dpo_as_run_pairs": count("data/dpo/train.jsonl") + count("data/dpo/val.jsonl"),
+        "dpo_strict_pairs": count("data/dpo/strict/train.jsonl")
+        + count("data/dpo/strict/val.jsonl"),
+        "dpo_strict_train": count("data/dpo/strict/train.jsonl"),
+        "dpo_strict_val": count("data/dpo/strict/val.jsonl"),
+        "grpo_train_tasks": count("data/grpo/train.jsonl"),
+        "grpo_val_tasks": count("data/grpo/val.jsonl"),
+    }
+
     # the entropy stop that fired on one batch (grpo-seed1, step 34), against its old baseline
     log = jsonl(REPO / "results/runs/grpo-seed1/train_log.jsonl")
     ent = {r["step"]: r["entropy"] for r in log if r.get("entropy") is not None and r.get("step")}

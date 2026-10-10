@@ -53,3 +53,22 @@ def test_lifecycle_names_real_rows():
         re.findall(r"\b(base-8b-hf|cpt-8b[\w-]*|sft-from-[\w-]+|dpo[\w-]*|grpo[\w-]*)", labels)
     )
     assert names and names <= rows, names - rows
+
+
+def test_diagram_numbers_are_checked(tmp_path):
+    """A number in a stage diagram's IR needs a sidecar row scoped to that file (`in`)."""
+    import json
+
+    ir = tmp_path / "stage9.json"
+    ir.write_text(
+        json.dumps({"nodes": [{"id": "a", "label": "463 strict pairs\n(445 train)"}], "edges": []})
+    )
+    lines = readme_audit.diagram_lines(ir)
+    assert lines == [(1, "463 strict pairs (445 train)")]
+    problems = readme_audit.check("stage9.json", lines, [], [])
+    assert {p.split(": ")[1].split()[0] for p in problems} == {"463", "445"}
+    rows = [
+        {"number": "463", "context": "463 strict", "source": "x"},
+        {"number": "445", "context": "445 train", "source": "x"},
+    ]
+    assert readme_audit.check("stage9.json", lines, [], rows) == []

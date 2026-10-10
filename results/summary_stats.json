@@ -162,6 +162,27 @@
       "usd": 34.85
     }
   },
+  "corpus": {
+    "sources": 251,
+    "pdf_gb": 3.173698042,
+    "tokens_extracted_m": 31.328418,
+    "docs_after_filter": 248,
+    "docs": 246,
+    "tokens_m": 20.637997,
+    "train_tokens_m": 19.421232,
+    "val_token_pct": 5.89,
+    "replay_tokens_m": 1.944824
+  },
+  "set_sizes": {
+    "sft_val_records": 80,
+    "dpo_prompt_pool": 2506,
+    "dpo_as_run_pairs": 506,
+    "dpo_strict_pairs": 463,
+    "dpo_strict_train": 445,
+    "dpo_strict_val": 18,
+    "grpo_train_tasks": 622,
+    "grpo_val_tasks": 50
+  },
   "grpo_seed1_entropy": {
     "step34": 0.14192796731367707,
     "steps1_5_mean": 0.47447764296084644,

@@ -7,7 +7,7 @@ A number in the prose passes if:
 - it has three or more significant digits and appears, at the precision written, in one of the
   README's generated blocks (train/report.py: the headline tables). Shorter numbers coincide with
   some table cell too easily (0.41 is in a dozen places), so they need the sidecar; or
-- a row of notes/readme_numbers.tsv covers it: `number<TAB>context<TAB>source`, where `context` is
+- a row of notes/readme_numbers.tsv covers it: `number<TAB>context<TAB>source<TAB>in`, where `context` is
   a few words of the line it sits on (or of the line before and it, joined, for a wrapped
   sentence) and `source` a repo file that contains the number (the script checks that it does, at
   the precision written).
@@ -22,6 +22,7 @@ The word count leaves out tables too (headings included): the measure behind "un
 
 import argparse
 import csv
+import json
 import re
 from pathlib import Path
 
@@ -109,10 +110,47 @@ def sidecar() -> list[dict]:
         return [r for r in csv.DictReader(f, delimiter="\t") if r.get("number")]
 
 
+DIAGRAMS = REPO / "docs/diagrams/src"  # the stage diagrams' IR (make diagrams renders them)
+
+
+def check(
+    name: str, lines: list[tuple[int, str]], pool: list[float], rows: list[dict]
+) -> list[str]:
+    """Every number on `lines` is in `pool` (3+ significant digits) or covered by one of `rows`, and
+    every row covers one. `name` labels the problems."""
+    problems, used = [], set()
+    for k, (n, line) in enumerate(lines):
+        window = " ".join(((lines[k - 1][1] + " " if k else "") + line).split())  # wrapped context
+        for written, value, decimals, _ in numbers(line):
+            if significant(written) >= 3 and matches(value, decimals, pool):
+                continue
+            hits = [
+                j
+                for j, r in enumerate(rows)
+                if numbers(f" {r['number']} ")[:1]
+                and numbers(f" {r['number']} ")[0][1:3] == (value, decimals)
+                and " ".join(r["context"].split()).lower() in window.lower()
+            ]
+            used.update(hits)
+            if not hits:
+                problems.append(f"{name}:{n}: {written}  | {line.strip()[:90]}")
+    problems += [  # a row that covers nothing is a number the file no longer states
+        f"{SIDECAR.name}: unused row {r['number']} ({r['context']}) for {name}"
+        for j, r in enumerate(rows)
+        if j not in used
+    ]
+    return problems
+
+
+def diagram_lines(path: Path) -> list[tuple[int, str]]:
+    """A diagram IR's node and edge labels, one line each (a label's line breaks joined)."""
+    ir = json.loads(path.read_text())
+    labels = [n["label"] for n in ir["nodes"]] + [e["label"] for e in ir["edges"] if e.get("label")]
+    return [(k + 1, " ".join(label.split("\n"))) for k, label in enumerate(labels)]
+
+
 def audit(path: Path = README) -> list[str]:
-    text = path.read_text()
-    blocks = [m.group(0) for m in BLOCK.finditer(text)]
-    block_pool = values_in("\n".join(blocks))
+    """The README's prose and every stage diagram's labels, against the sidecar."""
     rows = sidecar()
     problems = []
     for r in rows:  # every sidecar row's number must be in its source
@@ -122,28 +160,14 @@ def audit(path: Path = README) -> list[str]:
             problems.append(f"{SIDECAR.name}: {r['number']}: no file {r['source']}")
         elif not num or not matches(num[0][1], num[0][2], values_in(src.read_text())):
             problems.append(f"{SIDECAR.name}: {r['number']} not in {r['source']}")
-    used = set()
-    lines = prose_lines(text)
-    for k, (n, line) in enumerate(lines):
-        window = " ".join(((lines[k - 1][1] + " " if k else "") + line).split())  # wrapped context
-        for written, value, decimals, _ in numbers(line):
-            if significant(written) >= 3 and matches(value, decimals, block_pool):
-                continue
-            hits = [
-                k
-                for k, r in enumerate(rows)
-                if numbers(f" {r['number']} ")[:1]
-                and numbers(f" {r['number']} ")[0][1:3] == (value, decimals)
-                and " ".join(r["context"].split()).lower() in window.lower()
-            ]
-            used.update(hits)
-            if not hits:
-                problems.append(f"README.md:{n}: {written}  | {line.strip()[:90]}")
-    problems += [  # a row that covers nothing is a number the README no longer states
-        f"{SIDECAR.name}: unused row {r['number']} ({r['context']})"
-        for k, r in enumerate(rows)
-        if k not in used
-    ]
+    text = path.read_text()
+    pool = values_in("\n".join(m.group(0) for m in BLOCK.finditer(text)))
+    readme_rows = [r for r in rows if (r.get("in") or "README.md") == "README.md"]
+    problems += check(path.name, prose_lines(text), pool, readme_rows)
+    if path == README:
+        for ir in sorted(DIAGRAMS.glob("*.json")):
+            name = ir.relative_to(REPO).as_posix()
+            problems += check(name, diagram_lines(ir), [], [r for r in rows if r.get("in") == name])
     return problems
 
 
@@ -160,7 +184,9 @@ def main() -> None:
         print(word_count())
         return
     problems = audit()
-    print("\n".join(problems) or "every number in the README's prose traces to a file")
+    print(
+        "\n".join(problems) or "every number in the README and the stage diagrams traces to a file"
+    )
     raise SystemExit(1 if problems else 0)
 
 
