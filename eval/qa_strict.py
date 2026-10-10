@@ -176,10 +176,13 @@ def main() -> None:
     with (OUT / "flips.jsonl").open("w") as f:
         for x in flips:
             f.write(json.dumps(x, ensure_ascii=False) + "\n")
-    dp = dpo_pairs()
-    (OUT / "dpo_pairs.json").write_text(json.dumps(dp, indent=2, ensure_ascii=False) + "\n")
     print(md(res))
     print("flips:", len(flips), dict(Counter(f["reason"] or "strict_only" for f in flips)))
+    if not (REPO / "data/sft/work/judged.jsonl").exists():  # the golds come from the SFT builder
+        print("dpo_pairs.json kept as committed: its golds are in data/sft/work/ (make sft-data)")
+        return
+    dp = dpo_pairs()
+    (OUT / "dpo_pairs.json").write_text(json.dumps(dp, indent=2, ensure_ascii=False) + "\n")
     print("dpo closed-book pairs:", dp["pairs"], "chosen wrong (strict):", dp["chosen_wrong_total"],
           dict(dp["chosen_wrong"]), "by kind", dp["by_kind"], "rejected right:", dp["rejected_right"],
           "inverted:", dp["inverted"])  # fmt: skip
