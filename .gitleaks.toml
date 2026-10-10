@@ -1,0 +1,11 @@
+# gitleaks over the full history: the default rules, minus sha256 digests the generic-api-key rule
+# mistakes for keys (the judge cache's `key` field, checkpoint and tokenizer file hashes).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "sha256 digests, not secrets"
+paths = [
+  '''results/judge_cache\.jsonl''',
+  '''results/.*/(merge_check|checkpoint_sha256|quantize_meta)\.json''',
+]
