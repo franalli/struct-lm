@@ -32,7 +32,7 @@ proprietary text, synthetic data, SFT and preference optimisation, reinforcement
 LoRA where lighter adaptation is enough, all measured against evals tied to the client's KPIs.
 The default path starts from an existing checkpoint, not from scratch.
 
-**This repo runs that lifecycle once, end to end, at roughly 1% scale.** Public-domain US federal
+**This repo runs that lifecycle once, end to end, at small scale.** Public-domain US federal
 structural-engineering documents stand in for a client's private corpus: 246 manuals, reports and
 design examples from USACE, FEMA, FHWA, NIST and NASA (20.6M Tekken tokens after cleaning; the KPI
 eval tasks are sampled from the 234 training documents, at most 6 source passages per document per

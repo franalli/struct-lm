@@ -3,11 +3,8 @@ number	context	source	in
 20.6M	(20.6M tokens)	results/summary_stats.json	README.md
 716	716-item eval	results/summary_stats.json	README.md
 155	the 155 facts	results/summary_stats.json	README.md
-0.41	0.41 nats more probable	results/train_runs.md	README.md
 +0.23	+0.23 to +0.60	results/train_runs.md	README.md
 +0.60	+0.23 to +0.60	results/train_runs.md	README.md
-167	the 167 facts	results/summary_stats.json	README.md
-+10.8	CI +10.8	results/summary_stats.json	README.md
 +24.6	+10.8 to +24.6	results/summary_stats.json	README.md
 7.7%	against 7.7%	results/summary_stats.json	README.md
 0.38	DPO 0.38 nats	results/train_runs.md	README.md
@@ -29,7 +26,7 @@ number	context	source	in
 1.17	from 1.17 to 1.30	results/train_runs.md	README.md
 28%	caught 28% of grounded	results/dpo/judge_bench.json	README.md
 9%	9% of definition	results/dpo/judge_bench.json	README.md
-0.5	a 0.5 line	data/scripts/dpo_judge_bench.py	README.md
+0.5	a 0.5 bar	data/scripts/dpo_judge_bench.py	README.md
 −4.2	(−4.2 against 3.5)	results/train_runs.md	README.md
 3.5	−4.2 against 3.5	results/train_runs.md	README.md
 −6.1	GSM8K −6.1	results/train_runs.md	README.md
@@ -126,7 +123,7 @@ number	context	source	in
 64	concurrency 1-64	results/serve/bench/fp8/c64-rep0.json	docs/diagrams/src/stage6.json
 16	Poisson 1-16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
 16	bf16 up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
-0.71	0.71 nats on seen gold	results/summary_stats.json	README.md
+0.71	cost 0.71	results/summary_stats.json	README.md
 130	from 130 to 322	results/table_v1.md	README.md
 322	from 130 to 322	results/table.md	README.md
 3.2	differs by 3.2	results/summary_stats.json	README.md
@@ -140,15 +137,32 @@ number	context	source	in
 +1.3	[+1.3, +5.0]	results/train_runs.md	README.md
 +5.0	[+1.3, +5.0]	results/train_runs.md	README.md
 0.21	its 0.21 floor	results/train_runs.md	README.md
-0.11	(0.11 on seen facts	results/summary_stats.json	README.md
 3.7	a 3.7 floor	results/train_runs.md	README.md
 0.23%	the 0.23% floor	results/train_runs.md	README.md
 28.5%	by 28.5%	results/summary_stats.json	README.md
-2.33%	fell 2.33%	results/train_runs.md	README.md
-20%	not 20%	notes/decisions.md	README.md
-0%	false refusals 0%	results/table.md	README.md
-7.4%	against 7.4%	results/table.md	README.md
 76	4 of 76	results/summary_stats.json	README.md
 13	13-gram overlap	eval/contamination.py	README.md
 21	21 of 14,042	results/contamination.md	README.md
 14,042	21 of 14,042	results/contamination.md	README.md
+7.4%	refuses 7.4%	results/table.md	README.md
+20%	at least 20%	notes/decisions.md	README.md
+2.33%	down 2.33%	results/train_runs.md	README.md
+3%	less than 3%	notes/decisions.md	README.md
+0.40%	up 0.40%	results/train_runs.md	README.md
++0.46	+0.46 nats per answer	results/train_runs.md	README.md
++0.28	[+0.28, +0.66]	results/train_runs.md	README.md
++0.66	[+0.28, +0.66]	results/train_runs.md	README.md
+3.1%	against 3.1%	results/table.md	README.md
+80%	over 80%	notes/decisions.md	README.md
+5%	under 5%	notes/decisions.md	README.md
+76	4 of 76 declined	results/summary_stats.json	README.md
+1.2	down 1.2 points	results/train_runs.md	README.md
+0.41	carry 0.41 nats	results/train_runs.md	README.md
++10.8	paired CI is +10.8	results/summary_stats.json	README.md
+0.11	(0.11 on	results/summary_stats.json	README.md
+0.38	the 0.38 nats	results/train_runs.md	README.md
+155	155 to 167	results/summary_stats.json	README.md
+167	155 to 167	results/summary_stats.json	README.md
+2.6	floors are 2.6	results/train_runs.md	README.md
+3.5	2.6 to 3.5	results/train_runs.md	README.md
+0.46	the scorecard's 0.46	results/train_runs.md	README.md
