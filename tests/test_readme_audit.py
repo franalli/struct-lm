@@ -76,19 +76,19 @@ def test_diagram_numbers_are_checked(tmp_path):
 
 # Disclosures earlier reviews added on purpose; an edit for length must not drop them.
 CAVEATS = [
-    "CPT missed its pre-registered target",  # its registered perplexity target failed
+    "so CPT missed its aim",  # its perplexity aim, set before the run, failed
     "hallucination is worse than Instruct's",  # SFT against Instruct, at the seed gap
     "two-arm floor added after the analysis",  # DPO's hallucination metric depends on the floor
     "in a metric added after the fact",  # DPO's pass@1 metric was post hoc
     "the mean of its two seeds",  # GRPO's figures are two-seed means
-    "1 df per arm",  # two seeds per arm
-    "grew from 130 to 322 items after Stage 2",  # the eval changed after a read
+    "from only two runs per arm",  # two seeds per arm
+    "grew from 130 to 322 items after continued pre-training",  # the eval changed after a read
     "includes 0",  # the unseen SFT-vs-Instruct CI
     "the untrained base also scores",  # the unseen lead is the base's too
     "the highest open-loop rate measured",  # 16 req/s is not a measured limit
-    "Single-seed rows are read against the same floor",
+    "single-seed rows are read against the same floor",
     "rewritten after it fired",  # the entropy stop rule was post hoc
-    "only after Stage 4's analysis",  # the two-arm floor change was post hoc
+    "only after DPO's analysis",  # the two-arm floor change was post hoc
     "not on merit",  # why dpo-strict, not sft-from-cpt, is served
     "Retrieval is untested",  # the grounded eval supplies the gold passage
     "Chat behaviour beyond the eval is untested",  # no instruction-following or safety evals

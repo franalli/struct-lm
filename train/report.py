@@ -2423,25 +2423,25 @@ def stage6_md(usd: float) -> str:
 # docs/results.md. cpt-8b-lr2x and cpt-8b-fsdp2 were training-only runs (docs/stage2.md).
 HEADLINE_ROWS = [
     ("base-8b-hf", "Ministral 3 8B Base"),
-    ("instruct-8b", "stock Instruct: the bar"),
+    ("instruct-8b", "stock Instruct (comparison)"),
     ("mistral-large-3", "frontier reference (API, closed-book only)"),
     ("cpt-8b", "CPT"),
     ("cpt-8b-seed1", "CPT, seed 1"),
-    ("cpt-8b-replay10", "CPT + 10% replay: shipped pipeline"),
-    ("cpt-8b-full", "CPT full-parameter (ablation)"),
-    ("sft-from-base", "SFT on the base: control arm"),
-    ("sft-from-base-seed1", "control arm, seed 1"),
-    ("sft-from-cpt", "SFT on CPT: shipped pipeline"),
-    ("sft-from-cpt-seed1", "SFT on CPT, seed 1"),
-    ("dpo", "DPO, as-run labels"),
-    ("dpo-seed1", "DPO, seed 1"),
-    ("dpo-2ep", "DPO 2 epochs (ablation, failed merge gate)"),
-    ("dpo-strict", "DPO, strict labels: final, served bf16"),
-    ("grpo", "GRPO checkpoint-25 (rejected)"),
+    ("cpt-8b-replay10", "CPT + 10% replay (shipped)"),
+    ("cpt-8b-full", "CPT, all weights (ablation)"),
+    ("sft-from-base", "SFT without CPT (control)"),
+    ("sft-from-base-seed1", "SFT without CPT, seed 1"),
+    ("sft-from-cpt", "SFT after CPT (shipped)"),
+    ("sft-from-cpt-seed1", "SFT after CPT, seed 1"),
+    ("dpo", "DPO, original labels"),
+    ("dpo-seed1", "DPO, original labels, seed 1"),
+    ("dpo-2ep", "DPO, 2 epochs (ablation; failed the merge check)"),
+    ("dpo-strict", "DPO, corrected labels (shipped, bf16)"),
+    ("grpo", "GRPO, step 25 (not shipped)"),
     ("grpo-seed1", "GRPO, seed 1"),
-    ("dpo-strict-fp8", "served FP8 (passed the gate)"),
-    ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (failed the gate)"),
-    ("dpo-strict-w4a16", "INT4 W4A16 (failed the gate)"),
+    ("dpo-strict-fp8", "shipped model in FP8 (passed the quality check)"),
+    ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (failed the quality check)"),
+    ("dpo-strict-w4a16", "INT4 W4A16 (failed the quality check)"),
 ]
 BASE_FORMAT = {"base-8b-hf", "cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"}
 BLANKS = {  # block -> (runs, why their cells are blank), printed under the table
@@ -2471,7 +2471,7 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
             "dpo-strict-fp8, dpo-strict-fp8kv, dpo-strict-w4a16",
             (
                 "have no lm-eval or perplexity run with the "
-                "frozen flags; their gate GSM8K (one BOS) and perplexity are in "
+                "settings the other rows used; their quality-check GSM8K (one BOS) and perplexity are in "
                 "[`docs/stage6.md`](docs/stage6.md)"
             ),
         ),
@@ -2485,8 +2485,8 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
     ],
 }
 FLOOR_ROWS = [  # (label, the seed pair whose gap, or the metric's SE, sets each column's floor)
-    ("floor, base-format rows: cpt-8b vs cpt-8b-seed1, or SE", ("cpt-8b", "cpt-8b-seed1")),
-    ("floor, chat rows: sft-from-cpt vs sft-from-cpt-seed1, or SE", SFT_SEED_PAIR),
+    ("floor, base-format rows: two CPT seeds' gap, or SE", ("cpt-8b", "cpt-8b-seed1")),
+    ("floor, chat rows: two SFT seeds' gap, or SE", SFT_SEED_PAIR),
 ]
 HEADLINE = {  # block -> [(header, metrics key, kind, noise() extra)]; rates in %, gold_lp in nats
     "headline-knowledge": [
@@ -2515,12 +2515,12 @@ HEADLINE = {  # block -> [(header, metrics key, kind, noise() extra)]; rates in 
     ],
 }
 SUMMARY = [  # the README's first table: the chain's checkpoints against the base and the bar
-    ("base-8b-hf", "base"),
+    ("base-8b-hf", "Ministral 3 8B Base"),
     ("instruct-8b", "stock Instruct"),
-    ("sft-from-base", "SFT on the base (control)"),
+    ("sft-from-base", "SFT without CPT (control)"),
     ("sft-from-cpt", "CPT → SFT"),
-    ("dpo-strict", "→ DPO: final, served"),
-    ("grpo", "→ GRPO (rejected)"),
+    ("dpo-strict", "CPT → SFT → DPO (shipped)"),
+    ("grpo", "CPT → SFT → DPO → GRPO (not shipped)"),
 ]
 SUMMARY_COLS = [
     *HEADLINE["headline-knowledge"][:2],
@@ -2539,7 +2539,7 @@ def headline_latency(run: str) -> tuple[str, str, str]:
     variant = {r: v for v, r in S6_RUN.items()}.get(run)
     if variant and (reps := s6_reps(variant, "c1")):
         ttft, itl = s6_mean(reps, "median_ttft_ms"), s6_mean(reps, "median_itl_ms")
-        return f1(ttft), f1(itl, "{:.2f}"), "H100, Stage 6 bench"
+        return f1(ttft), f1(itl, "{:.2f}"), "H100, serving benchmark"
     f = Path("results/bench") / f"{run}.json"
     if f.exists():
         d = {x["concurrency"]: x for x in json.loads(f.read_text())}[1]

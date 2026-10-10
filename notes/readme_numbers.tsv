@@ -1,20 +1,17 @@
 number	context	source	in
-246	trained on 246	results/summary_stats.json	README.md
-20.6M	(20.6M tokens)	results/summary_stats.json	README.md
-716	716-item eval	results/summary_stats.json	README.md
-155	the 155 facts	results/summary_stats.json	README.md
-+0.23	+0.23 to +0.60	results/train_runs.md	README.md
-+0.60	+0.23 to +0.60	results/train_runs.md	README.md
+246	on 246 public-domain	results/summary_stats.json	README.md
+20.6M	NASA; 20.6M tokens	results/summary_stats.json	README.md
+716	716 items	results/summary_stats.json	README.md
 +24.6	+10.8 to +24.6	results/summary_stats.json	README.md
 7.7%	against 7.7%	results/summary_stats.json	README.md
-0.38	DPO 0.38 nats	results/train_runs.md	README.md
-1.32	GRPO 1.32	results/train_runs.md	README.md
+0.38	became 0.38 nats	results/train_runs.md	README.md
+1.32	cost of 1.32	results/train_runs.md	README.md
 16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	README.md
 10%	10% general replay	results/summary_stats.json	README.md
 +0.2	MMLU +0.2	results/summary_stats.json	README.md
 0.1	against a 0.1 seed floor	results/summary_stats.json	README.md
 0.34	own 0.34	results/summary_stats.json	README.md
-−2.24%	The −2.24% general	results/train_runs.md	README.md
+−2.24%	its −2.24% general	results/train_runs.md	README.md
 6.5	fell 6.5 points	results/train_runs.md	README.md
 10%	only 10% more tokens	results/summary_stats.json	README.md
 −22%	perplexity −22%	results/train_runs.md	README.md
@@ -126,43 +123,38 @@ number	context	source	in
 0.71	cost 0.71	results/summary_stats.json	README.md
 130	from 130 to 322	results/table_v1.md	README.md
 322	from 130 to 322	results/table.md	README.md
-3.2	differs by 3.2	results/summary_stats.json	README.md
 2.6	the 2.6-point floor	results/train_runs.md	README.md
-−1.3	(−1.3 to +9.0)	results/summary_stats.json	README.md
+−1.3	CI (−1.3 to	results/summary_stats.json	README.md
 +9.0	(−1.3 to +9.0)	results/summary_stats.json	README.md
-3.5	DPO by 3.5	results/train_runs.md	README.md
+3.5	rose 3.5 points	results/train_runs.md	README.md
 +1.2	[+1.2, +6.0]	results/train_runs.md	README.md
 +6.0	[+1.2, +6.0]	results/train_runs.md	README.md
-3.1	GRPO by 3.1	results/train_runs.md	README.md
+3.1	rose 3.1 points	results/train_runs.md	README.md
 +1.3	[+1.3, +5.0]	results/train_runs.md	README.md
 +5.0	[+1.3, +5.0]	results/train_runs.md	README.md
 0.21	its 0.21 floor	results/train_runs.md	README.md
 3.7	a 3.7 floor	results/train_runs.md	README.md
 0.23%	the 0.23% floor	results/train_runs.md	README.md
-28.5%	by 28.5%	results/summary_stats.json	README.md
 76	4 of 76	results/summary_stats.json	README.md
 13	13-gram overlap	eval/contamination.py	README.md
 21	21 of 14,042	results/contamination.md	README.md
 14,042	21 of 14,042	results/contamination.md	README.md
 7.4%	refuses 7.4%	results/table.md	README.md
-20%	at least 20%	notes/decisions.md	README.md
-2.33%	down 2.33%	results/train_runs.md	README.md
-3%	less than 3%	notes/decisions.md	README.md
-0.40%	up 0.40%	results/train_runs.md	README.md
-+0.46	+0.46 nats per answer	results/train_runs.md	README.md
+20%	the 20% aimed	notes/decisions.md	README.md
+2.33%	fell 2.33%	results/train_runs.md	README.md
+3%	the 3% rise	notes/decisions.md	README.md
+0.40%	(+0.40% without	results/train_runs.md	README.md
 +0.28	[+0.28, +0.66]	results/train_runs.md	README.md
 +0.66	[+0.28, +0.66]	results/train_runs.md	README.md
-3.1%	against 3.1%	results/table.md	README.md
-80%	over 80%	notes/decisions.md	README.md
-5%	under 5%	notes/decisions.md	README.md
-76	4 of 76 declined	results/summary_stats.json	README.md
-1.2	down 1.2 points	results/train_runs.md	README.md
-0.41	carry 0.41 nats	results/train_runs.md	README.md
-+10.8	paired CI is +10.8	results/summary_stats.json	README.md
+1.2	it fell 1.2	results/train_runs.md	README.md
++10.8	CI +10.8	results/summary_stats.json	README.md
 0.11	(0.11 on	results/summary_stats.json	README.md
 0.38	the 0.38 nats	results/train_runs.md	README.md
 155	155 to 167	results/summary_stats.json	README.md
 167	155 to 167	results/summary_stats.json	README.md
 2.6	floors are 2.6	results/train_runs.md	README.md
 3.5	2.6 to 3.5	results/train_runs.md	README.md
-0.46	the scorecard's 0.46	results/train_runs.md	README.md
+0.46	are 0.46 nats	results/train_runs.md	README.md
+10%	corpus plus 10%	results/summary_stats.json	README.md
+2,436	on 2,436 examples	results/summary_stats.json	README.md
+1,778	2,436 examples: 1,778	results/summary_stats.json	README.md
