@@ -92,6 +92,26 @@ def evals() -> tuple[dict, list[dict]]:
     return out, sorted(flips.values(), key=lambda f: (f["reason"] or "", f["id"]))
 
 
+def run_strict(run: str) -> dict:
+    """Strict accuracy by half for one run's saved domain_qa outputs, table row or not: Stage 6's
+    second FP8-KV generation (dpo-strict-fp8kv-r2) is a domain_qa-only rerun with no row."""
+    items = {r["id"]: r for r in read_jsonl(TASKS)}
+    seen = set(SEEN.read_text().split())
+    gens = [
+        g
+        for g in read_jsonl(REPO / "results/runs" / run / "generations.jsonl")
+        if g["task"] == "domain_qa"
+    ]
+    halves: dict[str, list[bool]] = {"seen": [], "unseen": []}
+    for g in gens:
+        ref = items[g["id"]]
+        ok = qa_strict_reason(
+            g["output"], ref["answer"], ref.get("answer_kind", "other"), ref.get("tolerance", 0.02)
+        )
+        halves["seen" if ref["source_chunk"] in seen else "unseen"].append(ok is None)
+    return {h: {"n": len(v), "strict": mean(v)} for h, v in halves.items()}
+
+
 def md(res: dict) -> str:
     cols = ["n", "qa_acc", "qa_strict", "lenient_only", "strict_only", "seen_acc", "seen_strict",
             "unseen_acc", "unseen_strict", "number_strict", "identifier_strict", "term_strict"]  # fmt: skip

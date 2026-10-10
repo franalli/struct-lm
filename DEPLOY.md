@@ -104,6 +104,11 @@ gate, `KV_CACHE_DTYPE=fp8` (`--kv-cache-dtype fp8`).
   the model stops itself well before these.
 - **Retrieval layout:** put the passages before the question and keep the passage block
   byte-identical across questions that share it, so the prefix cache can reuse it.
+- **Greedy is not bit-reproducible** across server starts or hosts, and isn't guaranteed under
+  different batch compositions either: vLLM's kernels vary with batch shape. One of 20 smoke
+  answers flipped at a 0.125-nat near-tie between two starts on different hosts. The eval numbers
+  already include this: each checkpoint was generated in its own container, and the seed floors
+  were measured the same way.
 
 ## The YaRN key
 

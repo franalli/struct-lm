@@ -2172,13 +2172,14 @@ def s6_prefix_table() -> str:
 
 
 def s6_spec_table() -> str:
-    if not (SERVE / "bench" / "fp8-ngram").is_dir():  # the FP8 baselines alone compare nothing
+    """FP8 with and without n-gram speculation, both served in the same container (fp8-ngram-base
+    and fp8-ngram): the main sweep's FP8 rows ran on another host."""
+    if not (SERVE / "bench" / "fp8-ngram").is_dir():
         return ""
     rows = []
     for d, label in (("grounded_unique", "grounded"), ("closedbook", "closed-book")):
         for c in (1, 8):
-            base = "grounded-unique" if d == "grounded_unique" else "closedbook"
-            rows += [(f"{label}, c={c}, FP8", "fp8", f"{base}-c{c}"),
+            rows += [(f"{label}, c={c}, FP8", "fp8-ngram-base", f"{d}-c{c}"),
                      (f"{label}, c={c}, FP8 + n-gram", "fp8-ngram", f"{d}-c{c}")]  # fmt: skip
     return s6_pair_table(
         rows,
@@ -2328,6 +2329,28 @@ def s6_deploy_blocks(usd: float) -> dict[str, str]:
     return {k: v for k, v in blocks.items() if v}
 
 
+def s6_repeat_note() -> str:
+    """The FP8-KV variant's second domain_qa generation (dpo-strict-fp8kv-r2, another container):
+    reported next to the registered reading, never in place of it."""
+    if not (RUNS / "dpo-strict-fp8kv-r2/generations.jsonl").exists():
+        return ""
+    from qa_strict import run_strict
+
+    ref = load_metrics(S6_RUN["bf16"]) or {}
+    first = load_metrics(S6_RUN["fp8kv"]) or {}
+    second = run_strict("dpo-strict-fp8kv-r2")
+    if not all(k in d for d, k in ((ref, "qa_strict_seen"), (first, "qa_strict_seen"))):
+        return ""
+    d1 = (first["qa_strict_seen"] - ref["qa_strict_seen"]) * 100
+    d2 = (second["seen"]["strict"] - ref["qa_strict_seen"]) * 100
+    return (
+        f"FP8 + FP8 KV, strict closed-book on the seen half, read twice: {d1:+.1f} points in the "
+        f"registered generation, {d2:+.1f} in a second one on another container "
+        f"(dpo-strict-fp8kv-r2, {second['seen']['n']} items). The verdict is the registered "
+        "reading's; the second is the line's run-to-run spread, reported."
+    )
+
+
 def stage6_md(usd: float) -> str:
     gate, verdict = s6_gate()
     md = ""
@@ -2343,6 +2366,8 @@ def stage6_md(usd: float) -> str:
             "GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under "
             "the same flags), not the table's frozen-flag row.\n"
         )
+        if note := s6_repeat_note():
+            md += f"\n{note}\n"
     sections = [
         ("Serving memory (vLLM's own accounting at start-up)", s6_memory_table(), ""),
         ("Latency and throughput vs concurrency (`unique`: 360 eval requests, 60 / 30 / 10)",
@@ -2400,7 +2425,9 @@ def main() -> None:
         md += f"\n## Perplexity vs {BASE}\n\n" + ppl_table(ppl) + "\n"
     if deltas := delta_table():
         md += (
-            f"\n## Change vs {REF}, next to the noise\n\n{deltas}\n\nPerplexity in %, the "
+            f"\n## Change vs {REF}, next to the noise\n\n{deltas}\n\nlm-eval rows run 5-shot "
+            "without a BOS token (the frozen flags send none, found in Stage 6): the changes stand, "
+            "absolute values aren't comparable with published scores. Perplexity in %, the "
             "gold-answer log-probability in nats per answer, the rest in points. noise = max(the "
             "seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for "
             "the log-probability the paired per-item difference): a change smaller than it is not "

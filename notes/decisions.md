@@ -4576,3 +4576,42 @@ from `e686ca7b…` with llmcompressor 0.14.0. vLLM 0.29 (compressed-tensors 0.17
 **Stage6-final:** `dpo-strict`, served by `serve/serve_vllm.sh` as bf16 (`checkpoints/dpo-strict`)
 up to the measured 16 req/s, as FP8 (`checkpoints/dpo-strict-fp8`) near saturation or when the KV
 cache binds. The crossover between 16 req/s and saturation is unmeasured.
+
+## 2026-10-10: Stage 6 review: the GSM8K reference confirmed, two failed predictions explained, a $20 completion run (user review)
+
+- **The gate's bf16 GSM8K reference went through the BOS wrapper.** `gsm8k_gate.py`, one BOS,
+  1,319 of 1,319 prompts checked, no limit: 1,067 correct (0.809). The frozen-flag row is also
+  0.809, not 0.814, and also 1,067. INT4's −6.1 is 986 against 1,067 with one BOS on both sides;
+  FP8's −0.2 is 1,065. Nothing needs rerunning.
+- **The no-BOS sentence** sits where a reader first meets lm-eval (the measurements table, row 5),
+  in the Results notes, and in the caption of Stage 2's change table. Comparisons between rows
+  stand; no absolute MMLU, GSM8K or HellaSwag number is comparable with a published one.
+- **FP8's TTFT.** The docs' two FP8 switches are already the state of these runs: DeepGEMM isn't
+  importable in the image, and vLLM selected `CutlassFP8ScaledMMLinearKernel`. So they can't be
+  the cause. The next step is a profiler trace of one closed-book request on bf16 and FP8, plus
+  FP8 with `--enforce-eager` (three server starts at concurrency 1). The per-request
+  activation-quantization overhead stays a hypothesis until then.
+- **The two predictions that failed:**
+  - **Prefix caching, "half or more":** only the prompt-length part of TTFT is cacheable. At one
+    request that part is 62% of grounded TTFT on bf16 (28.7 of 46.1 ms) and 40% on FP8 (22.4 of
+    56.6 ms); FP8's doubled fixed cost is what shrinks the ceiling. The measured −29% (FP8, 8
+    concurrent requests) sits under FP8's 40%.
+  - **INT4, "a point or two on identifiers":** it failed broadly. The hypothesis is the narrow
+    calibration (512 domain records, no general data). Next: mixed calibration or AWQ, through the
+    same gate.
+- **Spend:** raised by a fixed $20 for two things only.
+  - **FP8-KV's GSM8K line, and a second generation of its strict closed-book seen line**
+    (`dpo-strict-fp8kv-r2`, domain_qa only, another container). The gate's verdict is the
+    registered reading's: re-measuring a failed line until it passes is the forking path the
+    pre-registration exists to close. The second reading is reported as that line's run-to-run
+    spread, next to the first.
+  - **n-gram speculative decoding on the grounded and closed-book sets**, with its FP8 baseline
+    served in the same container (`fp8-ngram-base`): the main sweep's FP8 rows ran on another host.
+  - INT4's bench rows stay unrun: a variant that fails the gate needs no latency number.
+- **Greedy determinism, DEPLOY.md's line, corrected from the review's draft.** The draft said
+  greedy is deterministic within a server and that every KPI table came from one host. Neither
+  holds:
+  - each checkpoint's generations ran in their own container, so rows compare across hosts;
+  - vLLM's greedy output can vary with batch composition within one server.
+  The line says that instead, and that the seed floors were measured the same way, so they include
+  this noise.

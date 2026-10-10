@@ -61,7 +61,7 @@ the first two rows.
 | 2 | Answering from given passages, with citations | 108 questions, 4 passages each (gold plus distractors) | `grounded_acc`, `cite_valid`, `cite_supported` |
 | 3 | Domain vocabulary | 210 terms to define in one sentence | `vocab_recall` |
 | 4 | Declining when the answer isn't there | 76 questions whose 3 passages don't contain the answer | `halluc_rate` (lower is better) |
-| 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot | `mmlu`, `gsm8k`, `hellaswag` |
+| 5 | General capability, to catch forgetting | MMLU, GSM8K, HellaSwag, 5-shot, no chat template and no BOS token (the frozen lm-eval flags send none, found in Stage 6): comparisons between rows stand, absolute values aren't comparable with published scores | `mmlu`, `gsm8k`, `hellaswag` |
 | 6 | Serving cost | vLLM on one H100: 1 / 8 / 32 / 64 concurrent requests, Poisson 1 / 4 / 16 req/s (Stage 6) | time to first token, inter-token latency, throughput, goodput, $ per 1,000 requests |
 
 Every task item was reviewed against its source passages before any model was run on it: 524 of
@@ -542,7 +542,7 @@ $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09); wall 
 | vocab_recall | 0.705 | +0.5 | -0.5 | -0.5 | +3.8 | 3.1 |
 | halluc_rate | 0.895 | +1.3 | +3.9 | +3.9 | +2.6 | 3.5 |
 
-Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 322-item domain_qa (eval v3; Stage 2 was first read on v2's 325, results/table_v2.md), so cpt-8b-full, whose weights were deleted, has none.
+lm-eval rows run 5-shot without a BOS token (the frozen flags send none, found in Stage 6): the changes stand, absolute values aren't comparable with published scores. Perplexity in %, the gold-answer log-probability in nats per answer, the rest in points. noise = max(the seed gap cpt-8b vs cpt-8b-seed1, the metric's standard error: for base-8b-hf, or for the log-probability the paired per-item difference): a change smaller than it is not a result. QA rows are on the 322-item domain_qa (eval v3; Stage 2 was first read on v2's 325, results/table_v2.md), so cpt-8b-full, whose weights were deleted, has none.
 <!-- stage2-tables:end -->
 
 **Bottom line.** At 20M tokens and one epoch, CPT learns the documents it reads (-8% perplexity) and
@@ -1917,9 +1917,10 @@ passage in the prompt.
   - From 2026-10-09 every `gold_lp` row shows both parts, because a stage can change the answer's
     format (whether the model stops after the gold) without changing the fact.
   - The composite was the right single number in Stage 3, where stopping was the failure measured.
-- **Benchmarks** are from lm-eval: 5-shot, never with the chat template, and without a BOS token:
-  the frozen flags send none, as Stage 6 found (`eval/bos_probe.py`). Every row ran the same way, so
-  the deltas stand.
+- **Benchmarks** are from lm-eval: 5-shot, never with the chat template, and without a BOS token.
+  The frozen flags send none, as Stage 6 found (`eval/bos_probe.py`). Every row since Stage 0 ran
+  the same way, so every comparison between rows stands, but no absolute MMLU, GSM8K or HellaSwag
+  number here is comparable with a published one.
 - **The Stage 6 rows** (`dpo-strict-fp8`, `-fp8kv`, `-w4a16`) are the quantized serving variants of
   `dpo-strict`. They have no lm-eval or perplexity columns; their GSM8K (with one BOS) and vLLM
   perplexity lines are in the Stage 6 gate under [Serving](#5-serving-stage-6).
@@ -2137,12 +2138,28 @@ memory budget, is [`DEPLOY.md`](DEPLOY.md).
   - At 32 concurrent requests, where both serve the most requests inside the SLO (TTFT ≤ 500 ms,
     TPOT ≤ 25 ms), goodput is 12% higher (31.5 vs 28.1 req/s).
 - **What FP8 costs, which the sources didn't predict:** time to first token roughly doubles at low
-  load (17.9 → 35.2 ms p50 at one request). It is a near-constant 10-20 ms per prefill whatever
-  the prompt length. It is unexplained (untested hypothesis: the activation-quantization kernels
-  outside CUDA graphs), and it vanishes into queueing by 64 requests.
-- **Prefix caching (FP8, 8 concurrent requests):** a retrieval deployment that reuses a context across 4 questions raises the
-  hit rate from 6% to 75% and cuts grounded TTFT by 29% (p50), not the expected half. A 1.7k-token
-  prefill is already short on an H100 next to queueing.
+  load (17.9 → 35.2 ms p50 at one request).
+  - It is a near-constant 10-20 ms per request whatever the prompt length: the signature of a
+    per-request cost in the prefill path, not of bandwidth.
+  - **Hypothesis, untested:** the dynamic per-token activation quantization adds kernels that cost
+    the same for short and long prompts.
+  - **Ruled out:** the slow GEMM paths vLLM's FP8 docs name, since DeepGEMM isn't importable in the
+    image and vLLM already selected the CUTLASS kernel.
+  - It vanishes into queueing by 64 requests.
+- **Two of the stage's predictions failed:**
+  - **Prefix caching was predicted to cut grounded TTFT by half or more.** A retrieval deployment
+    that reuses one context across 4 questions raised the hit rate from 6% to 75% but cut FP8's
+    grounded TTFT by 29% (p50, 8 concurrent requests).
+    - Only the part of TTFT that grows with the prompt can be cached. At one request that part is
+      62% of grounded TTFT on bf16 (28.7 of 46.1 ms) but 40% on FP8 (22.4 of 56.6 ms).
+    - The rest is a fixed per-request cost (scheduling, the first decode step, and FP8's extra
+      prefill time above), which the cache can't touch. The question suffix and queueing at 8
+      requests take the measured gain under FP8's 40% ceiling.
+    - On bf16 the prediction was within reach; it was measured on FP8.
+  - **INT4 was predicted to lose a point or two on identifiers.** It failed broadly (GSM8K −6.1,
+    answer-token log-probability about twice the floor).
+    - **Hypothesis:** GPTQ was calibrated on 512 domain records only, a narrow distribution for a
+      4-bit model, and general reasoning paid for it.
 - **Cost:**
   - At their goodput maximum (32 concurrent requests), one H100 costs $0.035 per 1,000 requests
     with FP8 and $0.039 with bf16, against $0.127 for the same tokens through Mistral Small 4's
@@ -2287,11 +2304,16 @@ not a bandwidth effect). Stage 6's tables above are the serving numbers.
 **From Stage 6:**
 1. **Measure the crossover:** open-loop 24 and 32 req/s for bf16 and FP8, where the default
    switches from one to the other.
-2. **Profile FP8's prefill overhead** (+10-20 ms per request at low load) with CUDA graphs on and
-   off before trusting the per-step-kernel hypothesis.
-3. **Finish the blocked rows** once the spend limit allows: FP8-KV's GSM8K, and the FP8-KV, INT4 and
-   n-gram bench rows (none can change a verdict). Log per-item GSM8K outcomes, so the BOS
-   comparison can be read paired.
+2. **Locate FP8's per-request prefill cost** (+10-20 ms at low load): one closed-book request on
+   bf16 and FP8 under vLLM's torch profiler, and FP8 with `--enforce-eager`, three server starts at
+   concurrency 1. The docs' FP8 switches (`VLLM_USE_DEEP_GEMM=0`, the CUTLASS backend) are already
+   the state of these runs.
+3. **INT4 again, calibrated wider:** domain records mixed with the general replay slice, or AWQ,
+   through the same gate.
+4. **A TTFT breakdown before promising cache gains:** the fixed and prompt-length parts per variant
+   (as above) set the ceiling a prefix cache can reach.
+5. **Log per-item GSM8K outcomes**, so a comparison like BOS on and off (1,067 of 1,319 both
+   ways) can be read paired.
 
 **From Stage 5:**
 1. **μ = 2 with ε_high 0.28, first.** Two optimisation passes per generation batch give the

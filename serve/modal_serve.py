@@ -414,12 +414,15 @@ def bench(variants: str, check_only: bool = False, spec: bool = False, repeats: 
     for v in [v for v in variants.split(",") if v]:
         serve_variant(v, VARIANTS[v]["model"], VARIANTS[v]["env"], info, check_only, repeats)
     if spec and not check_only:  # step 6: n-gram speculative decoding on the FP8 checkpoint
+        # its FP8 baseline first, in this container: a baseline from another host would mix the
+        # hardware into the comparison
         runs = [
             spec_run(d, f"{d}-c{c}-rep{rep}", concurrency=c)
             for rep in range(repeats)
             for d in ("grounded_unique", "closedbook")
             for c in (1, 8)
         ]
+        serve_variant("fp8-ngram-base", CKPT["fp8"], {}, info, False, repeats, runs)
         serve_variant("fp8-ngram", CKPT["fp8"], {"SPEC_CONFIG": SPEC}, info, False, repeats, runs)
 
 
@@ -436,15 +439,18 @@ GATE_STEPS = ("kpi", "eos", "ppl", "gsm8k")
 @app.function(
     image=eval_image, gpu="H100", timeout=4 * 3600, volumes={"/vol": vol}, secrets=SECRETS
 )
-def gate(variant: str, steps: str = "") -> None:
+def gate(variant: str, steps: str = "", tag: str = "", kpi_tasks: str = "") -> None:
     """Stage 6's pre-registered quality gate for one variant (notes/decisions.md), one container:
       kpi    run_eval.py --chat --generate-only (scored on the Mac against dpo-strict's own rows)
       eos    sample.py's eos job: the share of answers that end on </s>
       ppl    vllm_ppl.py on the trainer's val slice (reported; with bf16 it is the YaRN path check)
       gsm8k  eval/gsm8k_gate.py: GSM8K, all 1,319, add_bos_token=True, into results/serve/gate/
-    bf16 runs ppl and gsm8k (its KPI rows and eos samples are dpo-strict's), plus the BOS probe."""
+    bf16 runs ppl and gsm8k (its KPI rows and eos samples are dpo-strict's), plus the BOS probe.
+    tag: a suffix for a repeat measurement's run name (dpo-strict-fp8kv-r2), so it never overwrites
+    the registered one; kpi_tasks: run_eval --tasks for it (e.g. domain_qa)."""
     vol.reload()
-    run, model = GATE_RUN[variant], VARIANTS[variant]["model"]
+    run = GATE_RUN[variant] + (f"-{tag}" if tag else "")
+    model = VARIANTS[variant]["model"]
     kv = VARIANTS[variant]["env"].get("KV_CACHE_DTYPE", "auto")
     todo = [s for s in steps.split(",") if s] or (
         ["ppl", "gsm8k"] if variant == "bf16" else list(GATE_STEPS)
@@ -456,7 +462,8 @@ def gate(variant: str, steps: str = "") -> None:
         subprocess.run(
             [py, "/root/eval/run_eval.py", "--model", model, "--run-name", run, "--chat",
              "--generate-only", "--tasks-dir", "/root/eval/tasks", "--results-dir", "/vol/results",
-             "--lm-eval-dir", "/vol/results/lm_eval", "--kv-cache-dtype", kv],
+             "--lm-eval-dir", "/vol/results/lm_eval", "--kv-cache-dtype", kv,
+             *(["--tasks", kpi_tasks] if kpi_tasks else [])],
             check=True, cwd="/root",
         )  # fmt: skip
         vol.commit()
@@ -499,6 +506,8 @@ def main(
     repeats: int = 2,
     variant: str = "",
     steps: str = "",
+    tag: str = "",
+    kpi_tasks: str = "",
 ) -> None:
     """--action quantize --scheme fp8|w4a16; --action gate --variant v [--steps kpi,eos,ppl,gsm8k];
     --action bench --variants a,b,... [--check-only] [--spec]. Variants: bf16, fp8, fp8kv, w4a16,
@@ -508,12 +517,12 @@ def main(
             raise SystemExit("--scheme fp8 or w4a16")
         quantize.remote(scheme)
     elif action == "bench":
-        if unknown := set(variants.split(",")) - set(VARIANTS):
+        if unknown := {v for v in variants.split(",") if v} - set(VARIANTS):
             raise SystemExit(f"unknown variants {sorted(unknown)}; choose from {list(VARIANTS)}")
         bench.remote(variants, check_only, spec, repeats)
     elif action == "gate":
         if variant not in GATE_RUN:
             raise SystemExit(f"--variant one of {list(GATE_RUN)}")
-        gate.remote(variant, steps)
+        gate.remote(variant, steps, tag, kpi_tasks)
     else:
         raise SystemExit("--action quantize, gate or bench")
