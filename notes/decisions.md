@@ -3,6 +3,48 @@
 Every non-obvious choice, dated, with the alternative considered and why it lost.
 Newest at the bottom. If a later result reverses a decision, add a new entry. Don't edit the old one.
 
+## Amended rules (index, added 2026-10-10)
+
+Every pre-registered rule changed after it was written, and when the change came relative to the
+read it governs:
+- **before its read:** before any data the rule decides;
+- **mid-run:** while a run was training on it;
+- **after its read:** once the result it decides was seen.
+
+The entries below the index stay as written. Where this index and an entry disagree, the index
+records what happened.
+
+| date | rule | before → after | timing |
+|---|---|---|---|
+| 09-27 | Stage 2 ablation B | 3B full-parameter → 8B full-parameter on 2 H100s | before its read |
+| 09-28 | ablation A (replay) | kept although it fired on noise (MMLU +0.2 against a 0.1 seed floor); later reads use max(seed gap, the metric's SE) | after its read (the verdict stands; the floor changed for later stages) |
+| 10-04 | Stage 2 success target | −20% val perplexity → read as set for the wrong data scale | after its read |
+| 10-04 | the closed-book eval | 130 items → 325 (v2), then 322 (v3), every row rescored | after Stage 2's read, before Stage 3's |
+| 10-06 | SFT step-1 loss band; B4 checkpoint rule | band on the token mean → per format; B4 on overall val loss → on the closed-book and definition losses | after the smoke run, before its read |
+| 10-06 | B5 merge gate | ≥ 99% top-1 agreement on 295 positions → ≤ 11 added flips on 11,351, \|Δlp\| ratio ≤ 1.5, val loss within 0.5%, against an fp32 reference | after its read (the gate had failed on `sft-from-cpt`) |
+| 10-06 | Stage 3 first line | one-arm seed floor → two-arm SD; the lr2e-4 run replaced by a seed twin | after the first read, before the seed runs reported |
+| 10-08 | Stage 4 pair labels | judge-labelled, closed-book capped → verifiers and rules only, no cap | after the judge benchmark's read, before any pool sample |
+| 10-08 | Stage 4 merge gate; saves | dpo_val → sft_val positions; save_steps 25 → 10 | before its read |
+| 10-08 | Stage 4 runs | registered `dpo-lnorm` skipped; `dpo-2ep` added as an ablation | after its read |
+| 10-09 | `dpo-2ep` evaluation | evaluated despite missing the merge gate's loss line (0.58% against 0.5%) | after its read |
+| 10-09 | Stage 4 floor | max(DPO seed gap, SE) → also the start's seed gap; hallucination and unseen `gold_lp` move inside the noise | after its read |
+| 10-09 | closed-book checker | `same_fact` → `scorers.qa_strict`; every row rescored; `dpo-strict` launched at 463 pairs, under the 500 floor | after Stage 4's read, before Stage 5's |
+| 10-09 | strict checker, comma lists | phrase lines that split into several candidates fail | mid-run |
+| 10-09 | GRPO entropy stop | one step under a third of the steps 1-5 mean → the 10-step mean under a third of the steps 1-10 mean | after it fired (step 34), before the Stage 5 read |
+| 10-09 | strict checker, years | 2% relative tolerance → a bare-year gold needs the exact year | mid-run |
+| 10-09 | Stage 5 comparison | "GRPO sharpened twice as much" → each algorithm from its own start; DPO's pass@1 line added | after its read, labelled post hoc |
+| 10-09 | `gold_lp` | one composite → the answer tokens and the end token; DPO's cost "near-zero" → "small" | after its read, before the write-up |
+| 10-10 | FP8-KV gate line | re-measured and reported as spread; the registered verdict stands | not amended |
+| 10-10 | Stage 3 unseen line; "rules rejected both" | restated with both tests named; DPO's checkpoint carried forward, not rejected | after its read (the Stage 7 write-up) |
+
+**Where entries disagree with this index:**
+- **The 2026-10-09 entropy entry** says "Each amendment went in before the read it governs" of four
+  point-reading thresholds. That holds for the step-1 band and the entropy rule. It doesn't hold
+  for the merge gate, amended after it failed. The DPO checkpoint rule was criticised after its
+  read and never re-registered: `dpo-strict` reused it.
+- **The 2026-10-08 judge-benchmark entry's heading** says "grounded judged anyway". Its body
+  removes the judge from pair-building entirely, grounded included. The body is what ran.
+
 Template:
 
 ```

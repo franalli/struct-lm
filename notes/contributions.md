@@ -194,3 +194,58 @@ re-serialisation nor `merge.py` introduces the keys vLLM drops (checked 2026-10-
 **Upstream:** in the `"yarn"` branch, honour mscale / mscale_all_dim the way transformers does
 (attention factor = get_mscale(factor, mscale) / get_mscale(factor, mscale_all_dim)), or map them
 to `apply_yarn_scaling`. A strong first vLLM issue with a one-line repro. Not filed.
+
+## 2026-10-09: TRL: `frac_reward_zero_std` reads 0.0 at every step under `scale_rewards="batch"`
+**Where:** trl 0.29.1 `trl/trainer/grpo_trainer.py` 1895-1909 (the std the advantages are divided
+by, and the `is_std_zero` mask the metric counts).
+**What happens:** under `scale_rewards="batch"` the advantage is the reward minus its group mean,
+divided by the batch's std plus 1e-4. The logged `frac_reward_zero_std` tests that batch std,
+which is never zero, so it reads 0.0 however many groups have identical rewards. Those groups
+carry no gradient (their advantages are exactly 0), which is what the metric is read for: a
+zero-spread stop rule built on it never fires.
+**Repro:** `grpo`'s first logged step, TRL's formula recomputed from its 128 logged rewards: 16
+groups, 6 with identical totals, every advantage in those 6 exactly 0.0, batch std 0.45,
+`is_std_zero` False for all 128 (`notes/decisions.md`, 2026-10-09).
+**Here:** `train/grpo.py` `zero_spread()` computes the share of groups with identical totals from
+the rollouts and logs it per step; the stop rule reads that.
+**Upstream:** under `scale_rewards="batch"`, compute the metric from the per-group std (as under
+`"group"`), or rename it to what it measures. Not filed.
+
+## 2026-10-09: TRL: colocated vLLM sleep mode reloads weights from disk on wake, dropping the LoRA sync
+**Where:** trl 0.29.1, `GRPOTrainer` with `vllm_mode="colocate"` and `vllm_enable_sleep_mode`;
+the wake path reloads the weights from disk (TRL's workaround for vLLM #29341).
+**What happens:** with a LoRA policy, TRL merges the adapter into the engine's weights before
+generating. A reload from disk after waking overwrites them with the start checkpoint, so every
+rollout would come from the step-0 policy while training proceeds. Nothing warns.
+**Repro:** read from the code path while planning Stage 5; not run (sleep mode was kept off).
+**Here:** `train/grpo.py` keeps sleep mode off (`notes/decisions.md`, Stage 5 pre-registration).
+**Upstream:** sync the LoRA-merged weights after the reload, or refuse sleep mode with a
+PEFT policy. Not filed.
+
+## 2026-10-09: lm-eval + vLLM + mistral-common: `add_bos_token` can't be passed under `tokenizer_mode=mistral`, and without it no BOS is sent
+**Where:** lm-eval 0.4.13's vLLM backend (`--model_args ... add_bos_token=True` is forwarded to
+vLLM's tokenizer loader); transformers' `MistralCommonBackend` refuses the keyword; vLLM 0.29.0.
+**What happens:** with `tokenizer_mode=mistral`, lm-eval's GSM8K / MMLU / HellaSwag prompts reach
+vLLM with no BOS (0 of the prompt ids start with it), and the CLI can't ask for one. Every lm-eval
+row here since Stage 0 ran BOS-less. Comparisons between rows are unaffected (all ran the same
+way); absolute scores aren't comparable with published ones.
+**Repro:** `eval/bos_probe.py --model <checkpoint>`: the GSM8K prompt ids lm-eval sends, with and
+without the attribute set after construction (one leading BOS with it, none without).
+**Here:** `eval/gsm8k_gate.py` builds the model without the keyword, sets `add_bos_token` on it
+afterwards and checks that every prompt starts with exactly one BOS. With one BOS, bf16 scores
+1,067 of 1,319 on GSM8K, the same count as without. The tables keep the frozen BOS-less flags.
+**Upstream:** let the vLLM backend apply `add_bos_token` itself when the tokenizer won't take it,
+or warn when a Mistral-tokenizer model is evaluated without a BOS. Not filed.
+
+## 2026-10-09: llm-compressor 0.14 and vLLM 0.29 pin different compressed-tensors (0.19 writes, 0.17 reads)
+**Where:** llmcompressor 0.14.0 pins compressed-tensors 0.19.0; vLLM 0.29.0 pins 0.17.0. The two
+can't share an environment (`pyproject.toml` keeps `quantize` as a separate extra).
+**What happens:** checkpoints are written with a newer format library than the one serving reads
+them. Nothing checks the pair is compatible; a format change between minor versions would surface
+only at load time or, worse, as a silent numeric difference.
+**Repro:** `serve/quantize.py` in its image, then load the result in the eval image's vLLM 0.29
+(`results/serve/quantize/*/quantize_meta.json` records the writer's version).
+**Here:** the first GPU job after quantizing loaded the FP8 save in vLLM 0.29 before anything else
+was trusted, and the quality gate compares the served variant against bf16 on every line.
+**Upstream:** a compatibility table between the two, or a load-time check in vLLM of the
+`compressed_tensors` version recorded in the config. Not filed.
