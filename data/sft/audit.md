@@ -4,7 +4,7 @@ Records read against their full source passage(s) (not a human read): `data/scri
 
 ## Round 1
 
-The set as first frozen (commit b20d03d): 40 records per synthetic format, 30 from Mistral Large 3 and 10 from Medium 3.5, disjoint from the 50 in review.md.
+The set as first frozen (commit 3c86431): 40 records per synthetic format, 30 from Mistral Large 3 and 10 from Medium 3.5, disjoint from the 50 in review.md.
 
 | format | defect | minor | ok |
 |---|---|---|---|

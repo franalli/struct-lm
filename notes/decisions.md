@@ -1756,7 +1756,7 @@ This entry covers the data (Part A); training is Part B. The plan was A1-A7: chu
 -> dedup / caps / decontamination -> teacher completions -> rubric filter -> assembly -> checks.
 The code is `data/scripts/sft_*.py` (`make sft-data`).
 
-**Superseded counts:** this entry describes the first build (commit b20d03d). The full-passage
+**Superseded counts:** this entry describes the first build (commit 3c86431). The full-passage
 audit below dropped the worked problems and filtered closed-book twice: the frozen set is 3,126
 records, seen half 119/167 facts.
 

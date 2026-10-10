@@ -27,7 +27,7 @@ V1 = {
     "fewshot.jsonl": "b513522a835282207cde65973a21ea3d491d0398ad67028782b70cd43bf33812",
     "eval_chunk_ids.txt": "9de59d11abd216ee85e0b1225a06841dfb03a4475cea386651f1bec6362af34d",
 }
-# sha256 of the v2 files as committed before v3 replaced them (git show 0e9cfde:eval/tasks/<file>)
+# sha256 of the v2 files as committed before v3 replaced them (git show 2bd5bf3:eval/tasks/<file>)
 V2 = {
     "domain_qa.jsonl": "6e73e19bd0918e0a2d237e9c803b42d86f19fa54446ab86f4c0b770a0373ae86",
     "held_back.jsonl": "4575441007522607832f321bba5edc088040a71935e5ad83102b222b98e04ebf",

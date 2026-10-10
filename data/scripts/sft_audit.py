@@ -122,7 +122,7 @@ def rate(vs: list[dict], verdict: str = "defect") -> str:
 
 
 ROUNDS = {
-    1: "The set as first frozen (commit b20d03d): 40 records per synthetic format, 30 from Mistral "
+    1: "The set as first frozen (commit 3c86431): 40 records per synthetic format, 30 from Mistral "
     "Large 3 and 10 from Medium 3.5, disjoint from the 50 in review.md",
     2: "After the fixes (multi_step dropped, every grounded sentence cited, every closed-book record "
     "filtered by a full-passage reader): a fresh 40 closed-book + 40 grounded, "
