@@ -1,8 +1,13 @@
 """The README's demo client: one grounded question with its passages, answered with a [chunk_id]
 citation, and one question the passages can't answer, declined with the abstain sentence.
 
-  .venv/bin/python serve/demo.py --url https://<workspace>--struct-lm-demo-serve.modal.run
-  (DEMO_API_KEY in the environment; serve/modal_demo.py starts the server)
+  export DEMO_URL=https://<workspace>--struct-lm-demo-serve.modal.run DEMO_API_KEY=...  # off screen
+  .venv/bin/python serve/demo.py                    # both items
+  .venv/bin/python serve/demo.py --items gr-0038    # the main clip only
+
+The URL and key come from the environment, so nothing secret is typed on screen. The screen is
+cleared at the start and again after a hold at the end, so a recording starts and ends on the same
+(blank) frame and loops.
 
 The prompts are the KPI eval's own (eval/prompts.grounded_prompt, one user turn, no system prompt),
 for two eval items dpo-strict got right in its saved generations (gr-0038, cited and judged
@@ -57,20 +62,24 @@ def ask(url: str, key: str, prompt: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", required=True, help="the URL `modal serve serve/modal_demo.py` prints")
-    ap.add_argument("--pause", type=float, default=1.5, help="seconds between the two questions")
+    ap.add_argument("--items", nargs="+", default=[i for _, i in ITEMS], help="item ids, in order")
+    ap.add_argument("--pause", type=float, default=1.5, help="seconds between the questions")
+    ap.add_argument("--hold", type=float, default=4.0, help="seconds the last answer stays up")
     args = ap.parse_args()
     key = os.environ.get("DEMO_API_KEY") or sys.exit("set DEMO_API_KEY")
-    url = args.url.rstrip("/")
-    for n, (task, item_id) in enumerate(ITEMS):
+    url = (os.environ.get("DEMO_URL") or sys.exit("set DEMO_URL")).rstrip("/")
+    task_of = {i: t for t, i in ITEMS}
+    chosen = [(task_of[i], i) for i in args.items if i in task_of] or sys.exit("unknown --items")
+    print("\033[2J\033[H", end="", flush=True)  # a blank first frame
+    for n, (task, item_id) in enumerate(chosen):
         it = item(task, item_id)
         print(f"\n\033[1mQuestion:\033[0m {it['question']}")
         for c in it["context"]:
             print(f"  \033[2m[{c['chunk_id']}] {c['text'][:90]}…\033[0m")
         print("\033[1mAnswer:\033[0m ", end="", flush=True)
         ask(url, key, grounded_prompt(it["question"], it["context"]))
-        if n < len(ITEMS) - 1:
-            time.sleep(args.pause)
+        time.sleep(args.pause if n < len(chosen) - 1 else args.hold)
+    print("\033[2J\033[H", end="", flush=True)  # and the same blank last frame
 
 
 if __name__ == "__main__":

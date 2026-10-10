@@ -1,15 +1,26 @@
-"""The SFT set without re-hosting third-party text.
+"""Third-party Tülu 3 text, kept out of git: row ids and hashes in the repo, text from the source.
 
-  .venv/bin/python data/scripts/sft_replay_fetch.py          # data/sft/hosted/ -> data/sft/{train,sft_val}.jsonl
-  .venv/bin/python data/scripts/sft_replay_fetch.py --strip  # after a rebuild: data/sft/*.jsonl -> data/sft/hosted/
+  .venv/bin/python data/scripts/sft_replay_fetch.py            # rebuild the inputs from data/sft/hosted/, eval/hosted/
+  .venv/bin/python data/scripts/sft_replay_fetch.py --strip    # after a rebuild: inputs -> their hosted copies
+  .venv/bin/python data/scripts/sft_replay_fetch.py --results  # after pulling results: third-party fields -> sha256
 
-`data/sft/hosted/{train,sft_val}.jsonl` are what git holds: every SFT record, with the 500 Tülu 3
-replay records' prompt and completion set to null and their row ids kept (`eid` "replay:<id>",
-`replay_source` "<source>#<id>"). The default mode reads the ids, takes those rows' messages from
-allenai/tulu-3-sft-mixture (the 6 parquet shards, 1.4 GB, into the HF cache, as
-data/scripts/sft_replay.py reads them), fills each record back in the way sft_assemble.replay_record
-built it, and writes data/sft/{train,sft_val}.jsonl. Both must match data/sft/SHA256SUMS byte for
-byte, or the script exits 1: the training set is exactly the one every SFT row was trained on.
+**Inputs** (rebuilt, gitignored, checked byte for byte):
+- `data/sft/{train,sft_val}.jsonl`, the SFT set: git holds `data/sft/hosted/`, every record with
+  the 500 Tülu 3 replay records' prompt and completion set to null and their row ids kept (`eid`
+  "replay:<id>"). Rebuilt they must match data/sft/SHA256SUMS, the hashes every SFT run was
+  trained on.
+- `eval/{diversity_prompts,sft_template_prompts}.jsonl`, the probe prompts: git holds `eval/hosted/`
+  with the 50 held-out Tülu prompts (format "general") and the replay template prompt blanked;
+  rebuilt they must match eval/hosted/SHA256SUMS.
+
+The default mode takes the rows' messages from allenai/tulu-3-sft-mixture (the 6 parquet shards,
+1.4 GB, into the HF cache, as data/scripts/sft_replay.py reads them) and fills each record back in
+the way sft_assemble.replay_record and eval/diversity.py built it. A mismatch exits 1.
+
+**Results** (outputs, rewritten in place): the prompt ids and references sampling and training
+stored for those rows (`prompt_token_ids`, `reference`, `prompt`) become `<field>_sha256`, the
+sha256 of the field's JSON, so the text isn't re-hosted and tests/test_template.py still checks
+the served prompt ids against the trainer's. The models' own outputs stay.
 
 Why: the replay subsets carry their own licences (docs/reproduce.md lists them; No Robots is
 CC-BY-NC-4.0), so the repo ships ids and this script rather than the text.
@@ -22,10 +33,30 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SFT = ROOT / "data/sft"
-HOSTED = SFT / "hosted"
-FILES = ("train.jsonl", "sft_val.jsonl")
+EVAL = ROOT / "eval"
+INPUTS = [  # (built dir, hosted dir, file, hash list)
+    (SFT, SFT / "hosted", "train.jsonl", SFT / "SHA256SUMS"),
+    (SFT, SFT / "hosted", "sft_val.jsonl", SFT / "SHA256SUMS"),
+    (EVAL, EVAL / "hosted", "diversity_prompts.jsonl", EVAL / "hosted/SHA256SUMS"),
+    (EVAL, EVAL / "hosted", "sft_template_prompts.jsonl", EVAL / "hosted/SHA256SUMS"),
+]
+RESULTS = [
+    "results/runs/*/eval_generations.jsonl",
+    "results/runs/*/samples/*.jsonl",
+    "results/serve/*/served_check*.jsonl",
+]
+HASHED = ("prompt_token_ids", "reference", "prompt")
 REPO = "allenai/tulu-3-sft-mixture"
 SHARDS = [f"data/train-{k:05d}-of-00006.parquet" for k in range(6)]
+
+
+def third_party(r: dict) -> bool:
+    """A Tülu 3 row: an SFT replay record, the replay template prompt, or a held-out probe."""
+    return r.get("format") in ("replay", "general") or str(r.get("id", "")).startswith("replay:")
+
+
+def tulu_id(r: dict) -> str:
+    return (r.get("eid") or r["id"]).removeprefix("replay:")
 
 
 def read(path: Path) -> list[dict]:
@@ -34,21 +65,29 @@ def read(path: Path) -> list[dict]:
 
 def write(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
-    )
+    text = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+    path.write_text(text, encoding="utf-8")
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def strip() -> None:
-    for name in FILES:
-        rows = read(SFT / name)
+    sums: dict[Path, list[str]] = {}
+    for built, hosted, name, sumfile in INPUTS:
+        rows = read(built / name)
         for r in rows:
-            if r["format"] == "replay":
-                r["prompt"] = r["completion"] = None
-        write(HOSTED / name, rows)
-        print(
-            f"-> {HOSTED / name}: {sum(r['format'] == 'replay' for r in rows)} replay records stripped"
-        )
+            if third_party(r):
+                for k in ("prompt", "completion"):
+                    if k in r:
+                        r[k] = None
+        write(hosted / name, rows)
+        if sumfile.parent == hosted:  # the probes' hashes are written here; SFT's are frozen
+            sums.setdefault(sumfile, []).append(f"{sha(built / name)}  {name}")
+        print(f"-> {hosted / name}: {sum(map(third_party, rows))} third-party rows blanked")
+    for sumfile, lines in sums.items():
+        sumfile.write_text("\n".join(lines) + "\n")
 
 
 def fetch_messages(ids: set[str]) -> dict[str, list[dict]]:
@@ -58,9 +97,8 @@ def fetch_messages(ids: set[str]) -> dict[str, list[dict]]:
     found: dict[str, list[dict]] = {}
     for shard in SHARDS:
         path = hf_hub_download(REPO, shard, repo_type="dataset")
-        for batch in pq.ParquetFile(path).iter_batches(
-            batch_size=20_000, columns=["id", "messages"]
-        ):
+        cols = ["id", "messages"]
+        for batch in pq.ParquetFile(path).iter_batches(batch_size=20_000, columns=cols):
             for r in batch.to_pylist():
                 if r["id"] in ids:
                     found[r["id"]] = r["messages"]
@@ -70,37 +108,53 @@ def fetch_messages(ids: set[str]) -> dict[str, list[dict]]:
 
 
 def fill() -> None:
-    hosted = {name: read(HOSTED / name) for name in FILES}
-    ids = {
-        r["eid"].removeprefix("replay:")
-        for rows in hosted.values()
-        for r in rows
-        if r["format"] == "replay"
-    }
+    hosted = {(built, name): read(h / name) for built, h, name, _ in INPUTS}
+    ids = {tulu_id(r) for rows in hosted.values() for r in rows if third_party(r)}
     messages = fetch_messages(ids)
-    sums = dict(line.split()[::-1] for line in (SFT / "SHA256SUMS").read_text().splitlines())
     ok = True
-    for name, rows in hosted.items():
+    for built, _, name, sumfile in INPUTS:
+        rows = hosted[(built, name)]
         for r in rows:
-            if r["format"] == "replay":
-                user, assistant = messages[r["eid"].removeprefix("replay:")]
+            if not third_party(r):
+                continue
+            user, assistant = messages[tulu_id(r)]
+            if "completion" in r:  # an SFT record
                 r["prompt"] = [{"role": "user", "content": user["content"]}]
                 r["completion"] = [{"role": "assistant", "content": assistant["content"]}]
-        write(SFT / name, rows)
-        digest = hashlib.sha256((SFT / name).read_bytes()).hexdigest()
-        match = digest == sums.get(name)
+            else:  # a probe prompt: the user turn's text
+                r["prompt"] = user["content"]
+        write(built / name, rows)
+        sums = dict(line.split()[::-1] for line in sumfile.read_text().splitlines())
+        match = sha(built / name) == sums.get(name)
         ok &= match
-        print(
-            f"-> {SFT / name}: sha256 {digest[:12]} {'matches' if match else 'DIFFERS from'} SHA256SUMS"
-        )
+        print(f"-> {built / name}: {'matches' if match else 'DIFFERS from'} {sumfile.name}")
     raise SystemExit(0 if ok else 1)
+
+
+def hash_results() -> None:
+    for pattern in RESULTS:
+        for path in sorted(ROOT.glob(pattern)):
+            rows, n = read(path), 0
+            for r in rows:
+                if not third_party(r):
+                    continue
+                for k in HASHED:
+                    if r.get(k) is not None:
+                        blob = json.dumps(r[k], ensure_ascii=False).encode()
+                        r[f"{k}_sha256"], r[k] = hashlib.sha256(blob).hexdigest(), None
+                        n += 1
+            if n:
+                write(path, rows)
+                print(f"-> {path.relative_to(ROOT)}: {n} fields hashed")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--strip", action="store_true", help="write data/sft/hosted/ from data/sft/")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--strip", action="store_true", help="inputs -> their hosted copies")
+    mode.add_argument("--results", action="store_true", help="third-party result fields -> sha256")
     args = ap.parse_args()
-    strip() if args.strip else fill()
+    strip() if args.strip else hash_results() if args.results else fill()
 
 
 if __name__ == "__main__":

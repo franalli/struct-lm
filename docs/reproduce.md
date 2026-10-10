@@ -82,6 +82,8 @@ with the licence the mixture's card gives each:
 The mixture as a whole is ODC-BY-1.0, and its card notes that "different licenses apply to subsets
 of the data" and that some outputs come "from third party models that are subject to separate terms".
 The three Claude-written Persona subsets are excluded (`data/scripts/sft_replay.py`, `EXCLUDED`).
+The diversity probe's 50 held-out prompts and the replay template prompt come from the same
+mixture and are handled the same way (`eval/hosted/`, `eval/hosted/SHA256SUMS`).
 
 ## Pipeline
 

@@ -8,6 +8,7 @@ smoke run's template samples when they have been pulled (results/runs/smoke-sft/
 
 A failure here blocks every Stage 3 launch (notes/decisions.md, Stage 3b pre-registration)."""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -152,7 +153,16 @@ def test_vllm_renders_the_training_prompt_ids(sd, train):
     for row in rows:
         enc = sd.encode(by_id[row["id"]], BASE)
         n_prompt = enc["completion_mask"].index(1)
-        assert row["prompt_token_ids"] == enc["input_ids"][:n_prompt], row["id"]
+        assert same_ids(row, enc["input_ids"][:n_prompt]), row["id"]
+
+
+def same_ids(row: dict, ids: list[int]) -> bool:
+    """The stored prompt ids equal `ids`; for a Tülu 3 row only their sha256 is committed
+    (data/scripts/sft_replay_fetch.py --results), so the hashes are compared."""
+    if row.get("prompt_token_ids") is not None:
+        return row["prompt_token_ids"] == ids
+    blob = json.dumps(ids, ensure_ascii=False).encode()
+    return hashlib.sha256(blob).hexdigest() == row["prompt_token_ids_sha256"]
 
 
 SERVED = sorted((REPO / "results/serve").glob("*/served_check*.jsonl"))
@@ -177,8 +187,9 @@ def test_served_chat_renders_the_training_prompt_ids(sd, train, special):
         assert {r["id"] for r in template} == set(by_id), path
         for r in template:
             enc = sd.encode(by_id[r["id"]], BASE)
-            ids = r["prompt_token_ids"]
-            assert ids == enc["input_ids"][: enc["completion_mask"].index(1)], (path, r["id"])
+            want = enc["input_ids"][: enc["completion_mask"].index(1)]
+            assert same_ids(r, want), (path, r["id"])
+            ids = r["prompt_token_ids"] or want  # a hashed (third-party) row: the ids it matched
             assert ids.count(special["<s>"]) == 1 and ids.count(special["[INST]"]) == 1
             assert special["[SYSTEM_PROMPT]"] not in ids
             assert r["finish_reason"] == "stop" and r["stop_reason"] in (None, special["</s>"])

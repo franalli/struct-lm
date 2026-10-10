@@ -410,7 +410,7 @@ README's prose appears in a generated table or a named file.
 | the corpus: 246 US federal documents | public domain (17 U.S.C. § 105); ASCE 7, the AISC manual and other copyrighted standards excluded | URLs and sha256 in [`data/sources.csv`](data/sources.csv); the PDFs aren't redistributed |
 | FineWeb-Edu (CPT replay, general val) | ODC-By | not redistributed |
 | Mistral Large 3 / Medium 3.5 output (eval items, SFT records) | assigned to the customer by Mistral's Commercial Terms (§3.1), labelled as model-written (§3.2) | committed |
-| Tülu 3 SFT mixture, 500 replay records | ODC-BY-1.0 as a collection; subsets below | row ids only (`data/sft/hosted/`); `data/scripts/sft_replay_fetch.py` rebuilds the set and checks its sha256 |
+| Tülu 3 SFT mixture: 500 replay records, 50 held-out probe prompts | ODC-BY-1.0 as a collection; subsets below | row ids only (`data/sft/hosted/`, `eval/hosted/`; results keep sha256s of their prompt ids); `make sft-replay` rebuilds the files and checks their sha256 |
 | Ministral 3 8B Base | Apache 2.0 (model card) | not redistributed |
 
 The replay records by subset, with the licence the mixture's card gives each:

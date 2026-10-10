@@ -1,6 +1,7 @@
 """Output diversity of a chat checkpoint (Stage 3, B6), and the </s> check on sampled answers (B5).
 
-  .venv/bin/python eval/diversity.py build        # -> eval/diversity_prompts.jsonl (once; committed)
+  .venv/bin/python eval/diversity.py build        # -> eval/diversity_prompts.jsonl (once; git keeps
+                                                  #    eval/hosted/, make sft-replay rebuilds it)
   .venv/bin/python eval/diversity.py score <run>  # samples -> results/diversity/<run>.json
   .venv/bin/python eval/diversity.py collapse <run>  # dpo_probe samples -> results/diversity/<run>_collapse.json
 

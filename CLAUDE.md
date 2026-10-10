@@ -66,7 +66,9 @@ Frontier closed-book reference (Mistral API, no GPU, ~15 min at 30 requests a mi
 
 **Always pull every Modal run's results into the repo as soon as it finishes** (training logs,
 perplexity, lm-eval, KPI generations, latency), score it locally, and write its row to
-`results/table.md`. A result that exists only on the volume doesn't count as collected.
+`results/table.md`. A result that exists only on the volume doesn't count as collected. Then run
+`data/scripts/sft_replay_fetch.py --results`: Tülu 3 rows' prompt ids and references are committed
+as sha256 only (third-party text stays out of git; `make sft-replay` rebuilds the inputs).
 
 Pull per run, never all of `results/`: `results/table.md` and `results/judge_cache.jsonl` are kept
 locally (a Modal run without `--generate-only` would start its own `table.md` on the volume).

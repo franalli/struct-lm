@@ -71,6 +71,9 @@ eval/.cache/
 # blanked, row ids kept) and data/scripts/sft_replay_fetch.py rebuilds them against SHA256SUMS.
 data/sft/train.jsonl
 data/sft/sft_val.jsonl
+# the probe prompts hold held-out Tülu 3 prompts: git keeps eval/hosted/, the same script rebuilds
+eval/diversity_prompts.jsonl
+eval/sft_template_prompts.jsonl
 data/sft/.cache/
 data/sft/work/
 
