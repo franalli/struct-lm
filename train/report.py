@@ -40,7 +40,6 @@ diversity. They go into the README's <!-- stage4-tables --> block.
 import argparse
 import json
 import math
-import re
 import statistics
 import sys
 from pathlib import Path
@@ -389,15 +388,28 @@ def ppl_table(ppl: dict) -> str:
     return "\n".join(lines)
 
 
-def update_readme(path: Path, name: str, block: str) -> None:
-    """Replace the README's generated block `name` (between <!-- name:start --> and
-    <!-- name:end -->) with `block`, so its tables are always the collected ones. The figures keep
-    their paths (results/curves/), so the images the README embeds update in place."""
+# where each generated block lives (docs/stageN.md hold the stage write-ups; their "## " headings
+# are the blocks' own). DEPLOY.md's blocks are s6_deploy_blocks().
+BLOCK_FILES = {
+    "stage2-tables": "docs/stage2.md",
+    "stage3-tables": "docs/stage3.md",
+    "stage4-tables": "docs/stage4.md",
+    "stage5-tables": "docs/stage5.md",
+    "stage6-tables": "docs/stage6.md",
+    "serving-table": "docs/stage6.md",
+    "results-table": "docs/results.md",
+}
+
+
+def update_block(path: Path, name: str, block: str) -> None:
+    """Replace the generated block `name` (between <!-- name:start --> and <!-- name:end -->) in
+    `path` with `block`, so its tables are always the collected ones. A missing marker is an error:
+    a block that moved without its writer would otherwise go stale silently. The figures keep their
+    paths (results/curves/), so the images the docs embed update in place."""
     start, end = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
     text = path.read_text()
-    if start not in text or end not in text:
-        print(f"{path}: no {start} ... {end} block; not updated")
-        return
+    if text.count(start) != 1 or text.count(end) != 1:
+        raise SystemExit(f"{path}: expected one {start} ... {end} block")
     head, rest = text.split(start, 1)
     tail = rest.split(end, 1)[1]
     path.write_text(f"{head}{start}\n{block.strip()}\n{end}{tail}")
@@ -2394,7 +2406,9 @@ def main() -> None:
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
     ap.add_argument("--scaling-run", default="cpt-8b-fsdp2")
     ap.add_argument("--scaling-ref", default="cpt-8b")
-    ap.add_argument("--readme", default="README.md", help="'' to leave the README alone")
+    ap.add_argument(
+        "--no-docs", action="store_true", help="leave README.md, docs/ and DEPLOY.md alone"
+    )
     args = ap.parse_args()
     every = {d.name: r for d in sorted(RUNS.iterdir()) if d.is_dir() and (r := load(d))}
     if not every:
@@ -2448,22 +2462,22 @@ def main() -> None:
         + ("\n# Stage 6: serving\n\n" + md6 if md6 else "")
     )
     print(md + md3 + md4 + md5 + md6)
-    if args.readme:
-        # the README nests these under "#### Stage N": their own headings go two levels down
-        update_readme(Path(args.readme), "stage2-tables", re.sub(r"(?m)^## ", "##### ", md))
-        if md3:
-            update_readme(Path(args.readme), "stage3-tables", re.sub(r"(?m)^## ", "##### ", md3))
-        if md4:
-            update_readme(Path(args.readme), "stage4-tables", re.sub(r"(?m)^## ", "##### ", md4))
-        if md5:
-            update_readme(Path(args.readme), "stage5-tables", re.sub(r"(?m)^## ", "##### ", md5))
+    if not args.no_docs:
+        blocks = {
+            "stage2-tables": md,
+            "stage3-tables": md3,
+            "stage4-tables": md4,
+            "stage5-tables": md5,
+            "stage6-tables": md6,
+            "results-table": results_table(),
+            "serving-table": serving_table(),
+        }
+        for name, block in blocks.items():
+            if block:
+                update_block(Path(BLOCK_FILES[name]), name, block)
         if md6:
-            update_readme(Path(args.readme), "stage6-tables", re.sub(r"(?m)^## ", "##### ", md6))
-            if Path("DEPLOY.md").exists():
-                for name, block in s6_deploy_blocks(args.usd_per_gpu_hour).items():
-                    update_readme(Path("DEPLOY.md"), name, block)
-        update_readme(Path(args.readme), "results-table", results_table())
-        update_readme(Path(args.readme), "serving-table", serving_table())
+            for name, block in s6_deploy_blocks(args.usd_per_gpu_hour).items():
+                update_block(Path("DEPLOY.md"), name, block)
     base_val = math.log(ppl[BASE]["ppl_val_slice"]) if BASE in ppl else None
     plot_loss(runs, base_val, Path("results/curves/cpt.png"))
     if BASE in ppl and len(ppl) > 1:
