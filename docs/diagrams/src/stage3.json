@@ -1,0 +1,128 @@
+{
+  "title": "Stage 3",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "pool",
+      "label": "training passages\n(seen eval facts allowed,\nunseen ones kept out: sft_guard)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "teach",
+      "label": "Mistral Large 3 writes the questions;\nLarge 3 and Medium 3.5\nwrite the completions",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "read",
+      "label": "full-passage read: keep or drop\n(Claude Code, verdicts only)",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "tulu",
+      "label": "Tülu 3: 500 general records\n(Claude-written subsets out)",
+      "type": "cloud",
+      "color": "gray"
+    },
+    {
+      "id": "set",
+      "label": "SFT set: 2,516 records\n(2,436 train, 80 val)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "cpt",
+      "label": "cpt-8b-replay10",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "base",
+      "label": "base-8b-hf",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "train",
+      "label": "SFT, LoRA r64, 2 epochs\ntwo seeds per arm",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "rules",
+      "label": "B4 picks epoch 1 (the recall losses\nrose in epoch 2); merge gate\nagainst an fp32 reference",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "out",
+      "label": "sft-from-cpt\n→ Stage 4",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "ctrl",
+      "label": "sft-from-base\n(control arm: no CPT)",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "arm",
+      "label": "two-arm read: CPT's gain\nsurvives as probability",
+      "type": "component",
+      "color": "purple"
+    }
+  ],
+  "edges": [
+    {
+      "from": "pool",
+      "to": "teach"
+    },
+    {
+      "from": "teach",
+      "to": "read"
+    },
+    {
+      "from": "read",
+      "to": "set"
+    },
+    {
+      "from": "tulu",
+      "to": "set"
+    },
+    {
+      "from": "set",
+      "to": "train"
+    },
+    {
+      "from": "cpt",
+      "to": "train"
+    },
+    {
+      "from": "base",
+      "to": "train"
+    },
+    {
+      "from": "train",
+      "to": "rules"
+    },
+    {
+      "from": "rules",
+      "to": "out"
+    },
+    {
+      "from": "rules",
+      "to": "ctrl"
+    },
+    {
+      "from": "out",
+      "to": "arm"
+    },
+    {
+      "from": "ctrl",
+      "to": "arm"
+    }
+  ]
+}

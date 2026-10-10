@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1370 1012" width="1370" height="1012">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1370" height="1012" fill="#ffffff" />
+  <rect x="525" y="40" width="320" height="132" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="525" y="252" width="320" height="132" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="260" y="464" width="250" height="132" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="40" y="676" width="320" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="770" y="476" width="180" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="780" y="676" width="160" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="420" y="676" width="300" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="370" y="864" width="320" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="1010" y="476" width="320" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <polyline points="685,172 685,252" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="685,384 385,464" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="385,596 200,676" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,784 530,864" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="860,584 860,676" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="860,784 530,864" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="385,596 570,676" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="685,384 1170,476" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="685" y="92" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="685" dy="0">data/sources.csv</tspan>
+    <tspan x="685" dy="20">251 candidate federal documents</tspan>
+    <tspan x="685" dy="20">(URL + sha256)</tspan>
+  </text>
+  <text x="685" y="304" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="685" dy="0">download.py, extract.py</tspan>
+    <tspan x="685" dy="20">3.2 GB of PDFs;</tspan>
+    <tspan x="685" dy="20">copyright notices hand-checked</tspan>
+  </text>
+  <text x="385" y="516" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="385" dy="0">filter.py, dedup.py</tspan>
+    <tspan x="385" dy="20">31.3M → 20.6M tokens,</tspan>
+    <tspan x="385" dy="20">246 documents</tspan>
+  </text>
+  <text x="200" y="726" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="200" dy="0">pii.py, split.py</tspan>
+    <tspan x="200" dy="20">train 19.4M tokens, val 5.9%</tspan>
+  </text>
+  <text x="860" y="526" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="860" dy="0">FineWeb-Edu</tspan>
+    <tspan x="860" dy="20">(general text)</tspan>
+  </text>
+  <text x="860" y="726" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="860" dy="0">replay.py</tspan>
+    <tspan x="860" dy="20">1.94M tokens</tspan>
+  </text>
+  <text x="570" y="726" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="570" dy="0">tokenizer_coverage.py</tspan>
+    <tspan x="570" dy="20">Tekken fits: no new tokens</tspan>
+  </text>
+  <text x="530" y="914" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="530" dy="0">train, val, replay, general_val</tspan>
+    <tspan x="530" dy="20">(data/processed/SHA256SUMS)</tspan>
+  </text>
+  <text x="1170" y="526" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="1170" dy="0">extract.py --chunks</tspan>
+    <tspan x="1170" dy="20">→ the eval's passages (Stage 0)</tspan>
+  </text>
+</svg>

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 1364" width="1110" height="1364">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1110" height="1364" fill="#ffffff" />
+  <rect x="75" y="40" width="270" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="50" y="228" width="320" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="50" y="416" width="320" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="50" y="604" width="320" height="132" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="40" y="816" width="320" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="760" y="616" width="310" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="420" y="816" width="320" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="420" y="1004" width="320" height="132" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="800" y="1016" width="250" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="652.5" y="1216" width="200" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <polyline points="210,148 210,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="210,336 210,416" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="210,524 210,604" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="210,736 200,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="210,736 580,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="915,724 580,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="915,724 925,1016" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="580,924 580,1004" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="580,1136 752.5,1216" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="925,1124 752.5,1216" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="210" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="210" dy="0">234 training documents</tspan>
+    <tspan x="210" dy="20">(pinned: eval_docs.txt)</tspan>
+  </text>
+  <text x="210" y="278" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="210" dy="0">make_tasks.py:</tspan>
+    <tspan x="210" dy="20">Mistral Large 3 drafts items</tspan>
+  </text>
+  <text x="210" y="466" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="210" dy="0">review against the source passage:</tspan>
+    <tspan x="210" dy="20">keep or reject (the rubric)</tspan>
+  </text>
+  <text x="210" y="656" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="210" dy="0">eval v3: 716 items</tspan>
+    <tspan x="210" dy="20">closed-book 322, grounded 108,</tspan>
+    <tspan x="210" dy="20">vocabulary 210, unanswerable 76</tspan>
+  </text>
+  <text x="200" y="866" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="200" dy="0">sft_split.py: each fact seen</tspan>
+    <tspan x="200" dy="20">or unseen by SFT (167 / 155)</tspan>
+  </text>
+  <text x="915" y="666" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="915" dy="0">base-8b-hf, instruct-8b,</tspan>
+    <tspan x="915" dy="20">mistral-large-3 (reference)</tspan>
+  </text>
+  <text x="580" y="866" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="580" dy="0">KPI generations (vLLM;</tspan>
+    <tspan x="580" dy="20">chat format for chat models)</tspan>
+  </text>
+  <text x="580" y="1056" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="580" dy="0">scoring: rules first (strict checker,</tspan>
+    <tspan x="580" dy="20">citations, abstain sentence),</tspan>
+    <tspan x="580" dy="20">then the judge (Large 3, T 0)</tspan>
+  </text>
+  <text x="925" y="1066" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="925" dy="0">lm-eval: MMLU, GSM8K,</tspan>
+    <tspan x="925" dy="20">HellaSwag (5-shot)</tspan>
+  </text>
+  <text x="752.5" y="1266" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="752.5" dy="0">results/table.md</tspan>
+    <tspan x="752.5" dy="20">one row per run</tspan>
+  </text>
+</svg>

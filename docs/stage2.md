@@ -1,5 +1,10 @@
 # Stage 2: continued pre-training (CPT)
 
+![Stage 2: continued pre-training, its inputs, steps, the rules that decided and its output](diagrams/stage2.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 One epoch of plain next-token training on the 19.4M-token train split, starting from
 `Ministral-3-8B-Base-2512`: LoRA r=64 (alpha 128) on all seven projections of the language model,
 LR 1e-4 with a cosine schedule, 32 windows of 4,096 tokens per optimizer step, so 149 steps (the

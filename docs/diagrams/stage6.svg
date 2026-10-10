@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 1152" width="400" height="1152">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="400" height="1152" fill="#ffffff" />
+  <rect x="95" y="40" width="210" height="84" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="40" y="204" width="320" height="132" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="40" y="416" width="320" height="132" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="40" y="628" width="320" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="40" y="816" width="320" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="45" y="1004" width="310" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <polyline points="200,124 200,204" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,336 200,416" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,548 200,628" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,736 200,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,924 200,1004" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="200" y="88" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="200" dy="0">dpo-strict (bf16)</tspan>
+  </text>
+  <text x="200" y="256" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="200" dy="0">quantize.py (llm-compressor):</tspan>
+    <tspan x="200" dy="20">FP8 W8A8, INT4 W4A16 (GPTQ);</tspan>
+    <tspan x="200" dy="20">FP8 KV cache as a serving flag</tspan>
+  </text>
+  <text x="200" y="468" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="200" dy="0">quality gate against bf16 (Stage 3</tspan>
+    <tspan x="200" dy="20">floors, GSM8K with one BOS):</tspan>
+    <tspan x="200" dy="20">FP8 passes; FP8-KV and INT4 fail</tspan>
+  </text>
+  <text x="200" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="200" dy="0">bench bf16 and FP8 on one pinned H100:</tspan>
+    <tspan x="200" dy="20">concurrency 1-64, Poisson 1-16 req/s</tspan>
+  </text>
+  <text x="200" y="866" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="200" dy="0">served by load: bf16 up to 16 req/s,</tspan>
+    <tspan x="200" dy="20">dpo-strict-fp8 near saturation</tspan>
+  </text>
+  <text x="200" y="1054" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="200" dy="0">DEPLOY.md: serve_vllm.sh</tspan>
+    <tspan x="200" dy="20">(the trained prompt format)</tspan>
+  </text>
+</svg>

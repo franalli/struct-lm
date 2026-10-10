@@ -1,0 +1,114 @@
+{
+  "title": "Stage 4",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "start",
+      "label": "sft-from-cpt",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "pool",
+      "label": "prompt pool: 2,506 prompts\n(closed-book, grounded,\nabstain, definition)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "sample",
+      "label": "the model's own answers\n(vLLM, T 0.7, 4-8 per prompt)",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "bench",
+      "label": "judge benchmark:\nrecall 0.28 / 0.09 → judge out",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "label",
+      "label": "labels by rule: substring verifier,\ncitation rules, decline rule",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "asrun",
+      "label": "506 as-run pairs",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "runs",
+      "label": "dpo, dpo-seed1, dpo-2ep\n(2 epochs: displacement)",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "audit",
+      "label": "label audit: 80 of 458\nclosed-book chosen answers\nfail the strict checker",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "strict",
+      "label": "463 strict pairs\n(445 train, 18 val)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "train",
+      "label": "DPO: sigmoid loss, β 0.1,\n1 epoch, LoRA r64;\nfinal step, merge gate on sft_val",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "out",
+      "label": "dpo-strict\n→ Stage 5, served",
+      "type": "component",
+      "color": "blue"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "sample"
+    },
+    {
+      "from": "pool",
+      "to": "sample"
+    },
+    {
+      "from": "sample",
+      "to": "label"
+    },
+    {
+      "from": "bench",
+      "to": "label"
+    },
+    {
+      "from": "label",
+      "to": "asrun"
+    },
+    {
+      "from": "asrun",
+      "to": "runs"
+    },
+    {
+      "from": "asrun",
+      "to": "audit"
+    },
+    {
+      "from": "audit",
+      "to": "strict"
+    },
+    {
+      "from": "strict",
+      "to": "train"
+    },
+    {
+      "from": "train",
+      "to": "out"
+    }
+  ]
+}

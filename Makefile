@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 MODAL ?= .venv/bin/modal
 
-.PHONY: data sft-data sft-replay dpo-data dpo-pairs dpo-pairs-strict grpo-data cpt sft dpo grpo train serve \
+.PHONY: data sft-data sft-replay diagrams dpo-data dpo-pairs dpo-pairs-strict grpo-data cpt sft dpo grpo train serve \
 	bench-data bench report audit reproduce-score reproduce-stage0 reproduce-stage1 reproduce-stage2 \
 	reproduce-stage3 reproduce-stage4 reproduce-stage5 reproduce-stage6
 
@@ -142,3 +142,10 @@ reproduce-stage6:  # FP8 and INT4 from dpo-strict, the quality gate, the bench o
 	$(MODAL) run serve/modal_serve.py --action gate --variant bf16
 	for v in fp8 fp8kv w4a16; do $(RUN_GPU) serve/modal_serve.py --action gate --variant $$v; done
 	$(RUN_GPU) serve/modal_serve.py --action bench --variants bf16,fp8
+
+# The stage diagrams: docs/diagrams/src/*.json (the IR) -> .excalidraw -> .svg, with the Excalidraw
+# Claude Code plugin's scripts (EXCALIDRAW points at them; npm install there once).
+EXCALIDRAW ?= $(HOME)/.claude/plugins/cache/anthropic-plugin-directory/excalidraw-plugin/1.0.0-be3f1d43d386/skills/excalidraw/scripts
+diagrams:
+	cd docs/diagrams && for f in src/*.json; do n=$$(basename $$f .json); \
+		node $(EXCALIDRAW)/generate.mjs $$n.excalidraw < $$f && node $(EXCALIDRAW)/export.mjs $$n.excalidraw $$n; done

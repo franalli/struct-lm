@@ -1,0 +1,94 @@
+{
+  "title": "Stage 1",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "src",
+      "label": "data/sources.csv\n251 candidate federal documents\n(URL + sha256)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "dlx",
+      "label": "download.py, extract.py\n3.2 GB of PDFs;\ncopyright notices hand-checked",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "fd",
+      "label": "filter.py, dedup.py\n31.3M → 20.6M tokens,\n246 documents",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "ps",
+      "label": "pii.py, split.py\ntrain 19.4M tokens, val 5.9%",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "fw",
+      "label": "FineWeb-Edu\n(general text)",
+      "type": "cloud",
+      "color": "gray"
+    },
+    {
+      "id": "rp",
+      "label": "replay.py\n1.94M tokens",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "tok",
+      "label": "tokenizer_coverage.py\nTekken fits: no new tokens",
+      "type": "component",
+      "color": "purple"
+    },
+    {
+      "id": "out",
+      "label": "train, val, replay, general_val\n(data/processed/SHA256SUMS)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "ch",
+      "label": "extract.py --chunks\n→ the eval's passages (Stage 0)",
+      "type": "component",
+      "color": "green"
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "dlx"
+    },
+    {
+      "from": "dlx",
+      "to": "fd"
+    },
+    {
+      "from": "fd",
+      "to": "ps"
+    },
+    {
+      "from": "ps",
+      "to": "out"
+    },
+    {
+      "from": "fw",
+      "to": "rp"
+    },
+    {
+      "from": "rp",
+      "to": "out"
+    },
+    {
+      "from": "fd",
+      "to": "tok"
+    },
+    {
+      "from": "dlx",
+      "to": "ch"
+    }
+  ]
+}

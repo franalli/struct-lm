@@ -1,0 +1,104 @@
+{
+  "title": "The lifecycle",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "data",
+      "label": "246 public-domain documents\n20.6M tokens",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "base",
+      "label": "base-8b-hf\nMinistral 3 8B Base",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "cpt",
+      "label": "cpt-8b-replay10\nCPT + 10% replay (ablation A's rule)",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "sft",
+      "label": "sft-from-cpt\nSFT, epoch 1 (rule B4)",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "dpo",
+      "label": "dpo-strict\nDPO on verifier labels (final step)",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "served",
+      "label": "served after the quality gate:\ndpo-strict (bf16) up to 16 req/s,\ndpo-strict-fp8 near saturation",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "grpo",
+      "label": "grpo\nGRPO: rejected by the Stage 5 read",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "ctrl",
+      "label": "sft-from-base\ncontrol arm: SFT without CPT",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "full",
+      "label": "cpt-8b, cpt-8b-full\nCPT ablations",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "ep2",
+      "label": "dpo-2ep\nDPO ablation",
+      "type": "component",
+      "color": "gray"
+    }
+  ],
+  "edges": [
+    {
+      "from": "data",
+      "to": "cpt"
+    },
+    {
+      "from": "base",
+      "to": "cpt"
+    },
+    {
+      "from": "cpt",
+      "to": "sft"
+    },
+    {
+      "from": "sft",
+      "to": "dpo"
+    },
+    {
+      "from": "dpo",
+      "to": "served"
+    },
+    {
+      "from": "dpo",
+      "to": "grpo"
+    },
+    {
+      "from": "base",
+      "to": "ctrl"
+    },
+    {
+      "from": "base",
+      "to": "full"
+    },
+    {
+      "from": "sft",
+      "to": "ep2"
+    }
+  ]
+}

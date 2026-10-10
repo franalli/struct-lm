@@ -1,0 +1,108 @@
+{
+  "title": "Stage 0",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "docs",
+      "label": "234 training documents\n(pinned: eval_docs.txt)",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "gen",
+      "label": "make_tasks.py:\nMistral Large 3 drafts items",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "review",
+      "label": "review against the source passage:\nkeep or reject (the rubric)",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "tasks",
+      "label": "eval v3: 716 items\nclosed-book 322, grounded 108,\nvocabulary 210, unanswerable 76",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "split",
+      "label": "sft_split.py: each fact seen\nor unseen by SFT (167 / 155)",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "runs",
+      "label": "base-8b-hf, instruct-8b,\nmistral-large-3 (reference)",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "gen2",
+      "label": "KPI generations (vLLM;\nchat format for chat models)",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "score",
+      "label": "scoring: rules first (strict checker,\ncitations, abstain sentence),\nthen the judge (Large 3, T 0)",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "lm",
+      "label": "lm-eval: MMLU, GSM8K,\nHellaSwag (5-shot)",
+      "type": "component",
+      "color": "purple"
+    },
+    {
+      "id": "table",
+      "label": "results/table.md\none row per run",
+      "type": "database",
+      "color": "purple"
+    }
+  ],
+  "edges": [
+    {
+      "from": "docs",
+      "to": "gen"
+    },
+    {
+      "from": "gen",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "tasks"
+    },
+    {
+      "from": "tasks",
+      "to": "split"
+    },
+    {
+      "from": "tasks",
+      "to": "gen2"
+    },
+    {
+      "from": "runs",
+      "to": "gen2"
+    },
+    {
+      "from": "runs",
+      "to": "lm"
+    },
+    {
+      "from": "gen2",
+      "to": "score"
+    },
+    {
+      "from": "score",
+      "to": "table"
+    },
+    {
+      "from": "lm",
+      "to": "table"
+    }
+  ]
+}

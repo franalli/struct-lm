@@ -1,0 +1,104 @@
+{
+  "title": "Stage 5",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "start",
+      "label": "dpo-strict",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "cand",
+      "label": "Stage 4 prompts\nwith their verifiers",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "probe",
+      "label": "probe: 8 samples per task at T 1.0;\nkeep tasks solved 1-7 times in 8",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "tasks",
+      "label": "622 train tasks\n50 val tasks",
+      "type": "database",
+      "color": "orange"
+    },
+    {
+      "id": "reward",
+      "label": "reward: format 0.1 + correctness 0.9\n(strict checker, cites the gold,\nabstain sentence) − length",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "train",
+      "label": "GRPO, DAPO loss, 8 rollouts\nε_high 0.28, no KL, 1 update/batch",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "audit",
+      "label": "3 verifier holes found (the hack audit\ncaught one, learned on one task);\neach fixed with fixtures",
+      "type": "component",
+      "color": "purple"
+    },
+    {
+      "id": "stop",
+      "label": "stop on entropy collapse (steps 52, 65);\nkeep checkpoint-25 (best val pass@1)",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "read",
+      "label": "Stage 5 read: sharpening only\n→ grpo, grpo-seed1 rejected",
+      "type": "component",
+      "color": "gray"
+    },
+    {
+      "id": "out",
+      "label": "stage5-final stays\ndpo-strict",
+      "type": "component",
+      "color": "blue"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "probe"
+    },
+    {
+      "from": "cand",
+      "to": "probe"
+    },
+    {
+      "from": "probe",
+      "to": "tasks"
+    },
+    {
+      "from": "tasks",
+      "to": "train"
+    },
+    {
+      "from": "reward",
+      "to": "train"
+    },
+    {
+      "from": "train",
+      "to": "audit"
+    },
+    {
+      "from": "train",
+      "to": "stop"
+    },
+    {
+      "from": "stop",
+      "to": "read"
+    },
+    {
+      "from": "read",
+      "to": "out"
+    }
+  ]
+}

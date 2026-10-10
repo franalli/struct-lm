@@ -1,5 +1,10 @@
 # Stage 6: serving
 
+![Stage 6: serving, its inputs, steps, the rules that decided and its output](diagrams/stage6.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 
 `stage5-final` = `dpo-strict`, served by vLLM 0.29 on one H100 80GB HBM3 in three precisions, with
 a quality gate registered before any quantized checkpoint existed (`notes/decisions.md`,

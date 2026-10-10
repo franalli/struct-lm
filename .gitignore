@@ -85,3 +85,5 @@ data/dpo/strict/work/
 video-work/
 *.mov
 *.mp4
+# diagram PNGs are a local preview; git keeps the IR (docs/diagrams/src), .excalidraw and .svg
+docs/diagrams/*.png

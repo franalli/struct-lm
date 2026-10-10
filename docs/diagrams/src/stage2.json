@@ -1,0 +1,30 @@
+{
+  "title": "Stage 2: continued pre-training (CPT)",
+  "direction": "TB",
+  "nodes": [
+    { "id": "corpus", "label": "19.4M-token train split\n+ 1.94M FineWeb-Edu replay", "type": "database", "color": "orange" },
+    { "id": "base", "label": "base-8b-hf\nMinistral 3 8B Base", "type": "component", "color": "blue" },
+    { "id": "pack", "label": "packing.py\nBOS + document + EOS,\n4,096-token windows", "type": "component", "color": "green" },
+    { "id": "train", "label": "LoRA r64, 1 epoch\n149 steps, LR 1e-4, 1 H100", "type": "component", "color": "green" },
+    { "id": "merge", "label": "merge.py\n(apply_yarn_scaling: false)", "type": "component", "color": "green" },
+    { "id": "evals", "label": "perplexity, lm-eval,\nKPI generations", "type": "component", "color": "purple" },
+    { "id": "ruleA", "label": "ablation A's rule:\nreplay adopted", "type": "component", "color": "red" },
+    { "id": "out", "label": "cpt-8b-replay10\n→ Stage 3", "type": "component", "color": "blue" },
+    { "id": "seed", "label": "cpt-8b, cpt-8b-seed1\n(no replay: the floor)", "type": "component", "color": "gray" },
+    { "id": "full", "label": "cpt-8b-full\nfull-parameter, 2 GPUs", "type": "component", "color": "gray" }
+  ],
+  "edges": [
+    { "from": "corpus", "to": "pack" },
+    { "from": "pack", "to": "train" },
+    { "from": "base", "to": "train" },
+    { "from": "train", "to": "merge" },
+    { "from": "merge", "to": "evals" },
+    { "from": "evals", "to": "ruleA" },
+    { "from": "ruleA", "to": "out" },
+    { "from": "seed", "to": "evals" },
+    { "from": "full", "to": "evals" }
+  ],
+  "groups": [
+    { "id": "controls", "label": "controls and ablation B", "members": ["seed", "full"] }
+  ]
+}

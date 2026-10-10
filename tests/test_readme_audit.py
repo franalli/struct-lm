@@ -40,11 +40,15 @@ def test_audit_catches_untraced_and_misattributed(tmp_path, monkeypatch):
 
 
 def test_lifecycle_names_real_rows():
-    text = (REPO / "README.md").read_text()
-    diagram = text.split("```mermaid", 1)[1].split("```", 1)[0]
+    """The README's lifecycle diagram (docs/diagrams/src/lifecycle.json, rendered to
+    docs/diagrams/lifecycle.svg) names only runs that are rows of results/table.md."""
+    import json
+
+    assert "docs/diagrams/lifecycle.svg" in (REPO / "README.md").read_text()
+    ir = json.loads((REPO / "docs/diagrams/src/lifecycle.json").read_text())
+    labels = " ".join(n["label"] for n in ir["nodes"])
     table = (REPO / "results/table.md").read_text()
     rows = set(re.findall(r"^\| ([a-z0-9.-]+) \|", table, re.MULTILINE))
-    labels = " ".join(re.findall(r'\["([^"]*)"\]', diagram))  # node labels, not node ids
     names = set(
         re.findall(r"\b(base-8b-hf|cpt-8b[\w-]*|sft-from-[\w-]+|dpo[\w-]*|grpo[\w-]*)", labels)
     )

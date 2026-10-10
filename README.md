@@ -82,32 +82,13 @@ to 23.9% without CPT, and from 15.0% to 28.7% with it.
 
 ## 2. Lifecycle
 
-Row names are the tables' `run` column. Each arrow is labelled with the rule that picked the
-checkpoint; dashed arrows are ablations and controls, which inform the chain but don't feed it.
-Ablation A is the replay ablation, and B4 the SFT rule that picks an epoch.
+Node names are the tables' `run` rows, each with the rule that picked it (ablation A: the replay
+ablation; B4: the SFT epoch rule). Each stage doc opens with its own diagram.
 
-```mermaid
-flowchart LR
-  base["base-8b-hf<br/>Ministral 3 8B Base"]
-  cpt["cpt-8b-replay10<br/>CPT, LoRA r64, + 10% general replay"]
-  sft["sft-from-cpt<br/>SFT, 2,436 records, 1,778 teacher-written"]
-  dpo["dpo-strict<br/>DPO, 445 verifier-labelled pairs"]
-  served["served: dpo-strict bf16 to 16 req/s,<br/>dpo-strict-fp8 near saturation"]
-  sftb["sft-from-base<br/>control arm: the same SFT, no CPT"]
-  grpo["grpo<br/>GRPO, 622 tasks: rejected"]
-  full["cpt-8b-full<br/>full-parameter ablation"]
-  dpo2["dpo-2ep<br/>2-epoch ablation"]
-  base -->|"ablation A's rule: replay adopted"| cpt
-  cpt -->|"B4: epoch 1, before the recall formats overfit"| sft
-  sft -->|"checkpoint rule: final step; strict relabel by user decision"| dpo
-  dpo -->|"quality gate: FP8 passes; served by load"| served
-  base -.->|"control"| sftb
-  cpt0["cpt-8b<br/>CPT without replay"]
-  base -.->|"ablation A's alternative"| cpt0
-  base -.->|"ablation B"| full
-  sft -.->|"ablation: two epochs"| dpo2
-  dpo -.->|"best val pass@1: checkpoint-25; Stage 5 read sets it aside"| grpo
-```
+![The lifecycle: base-8b-hf, CPT, SFT, DPO, served; GRPO rejected; the control arm and ablations to the side](docs/diagrams/lifecycle.svg)
+
+Blue: checkpoints. Orange: data. Green: steps. Purple: measurements. Red: the deciding rules. Gray:
+external models, controls, ablations.
 
 The stage write-ups, each with its curves, tables and what I'd do differently:
 [0, the eval and baselines](docs/stage0.md) · [1, the corpus](docs/stage1.md) ·

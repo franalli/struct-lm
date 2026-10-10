@@ -87,12 +87,10 @@ mixture and are handled the same way (`eval/hosted/`, `eval/hosted/SHA256SUMS`).
 
 ## Pipeline
 
-```
-sources.csv ─ download ─ extract ─ filter ─ dedup ─ pii ─ split ──► CPT ─merge─► SFT ─merge─► DPO ─merge─► GRPO ─merge─► FP8 ─► vLLM
-                            │                               │  replay (FineWeb-Edu)                                              │
-                            │                               └─ tokenizer_coverage, stats    run_eval + run_lm_eval + bench  ◄────┘
-                            └─ extract --chunks ─ make_tasks (eval/tasks/, frozen eval docs only)
-```
+![The lifecycle](diagrams/lifecycle.svg)
+
+Each stage's own diagram opens its doc ([`docs/stage0.md`](stage0.md) to [`stage6.md`](stage6.md)).
+The corpus steps are in [`stage1.md`](stage1.md).
 
 | Stage | Script | Input data | Signal |
 |-------|--------|-----------|--------|

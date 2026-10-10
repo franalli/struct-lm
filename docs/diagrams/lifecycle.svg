@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1410 964" width="1410" height="964">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1410" height="964" fill="#ffffff" />
+  <rect x="375" y="40" width="310" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="805" y="40" width="230" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="380" y="228" width="320" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="410" y="416" width="260" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="230" y="604" width="320" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="40" y="792" width="320" height="132" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="420" y="804" width="320" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="760" y="228" width="320" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="1140" y="228" width="230" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="610" y="604" width="160" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <polyline points="530,148 540,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="920,148 540,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="540,336 540,416" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="540,524 390,604" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="390,712 200,792" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="390,712 580,804" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="920,148 920,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="920,148 1255,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="540,524 690,604" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="530" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="530" dy="0">246 public-domain documents</tspan>
+    <tspan x="530" dy="20">20.6M tokens</tspan>
+  </text>
+  <text x="920" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="920" dy="0">base-8b-hf</tspan>
+    <tspan x="920" dy="20">Ministral 3 8B Base</tspan>
+  </text>
+  <text x="540" y="278" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="540" dy="0">cpt-8b-replay10</tspan>
+    <tspan x="540" dy="20">CPT + 10% replay (ablation A's rule)</tspan>
+  </text>
+  <text x="540" y="466" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="540" dy="0">sft-from-cpt</tspan>
+    <tspan x="540" dy="20">SFT, epoch 1 (rule B4)</tspan>
+  </text>
+  <text x="390" y="654" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="390" dy="0">dpo-strict</tspan>
+    <tspan x="390" dy="20">DPO on verifier labels (final step)</tspan>
+  </text>
+  <text x="200" y="844" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="200" dy="0">served after the quality gate:</tspan>
+    <tspan x="200" dy="20">dpo-strict (bf16) up to 16 req/s,</tspan>
+    <tspan x="200" dy="20">dpo-strict-fp8 near saturation</tspan>
+  </text>
+  <text x="580" y="854" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="580" dy="0">grpo</tspan>
+    <tspan x="580" dy="20">GRPO: rejected by the Stage 5 read</tspan>
+  </text>
+  <text x="920" y="278" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="920" dy="0">sft-from-base</tspan>
+    <tspan x="920" dy="20">control arm: SFT without CPT</tspan>
+  </text>
+  <text x="1255" y="278" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="1255" dy="0">cpt-8b, cpt-8b-full</tspan>
+    <tspan x="1255" dy="20">CPT ablations</tspan>
+  </text>
+  <text x="690" y="654" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="690" dy="0">dpo-2ep</tspan>
+    <tspan x="690" dy="20">DPO ablation</tspan>
+  </text>
+</svg>

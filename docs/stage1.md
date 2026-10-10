@@ -1,5 +1,10 @@
 # Stage 1: the corpus
 
+![Stage 1: the corpus, its inputs, steps, the rules that decided and its output](diagrams/stage1.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 The corpus card in [`notes/decisions.md`](../notes/decisions.md) ("Stage 1 corpus card") has every
 number, generated from [`data/processed/stats.json`](../data/processed/stats.json) by `stats.py`:
 documents and pages per publisher, pages dropped, paragraphs dropped per filter rule, exact and

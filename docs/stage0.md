@@ -1,5 +1,10 @@
 # Stage 0: the problem, the eval and the baselines
 
+![Stage 0: the eval and the baselines, its inputs, steps, the rules that decided and its output](diagrams/stage0.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 ## The problem
 
 Engineering organisations sit on decades of internal documents: design manuals, inspection

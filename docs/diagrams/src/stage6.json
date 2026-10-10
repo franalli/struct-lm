@@ -1,0 +1,64 @@
+{
+  "title": "Stage 6",
+  "direction": "TB",
+  "nodes": [
+    {
+      "id": "start",
+      "label": "dpo-strict (bf16)",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "quant",
+      "label": "quantize.py (llm-compressor):\nFP8 W8A8, INT4 W4A16 (GPTQ);\nFP8 KV cache as a serving flag",
+      "type": "component",
+      "color": "green"
+    },
+    {
+      "id": "gate",
+      "label": "quality gate against bf16 (Stage 3\nfloors, GSM8K with one BOS):\nFP8 passes; FP8-KV and INT4 fail",
+      "type": "component",
+      "color": "red"
+    },
+    {
+      "id": "bench",
+      "label": "bench bf16 and FP8 on one pinned H100:\nconcurrency 1-64, Poisson 1-16 req/s",
+      "type": "component",
+      "color": "purple"
+    },
+    {
+      "id": "served",
+      "label": "served by load: bf16 up to 16 req/s,\ndpo-strict-fp8 near saturation",
+      "type": "component",
+      "color": "blue"
+    },
+    {
+      "id": "deploy",
+      "label": "DEPLOY.md: serve_vllm.sh\n(the trained prompt format)",
+      "type": "component",
+      "color": "green"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "quant"
+    },
+    {
+      "from": "quant",
+      "to": "gate"
+    },
+    {
+      "from": "gate",
+      "to": "bench"
+    },
+    {
+      "from": "bench",
+      "to": "served"
+    },
+    {
+      "from": "served",
+      "to": "deploy"
+    }
+  ]
+}

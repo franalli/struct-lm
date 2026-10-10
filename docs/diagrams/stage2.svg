@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1205 1340" width="1205" height="1340">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1205" height="1340" fill="#ffffff" />
+  <rect x="525" y="568" width="640" height="198" rx="8" ry="8" fill="#f8f9fa" stroke="#495057" stroke-width="2" opacity="0.6" stroke-dasharray="8 4" />
+  <rect x="40" y="40" width="300" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="375" y="240" width="230" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="65" y="228" width="250" height="132" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="190" y="440" width="300" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="185" y="628" width="310" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="565" y="816" width="240" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="575" y="1004" width="220" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="590" y="1192" width="190" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="555" y="628" width="260" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="875" y="628" width="260" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <polyline points="190,148 190,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="190,360 340,440" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="490,348 340,440" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="340,548 340,628" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="340,736 685,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="685,924 685,1004" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="685,1112 685,1192" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="685,736 685,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="1005,736 685,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="533" y="590" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="14" fill="#495057" text-anchor="start">
+    <tspan x="533" dy="0">controls and ablation B</tspan>
+  </text>
+  <text x="190" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="190" dy="0">19.4M-token train split</tspan>
+    <tspan x="190" dy="20">+ 1.94M FineWeb-Edu replay</tspan>
+  </text>
+  <text x="490" y="290" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="490" dy="0">base-8b-hf</tspan>
+    <tspan x="490" dy="20">Ministral 3 8B Base</tspan>
+  </text>
+  <text x="190" y="280" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="190" dy="0">packing.py</tspan>
+    <tspan x="190" dy="20">BOS + document + EOS,</tspan>
+    <tspan x="190" dy="20">4,096-token windows</tspan>
+  </text>
+  <text x="340" y="490" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="340" dy="0">LoRA r64, 1 epoch</tspan>
+    <tspan x="340" dy="20">149 steps, LR 1e-4, 1 H100</tspan>
+  </text>
+  <text x="340" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="340" dy="0">merge.py</tspan>
+    <tspan x="340" dy="20">(apply_yarn_scaling: false)</tspan>
+  </text>
+  <text x="685" y="866" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="685" dy="0">perplexity, lm-eval,</tspan>
+    <tspan x="685" dy="20">KPI generations</tspan>
+  </text>
+  <text x="685" y="1054" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="685" dy="0">ablation A's rule:</tspan>
+    <tspan x="685" dy="20">replay adopted</tspan>
+  </text>
+  <text x="685" y="1242" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="685" dy="0">cpt-8b-replay10</tspan>
+    <tspan x="685" dy="20">→ Stage 3</tspan>
+  </text>
+  <text x="685" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="685" dy="0">cpt-8b, cpt-8b-seed1</tspan>
+    <tspan x="685" dy="20">(no replay: the floor)</tspan>
+  </text>
+  <text x="1005" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="1005" dy="0">cpt-8b-full</tspan>
+    <tspan x="1005" dy="20">full-parameter, 2 GPUs</tspan>
+  </text>
+</svg>

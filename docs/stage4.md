@@ -1,5 +1,10 @@
 # Stage 4: DPO on verifiable preferences
 
+![Stage 4: DPO on verifiable preferences, its inputs, steps, the rules that decided and its output](diagrams/stage4.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 **Result: one epoch of DPO on 484 verifier-labelled pairs is indistinguishable from its SFT start
 on every pre-registered line; two epochs fit the pairs and displaced the chosen answers.** The
 stage's two findings are that displacement curve, measured end to end with no judge noise to

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 797.5 1364" width="797.5" height="1364">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="797.5" height="1364" fill="#ffffff" />
+  <rect x="40" y="52" width="160" height="84" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="260" y="40" width="240" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="90" y="228" width="320" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="155" y="428" width="190" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="405" y="416" width="320" height="132" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="247.5" y="628" width="320" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="57.5" y="816" width="320" height="132" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="437.5" y="828" width="320" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="437.5" y="1028" width="320" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="487.5" y="1216" width="220" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <polyline points="120,136 250,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="380,148 250,228" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="250,336 250,428" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="250,536 407.5,628" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="565,548 407.5,628" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="407.5,736 217.5,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="407.5,736 597.5,828" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="597.5,936 597.5,1028" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="597.5,1136 597.5,1216" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="120" y="100" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="120" dy="0">dpo-strict</tspan>
+  </text>
+  <text x="380" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="380" dy="0">Stage 4 prompts</tspan>
+    <tspan x="380" dy="20">with their verifiers</tspan>
+  </text>
+  <text x="250" y="278" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="250" dy="0">probe: 8 samples per task at T 1.0;</tspan>
+    <tspan x="250" dy="20">keep tasks solved 1-7 times in 8</tspan>
+  </text>
+  <text x="250" y="478" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="250" dy="0">622 train tasks</tspan>
+    <tspan x="250" dy="20">50 val tasks</tspan>
+  </text>
+  <text x="565" y="468" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="565" dy="0">reward: format 0.1 + correctness 0.9</tspan>
+    <tspan x="565" dy="20">(strict checker, cites the gold,</tspan>
+    <tspan x="565" dy="20">abstain sentence) − length</tspan>
+  </text>
+  <text x="407.5" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="407.5" dy="0">GRPO, DAPO loss, 8 rollouts</tspan>
+    <tspan x="407.5" dy="20">ε_high 0.28, no KL, 1 update/batch</tspan>
+  </text>
+  <text x="217.5" y="868" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="217.5" dy="0">3 verifier holes found (the hack audit</tspan>
+    <tspan x="217.5" dy="20">caught one, learned on one task);</tspan>
+    <tspan x="217.5" dy="20">each fixed with fixtures</tspan>
+  </text>
+  <text x="597.5" y="878" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="597.5" dy="0">stop on entropy collapse (steps 52, 65);</tspan>
+    <tspan x="597.5" dy="20">keep checkpoint-25 (best val pass@1)</tspan>
+  </text>
+  <text x="597.5" y="1078" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="597.5" dy="0">Stage 5 read: sharpening only</tspan>
+    <tspan x="597.5" dy="20">→ grpo, grpo-seed1 rejected</tspan>
+  </text>
+  <text x="597.5" y="1266" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="597.5" dy="0">stage5-final stays</tspan>
+    <tspan x="597.5" dy="20">dpo-strict</tspan>
+  </text>
+</svg>

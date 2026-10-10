@@ -1,5 +1,10 @@
 # Stage 3: supervised fine-tuning (SFT)
 
+![Stage 3: supervised fine-tuning, its inputs, steps, the rules that decided and its output](diagrams/stage3.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 Supervised fine-tuning on a synthetic, fully read instruction set: the CPT checkpoint
 (`cpt-8b-replay10`) and, as the control for what CPT bought, the base (`base-8b-hf`), each with
 the same set, config and data order, and each run twice (seeds 0 and 1) so the noise floor is

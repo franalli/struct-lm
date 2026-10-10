@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1030 1576" width="1030" height="1576">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1030" height="1576" fill="#ffffff" />
+  <rect x="40" y="40" width="320" height="132" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="40" y="252" width="320" height="132" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="40" y="464" width="320" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="420" y="464" width="320" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="260" y="652" width="260" height="108" rx="8" ry="8" fill="#ffd8a8" stroke="#e8590c" stroke-width="2" opacity="1" />
+  <rect x="580" y="664" width="190" height="84" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="830" y="664" width="160" height="84" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="540" y="840" width="270" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
+  <rect x="515" y="1028" width="320" height="132" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="447.5" y="1240" width="160" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
+  <rect x="667.5" y="1240" width="250" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
+  <rect x="535" y="1428" width="280" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <polyline points="200,172 200,252" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,384 200,464" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="200,572 390,652" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="580,572 390,652" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="390,760 675,840" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="675,748 675,840" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="910,748 675,840" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="675,948 675,1028" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="675,1160 527.5,1240" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="675,1160 792.5,1240" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="527.5,1348 675,1428" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <polyline points="792.5,1348 675,1428" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="200" y="92" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="200" dy="0">training passages</tspan>
+    <tspan x="200" dy="20">(seen eval facts allowed,</tspan>
+    <tspan x="200" dy="20">unseen ones kept out: sft_guard)</tspan>
+  </text>
+  <text x="200" y="304" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="200" dy="0">Mistral Large 3 writes the questions;</tspan>
+    <tspan x="200" dy="20">Large 3 and Medium 3.5</tspan>
+    <tspan x="200" dy="20">write the completions</tspan>
+  </text>
+  <text x="200" y="514" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="200" dy="0">full-passage read: keep or drop</tspan>
+    <tspan x="200" dy="20">(Claude Code, verdicts only)</tspan>
+  </text>
+  <text x="580" y="514" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="580" dy="0">Tülu 3: 500 general records</tspan>
+    <tspan x="580" dy="20">(Claude-written subsets out)</tspan>
+  </text>
+  <text x="390" y="702" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
+    <tspan x="390" dy="0">SFT set: 2,516 records</tspan>
+    <tspan x="390" dy="20">(2,436 train, 80 val)</tspan>
+  </text>
+  <text x="675" y="712" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="675" dy="0">cpt-8b-replay10</tspan>
+  </text>
+  <text x="910" y="712" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="910" dy="0">base-8b-hf</tspan>
+  </text>
+  <text x="675" y="890" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
+    <tspan x="675" dy="0">SFT, LoRA r64, 2 epochs</tspan>
+    <tspan x="675" dy="20">two seeds per arm</tspan>
+  </text>
+  <text x="675" y="1080" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
+    <tspan x="675" dy="0">B4 picks epoch 1 (the recall losses</tspan>
+    <tspan x="675" dy="20">rose in epoch 2); merge gate</tspan>
+    <tspan x="675" dy="20">against an fp32 reference</tspan>
+  </text>
+  <text x="527.5" y="1290" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
+    <tspan x="527.5" dy="0">sft-from-cpt</tspan>
+    <tspan x="527.5" dy="20">→ Stage 4</tspan>
+  </text>
+  <text x="792.5" y="1290" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle">
+    <tspan x="792.5" dy="0">sft-from-base</tspan>
+    <tspan x="792.5" dy="20">(control arm: no CPT)</tspan>
+  </text>
+  <text x="675" y="1478" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
+    <tspan x="675" dy="0">two-arm read: CPT's gain</tspan>
+    <tspan x="675" dy="20">survives as probability</tspan>
+  </text>
+</svg>

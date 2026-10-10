@@ -1,5 +1,10 @@
 # Stage 5: GRPO with verifiable rewards
 
+![Stage 5: GRPO with verifiable rewards, its inputs, steps, the rules that decided and its output](diagrams/stage5.svg)
+
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
+and gates that decided; gray, external models, controls and ablations.
+
 **Result: GRPO sharpened what the model already answered and added no knowledge.**
 - **Both seeds collapsed and stopped early.** They stopped on entropy collapse (steps 52 and 65:
   entropy under a third of its start while the train reward climbed from 0.5 to 0.83), and the
