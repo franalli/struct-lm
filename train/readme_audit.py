@@ -8,15 +8,16 @@ A number in the prose passes if:
   README's generated blocks (train/report.py: the headline tables). Shorter numbers coincide with
   some table cell too easily (0.41 is in a dozen places), so they need the sidecar; or
 - a row of notes/readme_numbers.tsv covers it: `number<TAB>context<TAB>source`, where `context` is
-  a few words of the line it sits on and `source` a repo file that contains the number (the
-  script checks that it does, at the precision written).
+  a few words of the line it sits on (or of the line before and it, joined, for a wrapped
+  sentence) and `source` a repo file that contains the number (the script checks that it does, at
+  the precision written).
 
-Prose excludes code fences (the Mermaid diagram too), generated blocks, tables, inline code, link
-targets and HTML comments. Not numbers to trace: dates and years, versions, `Stage/rule/step/part
+Prose is everything but code fences (the Mermaid diagram too), generated blocks, inline code, link
+targets and HTML comments; hand-typed tables count as prose. Not numbers to trace: dates and years, versions, `Stage/rule/step/part
 N`, section signs, identifiers with digits in them (H100, r64, FP8, GSM8K, 8B), and integers below
 10 written without a decimal or a percent sign (counts such as "2 GPUs" or "1 df").
 
-The word count is the same prose (headings included), the measure behind "under 3,000 words".
+The word count leaves out tables too (headings included): the measure behind "under 3,000 words".
 """
 
 import argparse
@@ -41,7 +42,10 @@ SKIP_BEFORE = re.compile(
     r"|Medium|Small|Llama|Tülu|Magistral|Apache)\s*|[A-Za-z]-)$"
 )
 CONFIDENCE = re.compile(r"95%(?= CI| confidence)")  # a confidence level, not a measurement
-DATE = re.compile(r"\d{4}-\d{2}-\d{2}|\b(19|20)\d{2}\b|\b\d{1,2} (Oct|Sep)\w*")
+DATE = re.compile(
+    r"\d{4}-\d{2}-\d{2}|\b(19|20)\d{2}\b"
+    r"|\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*"
+)
 
 
 def prose_lines(text: str) -> list[tuple[int, str]]:
@@ -53,7 +57,7 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
         if ln.startswith("```"):
             fence = not fence
             continue
-        if fence or ln.lstrip().startswith("|"):
+        if fence:
             continue
         ln = re.sub(r"`[^`]*`", "", ln)
         ln = re.sub(r"\]\([^)]*\)", "]", ln)
@@ -119,7 +123,9 @@ def audit(path: Path = README) -> list[str]:
         elif not num or not matches(num[0][1], num[0][2], values_in(src.read_text())):
             problems.append(f"{SIDECAR.name}: {r['number']} not in {r['source']}")
     used = set()
-    for n, line in prose_lines(text):
+    lines = prose_lines(text)
+    for k, (n, line) in enumerate(lines):
+        window = " ".join(((lines[k - 1][1] + " " if k else "") + line).split())  # wrapped context
         for written, value, decimals, _ in numbers(line):
             if significant(written) >= 3 and matches(value, decimals, block_pool):
                 continue
@@ -128,7 +134,7 @@ def audit(path: Path = README) -> list[str]:
                 for k, r in enumerate(rows)
                 if numbers(f" {r['number']} ")[:1]
                 and numbers(f" {r['number']} ")[0][1:3] == (value, decimals)
-                and r["context"].lower() in line.lower()
+                and " ".join(r["context"].split()).lower() in window.lower()
             ]
             used.update(hits)
             if not hits:
@@ -142,7 +148,8 @@ def audit(path: Path = README) -> list[str]:
 
 
 def word_count(path: Path = README) -> int:
-    return sum(len(ln.split()) for _, ln in prose_lines(path.read_text()))
+    lines = prose_lines(path.read_text())
+    return sum(len(ln.split()) for _, ln in lines if not ln.lstrip().startswith("|"))
 
 
 def main() -> None:

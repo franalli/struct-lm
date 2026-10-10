@@ -86,6 +86,7 @@ PASSK_RUNS = instruct-8b sft-from-cpt dpo dpo-seed1 dpo-strict grpo grpo-seed1
 reproduce-score:
 	$(PY) eval/rescore_all.py
 	$(PY) eval/qa_strict.py
+	$(PY) eval/summary_stats.py
 	$(PY) eval/passk.py $(PASSK_RUNS)
 	$(PY) train/report.py
 	git diff --stat --exit-code -- results docs README.md DEPLOY.md

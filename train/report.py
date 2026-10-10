@@ -38,6 +38,7 @@ diversity. They go into the README's <!-- stage4-tables --> block.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import statistics
@@ -402,6 +403,8 @@ BLOCK_FILES = {
     "headline-knowledge": "README.md",
     "headline-behaviour": "README.md",
     "headline-general": "README.md",
+    "reproduce-table": "README.md",
+    "replay-licences": "README.md",
 }
 
 
@@ -2570,6 +2573,80 @@ def headline_tables() -> dict[str, str]:
     return blocks
 
 
+SUMMARY_STATS = Path("results/summary_stats.json")  # eval/summary_stats.py
+REPRODUCE = [  # (stage, make target, its results/train_runs.md section, data: a SHA256SUMS dir or a note)
+    ("0: the eval and baselines", "reproduce-stage0", None, "`eval/tasks/` (committed, reviewed)"),
+    ("1: the corpus", "reproduce-stage1", None, "data/processed"),
+    ("2: CPT", "reproduce-stage2", "Stage 2: CPT", "the corpus"),
+    ("3: SFT", "reproduce-stage3", "Stage 3: SFT", "data/sft"),
+    ("4: DPO", "reproduce-stage4", "Stage 4: DPO", "data/dpo/strict"),
+    ("5: GRPO", "reproduce-stage5", "Stage 5: GRPO", "data/grpo"),
+    ("6: serving", "reproduce-stage6", None, "`serve/bench_manifest.json`"),
+]
+REPLAY_LICENCES = {  # Tülu 3 subset -> (name, the licence the mixture's card gives it)
+    "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": ("Evol CodeAlpaca", "Apache 2.0"),
+    "ai2-adapt-dev/numinamath_tir_math_decontaminated": ("NuminaMath-TIR", "Apache 2.0"),
+    "ai2-adapt-dev/tulu_v3.9_synthetic_finalresp_wildguardmixtrain_decontaminated_50k": (
+        "WildGuardMix",
+        "Apache 2.0",
+    ),
+    "ai2-adapt-dev/oasst1_converted": ("OASST", "Apache 2.0"),
+    "ai2-adapt-dev/tulu_v3.9_wildjailbreak_decontaminated_50k": ("WildJailbreak", "ODC-BY-1.0"),
+    "allenai/tulu-3-sft-personas-math-grade": ("Persona GSM", "ODC-BY-1.0"),
+    "ai2-adapt-dev/tulu_v3.9_wildchat_100k": ("WildChat (GPT-4)", "ODC-BY-1.0"),
+    "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k": ("Persona Algebra", "ODC-BY-1.0"),
+    "ai2-adapt-dev/coconot_converted": ("CoCoNot", "ODC-BY-1.0"),
+    "ai2-adapt-dev/tulu_v3.9_sciriff_10k": ("SciRIFF", "ODC-BY-1.0"),
+    "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": ("TableGPT", "MIT"),
+    "ai2-adapt-dev/flan_v2_converted": ("FLAN v2", "not given on the card"),
+    "withdrawn": (
+        "withdrawn math set (GSM8K)",
+        "withdrawn after training",
+    ),
+    "ai2-adapt-dev/no_robots_converted": ("No Robots", "CC-BY-NC-4.0 (non-commercial)"),
+}
+
+
+def reproduce_table() -> str:
+    """One row per stage: its make target, its training GPU-hours and dollars (summed from the
+    training-run tables by eval/summary_stats.py) and its data set's hash, read live: the sha256 of
+    the set's SHA256SUMS, which lists every file's own."""
+    if not SUMMARY_STATS.exists():
+        return ""
+    cost = json.loads(SUMMARY_STATS.read_text())["training_cost"]
+    lines = [
+        "| stage | command | training GPU-h | training $ | data (sha256 of its `SHA256SUMS`) |",
+        "|---|---|---|---|---|",
+    ]
+    for stage, target, section, data in REPRODUCE:
+        c = cost.get(section) if section else None
+        sums = Path(data) / "SHA256SUMS"
+        if sums.exists():
+            data = f"`{data}`: {hashlib.sha256(sums.read_bytes()).hexdigest()[:8]}"
+        gpu = f"{c['gpu_h']:.2f}" if c else ("not totalled" if stage.startswith("6") else "")
+        usd = f"{c['usd']:.2f}" if c else ""
+        lines.append(f"| {stage} | `make {target}` | {gpu} | {usd} | {data} |")
+    t = cost["all training"]
+    lines.append(f"| all training | | {t['gpu_h']:.2f} | {t['usd']:.2f} | |")
+    return "\n".join(lines)
+
+
+def replay_licence_table() -> str:
+    """The Tülu 3 replay records by subset (data/sft/hosted/, counted by eval/summary_stats.py),
+    with the licence the mixture's card gives each."""
+    if not SUMMARY_STATS.exists():
+        return ""
+    counts = json.loads(SUMMARY_STATS.read_text())["licence_audit"]["replay_by_subset"]
+    unknown = set(counts) - set(REPLAY_LICENCES)
+    if unknown:
+        raise SystemExit(f"replay subsets without a licence entry: {sorted(unknown)}")
+    lines = ["| subset | records | licence |", "|---|---|---|"]
+    for sub, (name, licence) in REPLAY_LICENCES.items():
+        if counts.get(sub):
+            lines.append(f"| {name} | {counts[sub]} | {licence} |")
+    return "\n".join(lines)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usd-per-gpu-hour", type=float, default=3.95)
@@ -2641,6 +2718,8 @@ def main() -> None:
             "results-table": results_table(),
             "serving-table": serving_table(),
             **headline_tables(),
+            "reproduce-table": reproduce_table(),
+            "replay-licences": replay_licence_table(),
         }
         for name, block in blocks.items():
             if block:

@@ -367,16 +367,18 @@ becomes a reward, and its passes are read before its scores are believed.
 [`docs/reproduce.md`](docs/reproduce.md) has one command chain per stage and pins the versions
 and dataset hashes. It also says what lives in git, on the Modal volume and on Hugging Face.
 
+<!-- reproduce-table:start -->
 | stage | command | training GPU-h | training $ | data (sha256 of its `SHA256SUMS`) |
 |---|---|---|---|---|
-| 0: the eval and baselines | `make reproduce-stage0` | | | `eval/tasks/` (committed, reviewed) |
-| 1: the corpus | `make reproduce-stage1` | | | `data/processed`: 966d1e0c |
+| 0: the eval and baselines | `make reproduce-stage0` |  |  | `eval/tasks/` (committed, reviewed) |
+| 1: the corpus | `make reproduce-stage1` |  |  | `data/processed`: 966d1e0c |
 | 2: CPT | `make reproduce-stage2` | 5.40 | 21.32 | the corpus |
 | 3: SFT | `make reproduce-stage3` | 1.97 | 7.76 | `data/sft`: 70f47740 |
 | 4: DPO | `make reproduce-stage4` | 0.37 | 1.49 | `data/dpo/strict`: 5e3effaf |
 | 5: GRPO | `make reproduce-stage5` | 1.08 | 4.28 | `data/grpo`: 4db8f7a6 |
-| 6: serving | `make reproduce-stage6` | not totalled | | `serve/bench_manifest.json` |
+| 6: serving | `make reproduce-stage6` | not totalled |  | `serve/bench_manifest.json` |
 | all training | | 8.82 | 34.85 | |
+<!-- reproduce-table:end -->
 
 Dollars are at $3.95 per H100-hour (Modal's list price, checked 2026-10-09). Evals, sampling, the
 Stage 6 bench and the Mistral API calls aren't totalled anywhere. Stages 2-6 launch Modal GPU
@@ -410,19 +412,29 @@ README's prose appears in a generated table or a named file.
 | the corpus: 246 US federal documents | public domain (17 U.S.C. § 105); ASCE 7, the AISC manual and other copyrighted standards excluded | URLs and sha256 in [`data/sources.csv`](data/sources.csv); the PDFs aren't redistributed |
 | FineWeb-Edu (CPT replay, general val) | ODC-By | not redistributed |
 | Mistral Large 3 / Medium 3.5 output (eval items, SFT records) | assigned to the customer by Mistral's Commercial Terms (§3.1), labelled as model-written (§3.2) | committed |
-| Tülu 3 SFT mixture: 500 replay records, 50 held-out probe prompts | ODC-BY-1.0 as a collection; subsets below | row ids only (`data/sft/hosted/`, `eval/hosted/`; results keep sha256s of their prompt ids); `make sft-replay` rebuilds the files and checks their sha256 |
+| Tülu 3 SFT mixture: 500 replay records, 50 held-out probe prompts | ODC-BY-1.0 as a collection; subsets below | row ids only (`data/sft/hosted/`, `eval/hosted/`; results keep sha256s of their prompt ids); `make sft-replay` rebuilds the files and checks their sha256. Commits before `653f932` still hold the text, since the repo was public before the change. |
 | Ministral 3 8B Base | Apache 2.0 (model card) | not redistributed |
 
 The replay records by subset, with the licence the mixture's card gives each:
 
+<!-- replay-licences:start -->
 | subset | records | licence |
 |---|---|---|
-| Evol CodeAlpaca, NuminaMath-TIR, WildGuardMix, OASST | 97, 58, 46, 4 | Apache 2.0 |
-| WildJailbreak, Persona GSM, WildChat (GPT-4), Persona Algebra, CoCoNot, SciRIFF | 46, 46, 36, 18, 10, 7 | ODC-BY-1.0 |
+| Evol CodeAlpaca | 97 | Apache 2.0 |
+| NuminaMath-TIR | 58 | Apache 2.0 |
+| WildGuardMix | 46 | Apache 2.0 |
+| OASST | 4 | Apache 2.0 |
+| WildJailbreak | 46 | ODC-BY-1.0 |
+| Persona GSM | 46 | ODC-BY-1.0 |
+| WildChat (GPT-4) | 36 | ODC-BY-1.0 |
+| Persona Algebra | 18 | ODC-BY-1.0 |
+| CoCoNot | 10 | ODC-BY-1.0 |
+| SciRIFF | 7 | ODC-BY-1.0 |
 | TableGPT | 4 | MIT |
 | FLAN v2 | 74 | not given on the card |
 | withdrawn math set (GSM8K) | 46 | withdrawn after training |
 | No Robots | 8 | CC-BY-NC-4.0 (non-commercial) |
+<!-- replay-licences:end -->
 
 ### Weights
 

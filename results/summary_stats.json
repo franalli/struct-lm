@@ -1,0 +1,157 @@
+{
+  "against_instruct": {
+    "sft-from-cpt": {
+      "seen": {
+        "n": 167,
+        "correct": [
+          48,
+          19
+        ],
+        "diff_pt": 17.365269461077844,
+        "ci_pt": [
+          10.778443113772456,
+          24.550898203592812
+        ]
+      },
+      "unseen": {
+        "n": 155,
+        "correct": [
+          18,
+          12
+        ],
+        "diff_pt": 3.870967741935484,
+        "ci_pt": [
+          -1.2903225806451613,
+          9.032258064516128
+        ]
+      }
+    },
+    "sft-from-cpt-seed1": {
+      "seen": {
+        "n": 167,
+        "correct": [
+          43,
+          19
+        ],
+        "diff_pt": 14.37125748502994,
+        "ci_pt": [
+          7.18562874251497,
+          21.55688622754491
+        ]
+      },
+      "unseen": {
+        "n": 155,
+        "correct": [
+          17,
+          12
+        ],
+        "diff_pt": 3.225806451612903,
+        "ci_pt": [
+          -1.935483870967742,
+          8.38709677419355
+        ]
+      }
+    },
+    "base-8b-hf": {
+      "seen": {
+        "n": 167,
+        "correct": [
+          21,
+          19
+        ],
+        "diff_pt": 1.1976047904191616,
+        "ci_pt": [
+          -3.592814371257485,
+          5.9880239520958085
+        ]
+      },
+      "unseen": {
+        "n": 155,
+        "correct": [
+          18,
+          12
+        ],
+        "diff_pt": 3.870967741935484,
+        "ci_pt": [
+          0.0,
+          8.38709677419355
+        ]
+      }
+    }
+  },
+  "cpt_arm_gap": {
+    "train_slice_log_ppl_gap_per_token": 0.08585188607488758,
+    "unseen_answer_tokens_mean": 4.690322580645161,
+    "predicted_nats": 0.4026730398480211,
+    "measured_unseen_answer_nats": 0.4090070967741936,
+    "unseen_strict_pct": {
+      "cpt": 11.290322580645162,
+      "base": 8.06451612903226
+    },
+    "unseen_strict_diff_pt": 3.225806451612903
+  },
+  "demo_pools": {
+    "grounded_correct_cited_supported": 93,
+    "adversarial_declined": 73
+  },
+  "licence_audit": {
+    "sft_records": 2516,
+    "replay_records": 500,
+    "replay_by_subset": {
+      "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": 97,
+      "ai2-adapt-dev/flan_v2_converted": 74,
+      "ai2-adapt-dev/numinamath_tir_math_decontaminated": 58,
+      "allenai/tulu-3-sft-personas-math-grade": 46,
+      "ai2-adapt-dev/tulu_v3.9_wildjailbreak_decontaminated_50k": 46,
+      "ai2-adapt-dev/tulu_v3.9_synthetic_finalresp_wildguardmixtrain_decontaminated_50k": 46,
+      "withdrawn": 46,
+      "ai2-adapt-dev/tulu_v3.9_wildchat_100k": 36,
+      "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k": 18,
+      "ai2-adapt-dev/coconot_converted": 10,
+      "ai2-adapt-dev/no_robots_converted": 8,
+      "ai2-adapt-dev/tulu_v3.9_sciriff_10k": 7,
+      "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": 4,
+      "ai2-adapt-dev/oasst1_converted": 4
+    },
+    "non_commercial": 8,
+    "withdrawn": 46,
+    "sft_train_records": 2436,
+    "sft_train_by_format": {
+      "definition": 275,
+      "grounded": 374,
+      "closed_book": 1129,
+      "abstain": 183,
+      "replay": 475
+    },
+    "sft_train_teacher_written": 1778,
+    "probe_prompts": 50,
+    "blocking": 54
+  },
+  "training_cost": {
+    "Stage 2: CPT": {
+      "runs": 6,
+      "gpu_h": 5.4,
+      "usd": 21.32
+    },
+    "Stage 3: SFT": {
+      "runs": 4,
+      "gpu_h": 1.97,
+      "usd": 7.76
+    },
+    "Stage 4: DPO": {
+      "runs": 4,
+      "gpu_h": 0.37,
+      "usd": 1.49
+    },
+    "Stage 5: GRPO": {
+      "runs": 2,
+      "gpu_h": 1.08,
+      "usd": 4.28
+    },
+    "all training": {
+      "runs": 16,
+      "gpu_h": 8.82,
+      "usd": 34.85
+    }
+  }
+}

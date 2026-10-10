@@ -13,8 +13,8 @@ number	context	source
 2.6	2.6-point floor	results/train_runs.md
 3.5	DPO by 3.5	docs/stage4.md
 3.1	GRPO by 3.1	docs/stage5.md
-0.38	0.38	notes/decisions.md
-1.32	1.32	notes/decisions.md
+0.38	DPO lost 0.38	results/train_runs.md
+1.32	1.32 on unseen	results/train_runs.md
 +0.66	+0.66 nats on the answer tokens	notes/decisions.md
 16	16 req/s	DEPLOY.md
 $0.035	$0.035 per	results/train_runs.md
@@ -63,28 +63,28 @@ $3.95	$3.95 per H100-hour	results/train_runs.md
 716	its 716 items	CLAUDE.md
 130	from 130 to	docs/stage0.md
 322	322 items	results/table.md
-0.086	0.086 nats per	notes/decisions.md
-4.69	4.69 answer tokens	notes/decisions.md
-3.2	differs by 3.2	notes/decisions.md
-+10.8	+10.8	notes/decisions.md
-+24.6	+24.6	notes/decisions.md
-−1.3	−1.3 to +9.0	notes/decisions.md
-+9.0	−1.3 to +9.0	notes/decisions.md
+0.086	0.086 nats per	results/summary_stats.json
+4.69	4.69 answer tokens	results/summary_stats.json
+3.2	differs by 3.2	results/summary_stats.json
++10.8	CI +10.8	results/summary_stats.json
++24.6	CI +10.8 to +24.6	results/summary_stats.json
+−1.3	−1.3 to +9.0	results/summary_stats.json
++9.0	−1.3 to +9.0	results/summary_stats.json
 0.7	T 0.7	eval/passk.py
 +1.2	[+1.2, +6.0]	docs/stage4.md
 +6.0	[+1.2, +6.0]	docs/stage4.md
 +1.3	[+1.3, +5.0]	docs/stage5.md
 +5.0	[+1.3, +5.0]	docs/stage5.md
 0.21	its 0.21 floor	results/train_runs.md
-0.11	(0.11 on seen	notes/decisions.md
-0.71	lost 0.71	notes/decisions.md
-0.71	0.71 nats seen	notes/decisions.md
+0.11	(0.11 on seen	results/train_runs.md
+0.71	lost 0.71	results/train_runs.md
+0.71	0.71 nats seen	results/train_runs.md
 +0.45	+0.45 to +0.90	docs/results.md
 +0.90	+0.45 to +0.90	docs/results.md
 $0.127	cost $0.127	results/train_runs.md
 3.7	a 3.7 floor	results/train_runs.md
 0.9	fell 0.9 and	results/train_runs.md
-4.6	4.6	results/train_runs.md
+4.6	fell 0.9 and 4.6	results/train_runs.md
 8%	LoRA's 8%	results/train_runs.md
 0.17%	0.17% over two seeds	results/train_runs.md
 3.0	GSM8K fell 3.0	results/train_runs.md
@@ -102,9 +102,29 @@ $0.127	cost $0.127	results/train_runs.md
 512	512-record	docs/stage6.md
 29%	by 29%	docs/stage6.md
 40%	40% on FP8	docs/stage6.md
-54	54	notes/decisions.md
-2,516	of the 2,516	docs/stage3.md
-46	46	docs/reproduce.md
-25%	25%	docs/reproduce.md
-93	of the 93 grounded	notes/decisions.md
-73	of the 73	notes/decisions.md
+54	54 of the 2,516	results/summary_stats.json
+2,516	of the 2,516	results/summary_stats.json
+46	8 non-commercial, 46	results/summary_stats.json
+25%	25%), the completions	docs/reproduce.md
+93	of the 93 grounded	results/summary_stats.json
+73	of the 73	results/summary_stats.json
+0.38	DPO by 0.38	results/train_runs.md
+0.38	answer tokens −0.38	results/train_runs.md
+1.32	GRPO by 1.32	results/train_runs.md
+1.32	and 1.32 unseen	results/train_runs.md
+54	audited after training: 54	results/summary_stats.json
+54	those 54 records	results/summary_stats.json
+2,516	54 of the 2,516	results/summary_stats.json
+246	246 public PDFs	docs/stage0.md
+20.6M	20.6M tokens after cleaning	docs/stage0.md
+2,436	SFT on 2,436 records	results/summary_stats.json
+1,778	(1,778 teacher-written)	results/summary_stats.json
+445	DPO on 445	results/train_runs.md
+622	622 verifiable tasks	results/train_runs.md
+716	a 716-item KPI eval	CLAUDE.md
+8.8	8.8 GPU-hours	results/summary_stats.json
+$35	$35 of training	results/summary_stats.json
+246	246 US federal documents	docs/stage0.md
+17	(17 U.S.C.	docs/stage1.md
+500	500 replay records	results/summary_stats.json
+50	50 held-out probe prompts	results/summary_stats.json
