@@ -95,7 +95,6 @@ CAVEATS = [
     "No structural engineer saw items or outputs",  # no domain-expert review
     "No minimum detectable effect was set",  # the eval was not sized for 3-point gains
     "are fixtures and are never trained on",  # rule 13
-    "commits before `653f932` still hold the text",  # the Tülu history
 ]
 
 

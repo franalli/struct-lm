@@ -13,7 +13,7 @@
 - **The demo's candidate pools:** grounded items `dpo-strict` answered correctly with valid,
   judge-supported citations; adversarial items it declined.
 - **The replay licence audit:** SFT records in all and by format, replay records by subset, the
-  non-commercial (No Robots) and withdrawn (withdrawn math set) counts, and the held-out
+  non-commercial (No Robots) and withdrawn counts, and the held-out
   Tülu probe prompts.
 - **Training cost per stage:** the GPU-hours and dollars of `results/train_runs.md`'s
   training-run tables, summed.
@@ -178,7 +178,13 @@ def main() -> None:
         for name in ("train.jsonl", "sft_val.jsonl")
         for r in jsonl(REPO / "data/sft/hosted" / name)
     ]
-    subsets = Counter(r["replay_source"].split("#")[0] for r in sft if r["format"] == "replay")
+    subsets = Counter(  # a withdrawn record keeps only a digest of its source (sft_replay_fetch.py)
+        "withdrawn"
+        if r["replay_source"].startswith("sha256:")
+        else r["replay_source"].split("#")[0]
+        for r in sft
+        if r["format"] == "replay"
+    )
     res["licence_audit"] = {
         "sft_records": len(sft),
         "replay_records": sum(subsets.values()),

@@ -39,7 +39,7 @@ make sft-data                               # Makefile SFT_STEPS + contamination
 
 - Git keeps `data/sft/hosted/{train,sft_val}.jsonl`, not the built files: the 500 Tülu 3 replay
   records carry their subsets' licences (No Robots is non-commercial), so their text is blanked
-  there and their row ids kept. `make sft-replay` (`sft_replay_fetch.py`) rebuilds
+  there and their row ids kept (a withdrawn set's only as `sha256:` digests; keep them so). `make sft-replay` (`sft_replay_fetch.py`) rebuilds
   `data/sft/{train,sft_val}.jsonl` and checks `SHA256SUMS`; `make sft-data` ends with `--strip`,
   which refreshes the hosted copies. Never commit the built files. The same holds for the probe
   prompts (`eval/hosted/`, rebuilt to `eval/{diversity_prompts,sft_template_prompts}.jsonl`), and

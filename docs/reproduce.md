@@ -67,7 +67,7 @@ with the licence the mixture's card gives each:
 | Evol CodeAlpaca | 97 | Apache 2.0 |
 | FLAN v2 | 74 | not given on the card |
 | NuminaMath-TIR | 58 | Apache 2.0 |
-| withdrawn math set (GSM8K, 50k) | 46 | withdrawn after training; not in the card's list |
+| Withdrawn math set | 46 | withdrawn after training: its licence restricts models trained on it; ids kept as sha256 |
 | WildJailbreak | 46 | ODC-BY-1.0 |
 | WildGuardMix | 46 | Apache 2.0 |
 | Persona GSM | 46 | ODC-BY-1.0 |

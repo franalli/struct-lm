@@ -2650,8 +2650,8 @@ REPLAY_LICENCES = {  # Tülu 3 subset -> (name, the licence the mixture's card g
     "ai2-adapt-dev/tulu_v3.9_table_gpt_5k": ("TableGPT", "MIT"),
     "ai2-adapt-dev/flan_v2_converted": ("FLAN v2", "not given on the card"),
     "withdrawn": (
-        "withdrawn math set (GSM8K)",
-        "withdrawn after training",
+        "Withdrawn math set",
+        "withdrawn after training: its licence restricts models trained on it",
     ),
     "ai2-adapt-dev/no_robots_converted": ("No Robots", "CC-BY-NC-4.0 (non-commercial)"),
 }

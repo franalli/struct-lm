@@ -38,7 +38,7 @@ govern.
 | definition | 276 | 266 | Large 213, Medium 63 | every record |
 | grounded (4 passages, cited) | 401 | | Large 307, Medium 94 | every record |
 | abstain (4 passages, no answer) | 195 | | the fixed sentence "Not in the provided passages." | the 53 hard negatives; 0 defects in 40 of the rest |
-| replay (Tulu 3 SFT mixture) | 500 | | Tulu 3's sources: GPT-4o, GPT-3.5/4, Mixtral, people | sampled, not read |
+| replay (Tulu 3 SFT mixture) | 500 | | Tulu 3's sources: GPT-4o, GPT-3.5/4, Mixtral, people, and a math set since withdrawn | sampled, not read |
 
 - **Questions:** Mistral Large 3 wrote every domain question; half use the eval's exact
   instruction text and half are paraphrased.

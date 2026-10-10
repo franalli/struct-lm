@@ -418,7 +418,8 @@ dataset hashes.
   - Large 3 and Medium 3.5 wrote the completions; Medium 3.5 wrote 415 of the 1,778 train records.
   - The abstain records use one fixed sentence.
   - 500 general records come from the Tülu 3 mixture, minus its Claude-written subsets. That
-    mixture's records were written by GPT-4o, GPT-3.5/4, Mixtral and people.
+    mixture's records were written by GPT-4o, GPT-3.5/4, Mixtral and people, except a math set
+    since withdrawn (below).
 - **DPO and GRPO:** the models' own samples and rollouts, labelled and scored by rules.
 - **Claude**, through Claude Code, built the tooling and reviewed generated records with keep or
   drop verdicts only. No training set contains text Claude wrote. The hand-written answers in
@@ -432,7 +433,7 @@ dataset hashes.
 | the corpus: 246 US federal documents | public domain (17 U.S.C. § 105); 27 reproduce third-party material (photo credits, figures), each hand-checked; copyrighted standards excluded | URLs and sha256 of the 251 candidates in [`data/sources.csv`](data/sources.csv); no PDFs |
 | FineWeb-Edu (CPT replay) | ODC-By | not redistributed |
 | Mistral output (eval items, SFT) | the customer's under Mistral's Commercial Terms (§3.1); labelled model-written (§3.2) | committed |
-| Tülu 3 mixture: 500 replay records, 50 probe prompts | ODC-BY-1.0; subsets below | row ids only; `make sft-replay` rebuilds them (commits before `653f932` still hold the text) |
+| Tülu 3 mixture: 500 replay records, 50 probe prompts | ODC-BY-1.0; subsets below | row ids only (the withdrawn set's as sha256); `make sft-replay` rebuilds them |
 | Ministral 3 8B Base | Apache 2.0 | not redistributed |
 
 <!-- replay-licences:start -->
@@ -450,7 +451,7 @@ dataset hashes.
 | SciRIFF | 7 | ODC-BY-1.0 |
 | TableGPT | 4 | MIT |
 | FLAN v2 | 74 | not given on the card |
-| withdrawn math set (GSM8K) | 46 | withdrawn after training |
+| Withdrawn math set | 46 | withdrawn after training: its licence restricts models trained on it |
 | No Robots | 8 | CC-BY-NC-4.0 (non-commercial) |
 <!-- replay-licences:end -->
 
@@ -459,11 +460,11 @@ dataset hashes.
 **Not published at v1.0.**
 - **Why:** they were trained on the last two subset rows above.
   - No Robots is non-commercial.
-  - Its licence restricts how models trained on its outputs may be named.
+  - The withdrawn math set's licence restricts how models trained on it may be named.
 - **Further questions for a release:** FLAN v2's 74 records (no licence on the card) and the GPT-4
   and GPT-4o subsets (OpenAI's terms).
 - **The fix:**
-  - swap those 54 records: OASST1 for No Robots, and a unrestricted math source with no GSM8K test
+  - swap those 54 records: OASST1 for No Robots, and a math source with an unrestricted licence and no GSM8K test
     overlap;
   - retrain SFT, DPO and FP8;
   - rerun the gate.

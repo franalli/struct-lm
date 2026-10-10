@@ -22,6 +22,12 @@ stored for those rows (`prompt_token_ids`, `reference`, `prompt`) become `<field
 sha256 of the field's JSON, so the text isn't re-hosted and tests/test_template.py still checks
 the served prompt ids against the trainer's. The models' own outputs stay.
 
+**Withdrawn rows** (46 math records whose licence restricts models trained on them, withdrawn
+after training) keep only `sha256:<hex>` digests of their ids: `eid` and `replay_source` in the
+SFT set, `id` and `source` in the probes and the results. The fill finds them by hashing each
+mixture row's id and restores the ids, so the rebuilt files still match their hashes; `--strip` and
+`--results` keep any row whose id digest the hosted copies hold hashed.
+
 Why: the replay subsets carry their own licences (docs/reproduce.md lists them; No Robots is
 CC-BY-NC-4.0), so the repo ships ids and this script rather than the text.
 """
@@ -46,6 +52,7 @@ RESULTS = [
     "results/serve/*/served_check*.jsonl",
 ]
 HASHED = ("prompt_token_ids", "reference", "prompt")
+PREFIX = "sha256:"  # a withdrawn row's id, as the hosted copies keep it
 REPO = "allenai/tulu-3-sft-mixture"
 SHARDS = [f"data/train-{k:05d}-of-00006.parquet" for k in range(6)]
 
@@ -57,6 +64,38 @@ def third_party(r: dict) -> bool:
 
 def tulu_id(r: dict) -> str:
     return (r.get("eid") or r["id"]).removeprefix("replay:")
+
+
+def digest(s: str) -> str:
+    return PREFIX + hashlib.sha256(s.encode()).hexdigest()
+
+
+def key(r: dict) -> str:
+    """The id the hosted copy keeps: an SFT record's eid, a probe's id (a digest if withdrawn)."""
+    return r.get("eid") or r["id"]
+
+
+def withdrawn() -> set[str]:
+    """The id digests the hosted copies keep in place of withdrawn rows' ids."""
+    rows = (r for _, hosted, name, _ in INPUTS for r in read(hosted / name))
+    return {
+        k
+        for r in rows
+        if isinstance(k := r.get("eid") or r.get("id"), str) and k.startswith(PREFIX)
+    }
+
+
+def hide(r: dict, hidden: set[str]) -> int:
+    """Replace a withdrawn row's ids with their digests; 1 if it was one."""
+    if r.get("eid") and digest(r["eid"]) in hidden:
+        r["replay_source"], r["eid"] = digest(r["replay_source"]), digest(r["eid"])
+        return 1
+    if isinstance(r.get("id"), str) and digest(r["id"]) in hidden:
+        r["id"] = digest(r["id"])
+        if r.get("source"):
+            r["source"] = digest(r["source"])
+        return 1
+    return 0
 
 
 def read(path: Path) -> list[dict]:
@@ -75,6 +114,7 @@ def sha(path: Path) -> str:
 
 def strip() -> None:
     sums: dict[Path, list[str]] = {}
+    hidden = withdrawn()
     for built, hosted, name, sumfile in INPUTS:
         rows = read(built / name)
         for r in rows:
@@ -82,6 +122,7 @@ def strip() -> None:
                 for k in ("prompt", "completion"):
                     if k in r:
                         r[k] = None
+                hide(r, hidden)
         write(hosted / name, rows)
         if sumfile.parent == hosted:  # the probes' hashes are written here; SFT's are frozen
             sums.setdefault(sumfile, []).append(f"{sha(built / name)}  {name}")
@@ -90,34 +131,44 @@ def strip() -> None:
         sumfile.write_text("\n".join(lines) + "\n")
 
 
-def fetch_messages(ids: set[str]) -> dict[str, list[dict]]:
+def fetch_messages(ids: set[str], hidden: set[str]) -> dict[str, tuple[str, str, list[dict]]]:
+    """(id, source, messages) of each wanted row, by its id or, if withdrawn, its id digest."""
     import pyarrow.parquet as pq
     from huggingface_hub import hf_hub_download
 
-    found: dict[str, list[dict]] = {}
+    found: dict[str, tuple[str, str, list[dict]]] = {}
     for shard in SHARDS:
         path = hf_hub_download(REPO, shard, repo_type="dataset")
-        cols = ["id", "messages"]
+        cols = ["id", "source", "messages"]
         for batch in pq.ParquetFile(path).iter_batches(batch_size=20_000, columns=cols):
             for r in batch.to_pylist():
-                if r["id"] in ids:
-                    found[r["id"]] = r["messages"]
-    if missing := ids - set(found):
+                for k in (r["id"], digest(r["id"]), digest(f"replay:{r['id']}")):
+                    if k in ids or k in hidden:
+                        found[k] = (r["id"], r["source"], r["messages"])
+    if missing := (ids | hidden) - set(found):
         raise SystemExit(f"{len(missing)} replay ids not in {REPO}, e.g. {sorted(missing)[:3]}")
     return found
 
 
 def fill() -> None:
     hosted = {(built, name): read(h / name) for built, h, name, _ in INPUTS}
-    ids = {tulu_id(r) for rows in hosted.values() for r in rows if third_party(r)}
-    messages = fetch_messages(ids)
+    hidden = withdrawn()
+    third = [r for rows in hosted.values() for r in rows if third_party(r)]
+    found = fetch_messages({tulu_id(r) for r in third if key(r) not in hidden}, hidden)
     ok = True
     for built, _, name, sumfile in INPUTS:
         rows = hosted[(built, name)]
         for r in rows:
             if not third_party(r):
                 continue
-            user, assistant = messages[tulu_id(r)]
+            if key(r) in hidden:  # a withdrawn row: its ids come back from the source
+                tid, source, (user, assistant) = found[key(r)]
+                if "eid" in r:
+                    r["replay_source"], r["eid"] = f"{source}#{tid}", f"replay:{tid}"
+                else:
+                    r["id"], r["source"] = tid, source
+            else:
+                user, assistant = found[tulu_id(r)][2]
             if "completion" in r:  # an SFT record
                 r["prompt"] = [{"role": "user", "content": user["content"]}]
                 r["completion"] = [{"role": "assistant", "content": assistant["content"]}]
@@ -132,12 +183,14 @@ def fill() -> None:
 
 
 def hash_results() -> None:
+    hidden = withdrawn()
     for pattern in RESULTS:
         for path in sorted(ROOT.glob(pattern)):
             rows, n = read(path), 0
             for r in rows:
                 if not third_party(r):
                     continue
+                n += hide(r, hidden)
                 for k in HASHED:
                     if r.get(k) is not None:
                         blob = json.dumps(r[k], ensure_ascii=False).encode()
