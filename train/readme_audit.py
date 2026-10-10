@@ -38,8 +38,8 @@ NUMBER = re.compile(
 )
 # a stage, rule or section number, a model or licence version ("Medium 3.5", "CC-BY-4.0")
 SKIP_BEFORE = re.compile(
-    r"((Stage|stage|rule|Rule|step|Step|part|Part|§|ch\.|chapter|Section|Ministral|Mistral|Large"
-    r"|Medium|Small|Llama|Tülu|Magistral|Apache)\s*|[A-Za-z]-)$"
+    r"((Stage|stage|rule|Rule|steps?|Steps?|part|Part|§|ch\.|chapter|Section|Ministral|Mistral|Large"
+    r"|Medium|Small|Llama|Tülu|Magistral|Apache)\s*(\d+\s*[-–]?)?|[A-Za-z]-)$"
 )
 CONFIDENCE = re.compile(r"95%(?= CI| confidence)")  # a confidence level, not a measurement
 DATE = re.compile(

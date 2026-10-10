@@ -197,7 +197,66 @@ def main() -> None:
     res["licence_audit"]["blocking"] = (
         res["licence_audit"]["non_commercial"] + res["licence_audit"]["withdrawn"]
     )
+    res["licence_audit"]["sft_train_teacher"] = dict(
+        Counter(
+            r["teacher"] for r in train if r["format"] in ("closed_book", "grounded", "definition")
+        )
+    )
+    stats = json.loads((REPO / "data/processed/stats.json").read_text())
+    flags = next(
+        (v for k, v in stats.items() if isinstance(v, dict) and "copyright_flags" in v), {}
+    ).get("copyright_flags")
+    res["licence_audit"]["copyright_flagged_docs_kept"] = (
+        len(flags) if isinstance(flags, list | dict) else flags
+    )
+    rows = (REPO / "data/sources.csv").read_text().splitlines()
+    res["licence_audit"]["source_rows"] = len(rows) - 1  # the header
     res["training_cost"] = stage_costs()
+
+    # the entropy stop that fired on one batch (grpo-seed1, step 34), against its old baseline
+    log = jsonl(REPO / "results/runs/grpo-seed1/train_log.jsonl")
+    ent = {r["step"]: r["entropy"] for r in log if r.get("entropy") is not None and r.get("step")}
+    base15 = statistics.fmean(ent[s] for s in range(1, 6))
+    res["grpo_seed1_entropy"] = {
+        "step34": ent[34],
+        "steps1_5_mean": base15,
+        "steps25_34_mean": statistics.fmean(ent[s] for s in range(25, 35)),
+        "steps25_34_over_steps1_5_pct": 100
+        * statistics.fmean(ent[s] for s in range(25, 35))
+        / base15,
+    }
+
+    # dpo-2ep against dpo: answer-token gold_lp by half, strict seen accuracy
+    def ans(run: str, h: str) -> float:
+        rows = jsonl(REPO / "results/runs" / run / "generations.jsonl")
+        return statistics.fmean(
+            g["gold_lp"] - g["gold_lp_end"]
+            for g in rows
+            if g["task"] == "domain_qa"
+            and g.get("gold_lp") is not None
+            and g["id"] in ITEMS
+            and half(g["id"]) == h
+        )
+
+    seen_ids = halves["seen"]
+    res["dpo_2ep_vs_dpo"] = {
+        "answer_nats": {h: ans("dpo-2ep", h) - ans("dpo", h) for h in ("seen", "unseen")},
+        "strict_seen_pt": 100
+        * (
+            statistics.fmean(strict("dpo-2ep")[i] for i in seen_ids)
+            - statistics.fmean(strict("dpo")[i] for i in seen_ids)
+        ),
+    }
+
+    # the demo's pools in the FP8 run it serves
+    fp8 = jsonl(REPO / "results/runs/dpo-strict-fp8/scored.jsonl")
+    res["demo_pools"]["fp8_grounded_correct_cited_supported"] = sum(
+        s["task"] == "grounded" and s["correct"] == 1 and s["cite_valid"] and s["supported"] == 1
+        for s in fp8
+    )
+    res["demo_pools"]["fp8_adversarial_declined"] = sum(
+        s["task"] == "adversarial" and s["abstained"] == 1 for s in fp8
+    )
 
     OUT.write_text(json.dumps(res, indent=2) + "\n")
     print(f"-> {OUT.relative_to(REPO)}")

@@ -92,7 +92,9 @@
   },
   "demo_pools": {
     "grounded_correct_cited_supported": 93,
-    "adversarial_declined": 73
+    "adversarial_declined": 73,
+    "fp8_grounded_correct_cited_supported": 92,
+    "fp8_adversarial_declined": 72
   },
   "licence_audit": {
     "sft_records": 2516,
@@ -125,7 +127,13 @@
     },
     "sft_train_teacher_written": 1778,
     "probe_prompts": 50,
-    "blocking": 54
+    "blocking": 54,
+    "sft_train_teacher": {
+      "mistral-large-2512": 1363,
+      "mistral-medium-2604": 415
+    },
+    "copyright_flagged_docs_kept": 27,
+    "source_rows": 251
   },
   "training_cost": {
     "Stage 2: CPT": {
@@ -153,5 +161,18 @@
       "gpu_h": 8.82,
       "usd": 34.85
     }
+  },
+  "grpo_seed1_entropy": {
+    "step34": 0.14192796731367707,
+    "steps1_5_mean": 0.47447764296084644,
+    "steps25_34_mean": 0.26865251022391023,
+    "steps25_34_over_steps1_5_pct": 56.62068892170738
+  },
+  "dpo_2ep_vs_dpo": {
+    "answer_nats": {
+      "seen": -3.111567065868263,
+      "unseen": -4.408399354838711
+    },
+    "strict_seen_pt": -4.790419161676651
   }
 }

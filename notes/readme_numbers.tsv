@@ -3,7 +3,6 @@ number	context	source
 246	on 246 public-domain	docs/stage0.md
 20.6M	(20.6M tokens	docs/stage0.md
 19.4M	19.4M-token train split	docs/stage2.md
-19.4M	over 19.4M tokens	docs/stage2.md
 155	On the 155	docs/results.md
 167	on the 167 seen facts	docs/results.md
 0.41	0.41 nats more probable	results/train_runs.md
@@ -14,7 +13,6 @@ number	context	source
 3.5	DPO by 3.5	docs/stage4.md
 3.1	GRPO by 3.1	docs/stage5.md
 0.38	DPO lost 0.38	results/train_runs.md
-1.32	1.32 on unseen	results/train_runs.md
 +0.66	+0.66 nats on the answer tokens	notes/decisions.md
 16	16 req/s	DEPLOY.md
 $0.035	$0.035 per	results/train_runs.md
@@ -35,11 +33,7 @@ $0.039	$0.039 with bf16	results/train_runs.md
 28%	caught 28% of grounded	docs/stage4.md
 9%	9% of	docs/stage4.md
 0.5	a 0.5 line	docs/stage4.md
-79	79 of 458	docs/stage4.md
-458	79 of 458	docs/stage4.md
 0.28	ε_high 0.28	train/configs/grpo.yaml
-0.28	recall 0.28 grounded	docs/stage4.md
-0.09	0.09 definition	docs/stage4.md
 −4.2	(−4.2 against 3.5)	docs/stage6.md
 3.5	−4.2 against 3.5	docs/stage6.md
 21	21-40 against 39-76	docs/stage6.md
@@ -50,13 +44,10 @@ $0.039	$0.039 with bf16	results/train_runs.md
 2%	within 2%	notes/decisions.md
 10	10 of 16	notes/decisions.md
 16	10 of 16	notes/decisions.md
-4.8	fell 4.8 points	docs/results.md
 −6.1	GSM8K −6.1	docs/stage6.md
 1,067	1,067 of 1,319	notes/decisions.md
 1,319	1,067 of 1,319	notes/decisions.md
 1.6	0–1.6 points	docs/results.md
-10	10-step mean	docs/stage5.md
-57%	57% of the start	docs/stage5.md
 −20%	−20% perplexity	notes/decisions.md
 $3.95	$3.95 per H100-hour	results/train_runs.md
 500	500 general records	docs/reproduce.md
@@ -97,15 +88,12 @@ $0.127	cost $0.127	results/train_runs.md
 11%	11% faster	results/train_runs.md
 17%	(17%)	notes/decisions.md
 1.9	Large 3 moved 1.9	docs/results.md
-3.0	fell 3.0 and 4.3	docs/results.md
-4.3	fell 3.0 and 4.3	docs/results.md
 512	512-record	docs/stage6.md
 29%	by 29%	docs/stage6.md
 40%	40% on FP8	docs/stage6.md
 54	54 of the 2,516	results/summary_stats.json
 2,516	of the 2,516	results/summary_stats.json
 46	8 non-commercial, 46	results/summary_stats.json
-25%	25%), the completions	docs/reproduce.md
 93	of the 93 grounded	results/summary_stats.json
 73	of the 73	results/summary_stats.json
 0.38	DPO by 0.38	results/train_runs.md
@@ -128,3 +116,24 @@ $35	$35 of training	results/summary_stats.json
 17	(17 U.S.C.	docs/stage1.md
 500	500 replay records	results/summary_stats.json
 50	50 held-out probe prompts	results/summary_stats.json
+1.32	seen and 1.32	results/train_runs.md
+80	(80 of 458	results/qa_strict/dpo_pairs.json
+458	(80 of 458	results/qa_strict/dpo_pairs.json
+80	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json
+458	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json
+79	79 are wrong	docs/stage4.md
+0.28	caught 0.28 of 60	results/dpo/judge_bench.json
+60	caught 0.28 of 60	results/dpo/judge_bench.json
+0.09	0.09 of 23	results/dpo/judge_bench.json
+23	0.09 of 23	results/dpo/judge_bench.json
+4.8	accuracy fell 4.8	results/summary_stats.json
+3.1	fell 3.1 nats seen	results/summary_stats.json
+4.4	and 4.4 unseen	results/summary_stats.json
+57%	57% of the steps	results/summary_stats.json
+415	415 of the 1,778	results/summary_stats.json
+1,778	415 of the 1,778	results/summary_stats.json
+27	material 27 of them	results/summary_stats.json
+251	all 251 candidate sources	results/summary_stats.json
+74	FLAN v2's 74 records	results/summary_stats.json
+92	(92 in the FP8 run)	results/summary_stats.json
+72	(72 in FP8)	results/summary_stats.json
