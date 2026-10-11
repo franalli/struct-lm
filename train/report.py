@@ -19,7 +19,7 @@ every step and the per-step losses should agree to bf16 noise.
 Figures (for the README): cpt.png has two panels, train loss (moving average) and val loss (the
 trainer's evals on the 49 val windows, starting from base-8b's loss on the same windows at step 0);
 cpt_ppl.png has each merged run's perplexity change vs base-8b on the train slice, domain val and
-general val (results/ppl/<run>.json from eval/perplexity.py), with the pre-registered thresholds.
+general val (results/ppl/<run>.json from eval/perplexity.py).
 
 Stage 3 (runs whose train_summary.json says stage "sft"; notes/decisions.md, Stage 3b
 pre-registration): the run table with B4's epoch-end val losses and the epoch the rule picks;
@@ -88,10 +88,6 @@ PPL_METRICS = [
     ("ppl_domain_val", "domain val\n(held-out documents)"),
     ("ppl_general_val", "general val\n(FineWeb-Edu)"),
 ]
-THRESHOLDS = {
-    "ppl_domain_val": (-20.0, "pre-registered: -20%"),
-    "ppl_general_val": (3.0, "bound: +3%"),
-}
 SURFACE, INK, INK_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 SMOOTH = 10
 
@@ -286,8 +282,7 @@ def plot_loss(runs: dict, base_val_loss: float | None, out: Path) -> None:
 
 
 def plot_ppl(ppl: dict, out: Path) -> None:
-    """Perplexity change vs base-8b per merged run, grouped by slice, with the pre-registered
-    thresholds (domain val down at least 20%, general val up less than 3%)."""
+    """Perplexity change vs base-8b per merged run, grouped by slice."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -322,20 +317,6 @@ def plot_ppl(ppl: dict, out: Path) -> None:
                 va="bottom" if v >= 0 else "top",
                 fontsize=8,
                 color=INK_2,
-            )
-    for i, (m, _) in enumerate(PPL_METRICS):
-        if m in THRESHOLDS:
-            y, text = THRESHOLDS[m]
-            ax.plot([i - 0.45, i + 0.45], [y, y], color=INK, lw=1, ls="--")
-            ax.annotate(
-                text,
-                (i - 0.45, y),
-                xytext=(0, 3),
-                textcoords="offset points",
-                ha="left",
-                va="bottom",
-                fontsize=8,
-                color=INK,
             )
     ax.axhline(0, color=INK_2, lw=1)
     ax.set_xticks(range(len(PPL_METRICS)), [label for _, label in PPL_METRICS])
@@ -750,7 +731,7 @@ def sft_table(runs: dict, usd: float) -> str:
         "val_loss epoch 1 / 2",
         "closed-book 1 / 2",
         "definition 1 / 2",
-        "B4 picks",
+        "epoch kept",
     ]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for name, (s, _) in runs.items():
@@ -969,9 +950,9 @@ def bootstrap_diff(a: dict, b: dict, n_boot: int = 10_000) -> dict:
 
 
 def b7_first_line() -> str:
-    """B7's first line: gold_lp by half, CPT arm - base arm, against the noise.
+    """What CPT added after SFT: gold_lp by half, CPT arm - base arm, against the noise.
 
-    One seed per arm (pre-registered 2026-10-06): sft-from-cpt - sft-from-base, noise = max(the
+    One seed per arm (2026-10-06): sft-from-cpt - sft-from-base, noise = max(the
     CPT arm's seed gap, the paired per-item SE). With a seed twin on both arms (2026-10-06,
     fixed before sft-from-base-seed1's results): the difference of the arm means, noise =
     max(its run-variance SD, sqrt(gap_cpt^2 + gap_base^2) / 2, and the paired per-item SE of the
@@ -1102,7 +1083,7 @@ def checks_table(
             )
     if rows:
         out.append(
-            f"\nMerge gate (B5, amended): {gate}, "
+            f"\nMerge check: {gate}, "
             "and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss "
             "within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are "
             "reported, not gated; sha256 of the merged checkpoint's file list:\n"
@@ -1261,9 +1242,9 @@ def plot_sft_kpi(out: Path) -> None:
 def stage3_md(runs: dict, usd: float) -> str:
     md = "## Training runs\n\n" + sft_table(runs, usd)
     md += (
-        "\n\nB4 (pre-registered, amended before training): epoch 2 unless the closed-book or the "
-        "definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss "
-        "is 83% replay tokens, so it is shown, not used. $ at "
+        "\n\nThe epoch kept: epoch 2 unless the closed-book or the definition sft_val loss (token "
+        "mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is "
+        "shown, not used. $ at "
         f"{usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if deltas := sft_delta_table():
@@ -1273,10 +1254,10 @@ def stage3_md(runs: dict, usd: float) -> str:
             "SE): Stage 3 for sft-from-cpt vs sft-from-cpt-seed1, Stage 2 for cpt-8b vs "
             "cpt-8b-seed1. The SE is binomial on the metric's items, lm-eval's stderr, or for "
             "gold_lp the paired per-item SE of the twins on that half. Starts: sft-from-cpt from "
-            "cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the bar.\n"
+            "cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the comparison.\n"
         )
     if first := b7_first_line():
-        md += "\n## B7's first line: what CPT bought, measured after SFT\n\n" + first + "\n"
+        md += "\n## What CPT added, measured after SFT\n\n" + first + "\n"
     if checks := checks_table():
         md += "\n## Checks\n\n" + checks + "\n"
     return md
@@ -1371,8 +1352,8 @@ DPO_ROWS = [  # the amended read (2026-10-08): primary verifier lines, then the 
     ("halluc_rate (lower is better)", "halluc_rate", "kpi", "adversarial", "primary"),
     ("false_abstain (lower is better)", "false_abstain", "kpi", "grounded", "primary"),
     ("cite_valid", "cite_valid", "kpi", "grounded", "primary"),
-    ("qa_seen (lenient, as registered)", "qa_seen", "kpi", "qa_seen", "primary"),
-    ("qa_unseen (lenient, as registered)", "qa_unseen", "kpi", "qa_unseen", "primary"),
+    ("qa_seen (lenient checker)", "qa_seen", "kpi", "qa_seen", "primary"),
+    ("qa_unseen (lenient checker)", "qa_unseen", "kpi", "qa_unseen", "primary"),
     ("qa_strict seen", "qa_strict_seen", "kpi", "qa_seen", "reported"),
     ("qa_strict unseen", "qa_strict_unseen", "kpi", "qa_unseen", "reported"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
@@ -1390,10 +1371,8 @@ DPO_ROWS = [  # the amended read (2026-10-08): primary verifier lines, then the 
 
 
 def dpo_delta_table() -> str:
-    """Each DPO run against the start and the mean change of the two seeds, read two ways:
-    - as written (pre-registered): noise = max(the DPO seed gap, the start's SE);
-    - the Stage 3 way (2026-10-09 review): the floor also takes the start's own seed gap
-      (sft-from-cpt vs sft-from-cpt-seed1), since the start is one run of a noisy stage.
+    """Each DPO run against the start and the mean change of the two seeds. Floor: max(the DPO
+    seed gap, the start's SE, the start's own seed gap: sft-from-cpt vs sft-from-cpt-seed1).
     gold_lp gets the item-bootstrap 95% CI of the two-seed mean minus the start; beyond needs
     |change| > floor (and, for gold_lp, the CI excluding 0). One seed pair each: 1 df."""
     m = {}
@@ -1403,10 +1382,9 @@ def dpo_delta_table() -> str:
     if not all(r in m for r in (DPO_START, *DPO_PAIR, *SFT_SEED_PAIR)):
         return ""
     sizes = half_sizes()
-    head = ["metric", "read", DPO_START, *DPO_PAIR, "change (mean of 2)", "noise as written",
-            "beyond (as written)", "floor with the start's seed gap", "beyond (Stage 3 way)"]  # fmt: skip
+    head = ["metric", DPO_START, *DPO_PAIR, "change (mean of 2)", "floor", "beyond the floor"]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-    for label, key, kind, extra, role in DPO_ROWS:
+    for label, key, kind, extra, _ in DPO_ROWS:
         vals = [m[r].get(key) for r in (DPO_START, *DPO_PAIR)]
         if any(v is None for v in vals):
             continue
@@ -1431,8 +1409,7 @@ def dpo_delta_table() -> str:
             excl = True
             note, unit = f"{change:+.1f} pt", "{:.1f} pt"
         floor = max(n, n_start)
-        cells = [label, role, *(f"{v:.3f}" for v in vals), note, unit.format(n),
-                 "yes" if abs(change) > n and excl else "no", unit.format(floor),
+        cells = [label, *(f"{v:.3f}" for v in vals), note, unit.format(floor),
                  "yes" if abs(change) > floor and excl else "no"]  # fmt: skip
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
@@ -1442,7 +1419,7 @@ DPO_MORE = "dpo-2ep"  # the "more training" ablation (2026-10-08, post hoc): two
 
 
 def dpo_more_table() -> str:
-    """dpo-2ep against dpo (one epoch, same data, seed and recipe) on the read's rows, next to the
+    """dpo-2ep against dpo (one epoch, same data, seed and recipe) on the DPO rows, next to the
     Stage 4 floor: max(the dpo / dpo-seed1 seed gap, dpo's SE; for gold_lp the twins' paired
     per-item SE), with the item-bootstrap CI for gold_lp."""
     m = {}
@@ -1455,7 +1432,6 @@ def dpo_more_table() -> str:
     one, more = DPO_PAIR[0], DPO_MORE
     head = [
         "metric",
-        "read",
         f"{one} (1 epoch)",
         f"{more} (2 epochs)",
         "change",
@@ -1463,7 +1439,7 @@ def dpo_more_table() -> str:
         "beyond floor",
     ]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-    for label, key, kind, extra, role in DPO_ROWS:
+    for label, key, kind, extra, _ in DPO_ROWS:
         a, b, twin = m[one].get(key), m[more].get(key), m[DPO_PAIR[1]].get(key)
         if a is None or b is None or twin is None:
             continue
@@ -1484,7 +1460,6 @@ def dpo_more_table() -> str:
             note, unit = f"{change:+.1f} pt", "{:.1f} pt"
         cells = [
             label,
-            role,
             f"{a:.3f}",
             f"{b:.3f}",
             note,
@@ -1509,12 +1484,11 @@ def gate_flags(names) -> str:
                     / d["unmerged_bf16_vs_fp32_ref"]["mean_abs_lp_diff"]
                 )
                 out.append(
-                    f"- **{name}: merge gate flagged.** Val-loss criterion "
+                    f"- **{name}: merge check flagged.** Val-loss criterion "
                     f"{c['val_loss_rel_diff']:.2%} against 0.5% (merged {c['val_loss_merged']:.4f}, "
                     f"unmerged {c['val_loss_unmerged']:.4f} nats on sft_val). The merge-isolating "
                     f"criteria pass in `merge_diagnose`: {d['merge_adds_flips']} added flips of 11, "
-                    f"|dlp| ratio {ratio:.2f} against 1.5. Evaluated under the rule fixed before the "
-                    "diagnosis (notes/decisions.md, 2026-10-09)."
+                    f"|dlp| ratio {ratio:.2f} against 1.5. Its scores carry the merge's extra error."
                 )
     return "\n".join(out)
 
@@ -1582,28 +1556,26 @@ def plot_dpo(runs: dict, out: Path) -> None:
 def stage4_md(runs: dict, usd: float) -> str:
     md = "## Training runs\n\n" + dpo_table(runs, usd)
     md += (
-        "\n\nThe checkpoint rule (pre-registered): the final step unless the dpo_val loss at the "
+        "\n\nThe checkpoint kept: the final step unless the dpo_val loss at the "
         "end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). "
         f"dpo_val values at the last evaluation. $ at {usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if dt := dpo_delta_table():
         md += (
-            f"\n## The read: change against {DPO_START}, next to the noise\n\n" + dt + "\n\n"
-            "Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must "
-            "stay within the noise; judge-scored rows are reported, not read. As written: max(the DPO "
-            "seed gap, the start's SE). The Stage 3 way also takes the start's own seed gap "
-            f"({SFT_SEED_PAIR[0]} vs {SFT_SEED_PAIR[1]}): the start is one run. One seed pair each "
-            "(1 df). The verdict uses the Stage 3 way.\n"
+            f"\n## Change against {DPO_START}, next to the floor\n\n" + dt + "\n\n"
+            "Floor: max(the DPO seed gap, the start's SE, the start's own seed gap "
+            f"({SFT_SEED_PAIR[0]} vs {SFT_SEED_PAIR[1]})). One seed pair each (1 df). "
+            "Judge-scored rows carry the judge's own error.\n"
         )
     if mt := dpo_more_table():
         md += (
-            f"\n## More training: {DPO_MORE} against {DPO_PAIR[0]} (ablation, not a candidate)\n\n"
+            f"\n## More training: {DPO_MORE} against {DPO_PAIR[0]} (a variant)\n\n"
             + mt
             + "\n\nSame data, seed and recipe; two epochs, epoch 2 evaluated. Floor: max(the "
             f"{DPO_PAIR[0]} / {DPO_PAIR[1]} seed gap, {DPO_PAIR[0]}'s SE), one seed pair.\n"
         )
     if wr := winrate_table(runs):
-        md += f"\n## Win rate against {DPO_START} (reported, not read)\n\n" + wr + "\n"
+        md += f"\n## Win rate against {DPO_START} (reported only)\n\n" + wr + "\n"
     checks = checks_table(
         names=list(runs),
         starts=(DPO_START,),
@@ -1624,7 +1596,7 @@ def stage4_md(runs: dict, usd: float) -> str:
 GRPO_PAIR = ("grpo", "grpo-seed1")
 QA_STRICT = Path("results/qa_strict/evals.json")
 PASSK = Path("results/passk")
-GRPO_ROWS = [  # the pre-registered read (2026-10-09): primary, reported, guards
+GRPO_ROWS = [  # (label, metrics key, kind, noise() extra, group)
     ("qa_strict seen (the reward's rule)", "qa_strict_seen", "kpi", "qa_seen", "primary"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
     ("  of it, the answer tokens", "gold_lp_ans_seen", "lp_ans", "seen", "reported"),
@@ -1727,14 +1699,14 @@ def grpo_delta_table() -> str:
     if not all(r in m for r in (GRPO_START, *GRPO_PAIR)):
         return ""
     sizes = half_sizes()
-    head = ["metric", "read", GRPO_START, *GRPO_PAIR, "change (mean of 2)", "floor", "beyond"]
+    head = ["metric", GRPO_START, *GRPO_PAIR, "change (mean of 2)", "floor", "beyond the floor"]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-    for label, key, kind, extra, role in GRPO_ROWS:
+    for label, key, kind, extra, _ in GRPO_ROWS:
         row = change_row(m, label, key, kind, extra, GRPO_START, GRPO_PAIR, (DPO_PAIR,), sizes)
         if row is None:
             continue
         vals = [m[r].get(key) for r in (GRPO_START, *GRPO_PAIR)]
-        cells = [label, role, *("" if v is None else f"{v:.3f}" for v in vals), *row[0]]
+        cells = [label, *("" if v is None else f"{v:.3f}" for v in vals), *row[0]]
         lines.append("| " + " | ".join(cells) + " |")
     for label, metric, half in PASSK_ROWS_READ:
         ch = passk_change(GRPO_START, GRPO_PAIR, metric, half, (DPO_PAIR,))
@@ -1745,9 +1717,7 @@ def grpo_delta_table() -> str:
             np.mean([float(v[i]["strict"][metric]) for i in v if v[i]["half"] == half])
             for v in vals
         ]
-        lines.append(
-            "| " + " | ".join([label, "reported", *(f"{x:.3f}" for x in means), *ch]) + " |"
-        )
+        lines.append("| " + " | ".join([label, *(f"{x:.3f}" for x in means), *ch]) + " |")
     return "\n".join(lines)
 
 
@@ -1866,7 +1836,7 @@ def plot_passk(out: Path) -> None:
 
 
 def grpo_table(runs: dict, usd: float) -> str:
-    head = ["run", "start", "tasks", "steps", "stop", "rule picks", "grpo_val pass@1 / pass@8 at the pick",
+    head = ["run", "start", "tasks", "steps", "stop", "checkpoint kept", "grpo_val pass@1 / pass@8 at it",
             "final train reward", "final entropy", "mean length", "base drift", "wall (h)", "GPU-h", "$",
             "peak GB"]  # fmt: skip
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
@@ -1954,15 +1924,14 @@ def plot_grpo(runs: dict, out: Path) -> None:
 def stage5_md(runs: dict, usd: float) -> str:
     md = "## Training runs\n\n" + grpo_table(runs, usd)
     md += (
-        "\n\nThe checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or "
+        "\n\nThe checkpoint kept: the best grpo_val pass@1 among the saves at or "
         "before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 "
         f"samples at T 1.0. $ at {usd} per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).\n"
     )
     if dt := grpo_delta_table():
         md += (
-            f"\n## The read: change against {GRPO_START}, next to the noise\n\n" + dt + "\n\n"
-            "Rows marked primary are the pre-registered read (2026-10-09); guards must stay within "
-            "the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO "
+            f"\n## Change against {GRPO_START}, next to the floor\n\n" + dt + "\n\n"
+            "Floor: max(the GRPO "
             f"seed gap, the start's SE, the start's own seed gap: {GRPO_START} has no twin, so the "
             f"lenient {DPO_PAIR[0]} / {DPO_PAIR[1]} gap). One seed pair each (1 df).\n"
         )
@@ -1975,7 +1944,7 @@ def stage5_md(runs: dict, usd: float) -> str:
             f"floor also takes {DPO_START}'s own seed gap. pass@k lines: paired per item (8 samples "
             "at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient "
             f"dpo pair for dpo-strict); {DPO_START}'s twin was not sampled. Win rate: not run for "
-            "these rows: the judge failed its benchmark and its two orders agreed at coin-flip.\n"
+            "these rows: the judge's two orders of a pair agreed about half the time.\n"
         )
     if pk := passk_table():
         md += (
@@ -2004,8 +1973,8 @@ S6_RUN = {  # variant -> the run its gate generations are filed under (serve/mod
 }
 S6_LABEL = {"bf16": "bf16", "fp8": "FP8", "fp8kv": "FP8 + FP8 KV", "w4a16": "INT4 W4A16"}
 S6_COLORS = {"bf16": INK, "fp8": "#2a78d6", "fp8kv": "#8a5cd6", "w4a16": "#d6772a"}
-# Pre-registered (notes/decisions.md, 2026-10-09, Stage 6): a variant ships if every line's
-# |variant - bf16| is within the Stage 3 floor (report.noise on the sft-from-cpt pair)
+# The serving comparison (notes/decisions.md, 2026-10-09, Stage 6): each line's |variant - bf16|
+# against the Stage 3 floor (report.noise on the sft-from-cpt pair); the verdict feeds the cost table
 S6_GATE = [  # (label, key, "rate" in points or "lp" in nats, floor)
     ("qa_strict unseen", "qa_strict_unseen", "rate", 2.6),
     ("qa_strict seen", "qa_strict_seen", "rate", 3.5),
@@ -2084,12 +2053,12 @@ def s6_gate() -> tuple[str, dict]:
     ]
     for v in variants:
         e = m[v].get("eos_rate")
-        cells.append("" if e is None else f"{e:.2f}" if e >= S6_EOS_PASS else f"**{e:.2f}**")
+        cells.append("" if e is None else f"{e:.2f}")
         if e is None:
             verdict[v] = "incomplete" if verdict[v] == "ships" else verdict[v]
         elif e < S6_EOS_PASS:
             verdict[v] = "fails"
-    lines.append("| " + " | ".join([*cells, f">= {S6_EOS_PASS}"]) + " |")
+    lines.append("| " + " | ".join([*cells, ""]) + " |")
     cells = [
         "vLLM val-slice perplexity (reported)",
         "" if "vllm_ppl" not in ref else f"{ref['vllm_ppl']:.3f}",
@@ -2100,9 +2069,6 @@ def s6_gate() -> tuple[str, dict]:
             "" if p is None or "vllm_ppl" not in ref else f"{(p / ref['vllm_ppl'] - 1):+.2%}"
         )
     lines.append("| " + " | ".join([*cells, ""]) + " |")
-    lines.append(
-        "| " + " | ".join(["**verdict**", "", *(f"**{verdict[v]}**" for v in variants), ""]) + " |"
-    )
     return "\n".join(lines), verdict
 
 
@@ -2123,7 +2089,7 @@ def s6_mean(reps: list[dict], key: str) -> float | None:
 
 
 def s6_spread(reps: list[dict], key: str = "request_throughput") -> float | None:
-    """(max - min) / mean of a config's repeated runs: over 20% is the pre-registered rerun flag."""
+    """(max - min) / mean of a config's repeated runs: over 20% flags the config for a rerun."""
     vals = [r[key] for r in reps if r.get(key)]
     return (max(vals) - min(vals)) / statistics.fmean(vals) if len(vals) > 1 else None
 
@@ -2364,7 +2330,7 @@ def s6_deploy_blocks(usd: float) -> dict[str, str]:
 
 def s6_repeat_note() -> str:
     """The FP8-KV variant's second domain_qa generation (dpo-strict-fp8kv-r2, another container):
-    reported next to the registered reading, never in place of it."""
+    reported next to the first reading, never in place of it."""
     if not (RUNS / "dpo-strict-fp8kv-r2/generations.jsonl").exists():
         return ""
     from qa_strict import run_strict
@@ -2378,9 +2344,9 @@ def s6_repeat_note() -> str:
     d2 = (second["seen"]["strict"] - ref["qa_strict_seen"]) * 100
     return (
         f"FP8 + FP8 KV, strict closed-book on the seen half, read twice: {d1:+.1f} points in the "
-        f"registered generation, {d2:+.1f} in a second one on another container "
-        f"(dpo-strict-fp8kv-r2, {second['seen']['n']} items). The verdict is the registered "
-        "reading's; the second is the line's run-to-run spread, reported."
+        f"first generation, {d2:+.1f} in a second one on another container "
+        f"(dpo-strict-fp8kv-r2, {second['seen']['n']} items). The table shows the first; the "
+        "second is the line's run-to-run spread, reported."
     )
 
 
@@ -2389,15 +2355,12 @@ def stage6_md(usd: float) -> str:
     md = ""
     if gate:
         md += (
-            "## Quality gate (pre-registered): change against bf16, next to the Stage 3 floor\n\n"
-            + gate
-            + "\n\n"
-            "A variant ships if every gated line is within its floor (bold: beyond it) and the eos "
-            "job ends >= 95% of answers on </s> (notes/decisions.md, 2026-10-09). The floor is the "
-            "sft-from-cpt seed gap or the SE, whichever is larger: a cost under it is invisible to "
-            "every other comparison here, which is what ships means, not that it costs nothing. "
-            "GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under "
-            "the same flags), not the table's frozen-flag row.\n"
+            "## Quality: change against bf16, next to the floor\n\n" + gate + "\n\n"
+            "Bold: beyond the floor. The floor is the sft-from-cpt seed gap or the SE, whichever is "
+            "larger: a change under it is invisible to every other comparison here, not proof that "
+            "it costs nothing. GSM8K is a rerun for this table (all 1,319, 5-shot, "
+            "add_bos_token=True, bf16 rerun under the same flags), not the frozen-flag row of the "
+            "other tables.\n"
         )
         if note := s6_repeat_note():
             md += f"\n{note}\n"

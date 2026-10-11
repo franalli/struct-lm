@@ -184,9 +184,8 @@ inter-token latency under 4.75 ms at concurrency 1 did not run on an H100 (an H2
 | false_abstain | 0.000 | +0.0 | +0.0 | +0.0 | 0.9 pt |
 | GSM8K (all 1,319, add_bos_token) | 0.809 | -0.2 |  | **-6.1** | 2.2 pt |
 | qa_strict identifiers (reported) | 0.188 | -1.6 | -1.6 | **-7.8** | 5 pt |
-| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 | >= 0.95 |
+| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 |  |
 | vLLM val-slice perplexity (reported) | 6.894 | +0.33% | +0.58% | +3.53% |  |
-| **verdict** |  | **ships** | **fails** | **fails** |  |
 <!-- deploy-gate:end -->
 
 ## Cost

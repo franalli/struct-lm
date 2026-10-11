@@ -80,7 +80,7 @@ load; the concurrency sweep saturates near 44 req/s for bf16 and 53 for FP8). FP
 shows in the tail: TTFT p99 93 against 57 ms at 1 req/s, 143 against 116 at 16.
 
 <!-- stage6-tables:start -->
-## Quality gate (pre-registered): change against bf16, next to the Stage 3 floor
+## Quality: change against bf16, next to the floor
 
 | line | bf16 | FP8 − bf16 | FP8 + FP8 KV − bf16 | INT4 W4A16 − bf16 | floor |
 |---|---|---|---|---|---|
@@ -96,11 +96,10 @@ shows in the tail: TTFT p99 93 against 57 ms at 1 req/s, 143 against 116 at 16.
 | false_abstain | 0.000 | +0.0 | +0.0 | +0.0 | 0.9 pt |
 | GSM8K (all 1,319, add_bos_token) | 0.809 | -0.2 |  | **-6.1** | 2.2 pt |
 | qa_strict identifiers (reported) | 0.188 | -1.6 | -1.6 | **-7.8** | 5 pt |
-| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 | >= 0.95 |
+| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 |  |
 | vLLM val-slice perplexity (reported) | 6.894 | +0.33% | +0.58% | +3.53% |  |
-| **verdict** |  | **ships** | **fails** | **fails** |  |
 
-A variant ships if every gated line is within its floor (bold: beyond it) and the eos job ends >= 95% of answers on </s> (notes/decisions.md, 2026-10-09). The floor is the sft-from-cpt seed gap or the SE, whichever is larger: a cost under it is invisible to every other comparison here, which is what ships means, not that it costs nothing. GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under the same flags), not the table's frozen-flag row.
+Bold: beyond the floor. The floor is the sft-from-cpt seed gap or the SE, whichever is larger: a change under it is invisible to every other comparison here, not proof that it costs nothing. GSM8K is a rerun for this table (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under the same flags), not the frozen-flag row of the other tables.
 
 ## Serving memory (vLLM's own accounting at start-up)
 

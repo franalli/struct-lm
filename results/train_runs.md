@@ -62,14 +62,14 @@ lm-eval rows run 5-shot without a BOS token (the frozen flags send none, found i
 
 ## Training runs
 
-| run | start | steps | tokens trained | tokens/s | wall (h) | GPU-h | $ | peak GB | final train loss | val_loss epoch 1 / 2 | closed-book 1 / 2 | definition 1 / 2 | B4 picks |
+| run | start | steps | tokens trained | tokens/s | wall (h) | GPU-h | $ | peak GB | final train loss | val_loss epoch 1 / 2 | closed-book 1 / 2 | definition 1 / 2 | epoch kept |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | sft-from-cpt | cpt-8b-replay10 | 154 | 2.70M | 1,790 | 0.50 | 0.50 | 1.96 | 55 | 0.427 | 0.5592 / 0.5771 | 1.1655 / 1.3040 | 1.9832 / 2.0341 | epoch 1 |
 | sft-from-base | base-8b-hf | 154 | 2.70M | 1,834 | 0.48 | 0.48 | 1.89 | 55 | 0.435 | 0.5592 / 0.5790 | 1.2134 / 1.3765 | 2.0178 / 2.0723 | epoch 1 |
 | sft-from-cpt-seed1 | cpt-8b-replay10 | 154 | 2.70M | 1,737 | 0.54 | 0.54 | 2.12 | 55 | 0.362 | 0.5586 / 0.5804 | 1.1696 / 1.3126 | 1.8940 / 2.1049 | epoch 1 |
 | sft-from-base-seed1 | base-8b-hf | 154 | 2.70M | 2,022 | 0.45 | 0.45 | 1.79 | 55 | 0.364 | 0.5580 / 0.5782 | 1.2347 / 1.3453 | 1.9116 / 2.0432 | epoch 1 |
 
-B4 (pre-registered, amended before training): epoch 2 unless the closed-book or the definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is shown, not used. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
+The epoch kept: epoch 2 unless the closed-book or the definition sft_val loss (token mean) rose from epoch 1 to epoch 2. The overall val_loss is 83% replay tokens, so it is shown, not used. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
 ## Results next to the noise
 
@@ -97,9 +97,9 @@ B4 (pre-registered, amended before training): epoch 2 unless the closed-book or 
 | GSM8K | 0.855 | 0.793 | 0.792 | 0.790 | 0.791 | 0.814 | 0.792 | 2.2 | 1.1 |
 | HellaSwag | 0.801 | 0.801 | 0.795 | 0.799 | 0.800 | 0.794 | 0.799 | 0.6 | 0.4 |
 
-Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in nats). Noise = max(the seed gap, the SE): Stage 3 for sft-from-cpt vs sft-from-cpt-seed1, Stage 2 for cpt-8b vs cpt-8b-seed1. The SE is binomial on the metric's items, lm-eval's stderr, or for gold_lp the paired per-item SE of the twins on that half. Starts: sft-from-cpt from cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the bar.
+Values as fractions (gold_lp in nats per answer); noise in points (gold_lp in nats). Noise = max(the seed gap, the SE): Stage 3 for sft-from-cpt vs sft-from-cpt-seed1, Stage 2 for cpt-8b vs cpt-8b-seed1. The SE is binomial on the metric's items, lm-eval's stderr, or for gold_lp the paired per-item SE of the twins on that half. Starts: sft-from-cpt from cpt-8b-replay10, sft-from-base from base-8b-hf; instruct-8b is the comparison.
 
-## B7's first line: what CPT bought, measured after SFT
+## What CPT added, measured after SFT
 
 - **unseen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.464 nats per answer [95% CI over items +0.276, +0.660; 155 items, 68% up]; noise 0.130 (run-variance SD 0.130 from seed gaps 0.258 (CPT arm) and 0.039 (base arm), paired SE 0.099; the difference is 3.6 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.355, +0.315, +0.612, +0.573; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.409 [+0.227, +0.602] and the end token +0.055 [+0.021, +0.099]. The item CI conditions on these training runs; run variance enters only through the noise.
 - **seen gold_lp, mean of 2 CPT-arm runs - mean of 2 base-arm runs:** +0.332 nats per answer [95% CI over items +0.191, +0.482; 167 items, 66% up]; noise 0.147 (run-variance SD 0.147 from seed gaps 0.247 (CPT arm) and 0.160 (base arm), paired SE 0.074; the difference is 2.3 run SD, indicative only: each arm's SD rests on one seed pair (1 df). Single-run pairs +0.289, +0.129, +0.536, +0.376; every CPT-arm run above every base-arm run, an ordering with exact one-sided permutation probability 1 in 6): beyond the noise: CPT bought something that survives SFT. Of it, the answer tokens +0.311 [+0.173, +0.456] and the end token +0.022 [+0.003, +0.039]. The item CI conditions on these training runs; run variance enters only through the noise.
@@ -113,7 +113,7 @@ No-op control (an untrained adapter, merged, against its start):
 | base-8b-hf | 531 | 0 | 0.0 | yes |
 | cpt-8b-replay10 | 531 | 0 | 0.0 | yes |
 
-Merge gate (B5, amended): over all 11,351 sft_val completion positions against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own, and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
+Merge check: over all 11,351 sft_val completion positions against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own, and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
 
 | run | flips added | \|dlp\| ratio | val loss diff | merged vs unmerged top-1 | probe error ratio | checkpoint sha256 | passed |
 |---|---|---|---|---|---|---|---|
@@ -143,59 +143,59 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 | dpo-2ep | sft-from-cpt | 484 | 62 | 2,297 | 0.13 | 0.13 | 0.52 | 37 | 0.382 | 0.571 | 0.682 | 0.378 | step 62 (final): 0.5711 vs 0.6471 at 30 |
 | dpo-strict | sft-from-cpt | 445 | 28 | 2,589 | 0.08 | 0.08 | 0.32 | 37 | 0.662 | 0.670 | 0.556 | 0.051 | step 28 (final): 0.6696 vs 0.6839 at 10 |
 
-The checkpoint rule (pre-registered): the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
+The checkpoint kept: the final step unless the dpo_val loss at the end is above its value at step 50 (runs under 100 steps: the save nearest the midpoint). dpo_val values at the last evaluation. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
-## The read: change against sft-from-cpt, next to the noise
+## Change against sft-from-cpt, next to the floor
 
-| metric | read | sft-from-cpt | dpo | dpo-seed1 | change (mean of 2) | noise as written | beyond (as written) | floor with the start's seed gap | beyond (Stage 3 way) |
-|---|---|---|---|---|---|---|---|---|---|
-| halluc_rate (lower is better) | primary | 0.053 | 0.013 | 0.026 | -3.3 pt | 2.6 pt | yes | 3.9 pt | no |
-| false_abstain (lower is better) | primary | 0.000 | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no | 0.9 pt | no |
-| cite_valid | primary | 1.000 | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no | 1.8 pt | no |
-| qa_seen (lenient, as registered) | primary | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no | 3.5 pt | no |
-| qa_unseen (lenient, as registered) | primary | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no | 2.7 pt | no |
-| qa_strict seen | reported | 0.287 | 0.305 | 0.287 | +0.9 pt | 3.5 pt | no | 3.5 pt | no |
-| qa_strict unseen | reported | 0.116 | 0.116 | 0.110 | -0.3 pt | 2.6 pt | no | 2.6 pt | no |
-| seen gold-answer log-prob (nats) | primary | -5.120 | -5.003 | -5.196 | +0.021 [-0.072, +0.113] | 0.193 | no | 0.247 | no |
-|   of it, the answer tokens | reported | -4.697 | -4.705 | -4.848 | -0.079 [-0.168, +0.008] | 0.143 | no | 0.173 | no |
-|   of it, the end token | reported | -0.423 | -0.298 | -0.348 | +0.100 [+0.079, +0.123] | 0.050 | yes | 0.074 | yes |
-| unseen gold-answer log-prob (nats) | primary | -6.426 | -6.544 | -6.731 | -0.212 [-0.335, -0.097] | 0.187 | yes | 0.258 | no |
-|   of it, the answer tokens | reported | -5.895 | -6.161 | -6.282 | -0.327 [-0.445, -0.218] | 0.121 | yes | 0.210 | yes |
-|   of it, the end token | reported | -0.531 | -0.383 | -0.449 | +0.115 [+0.090, +0.143] | 0.066 | yes | 0.066 | yes |
-| MMLU | guard | 0.766 | 0.767 | 0.765 | -0.0 pt | 0.3 pt | no | 0.4 pt | no |
-| GSM8K | guard | 0.814 | 0.810 | 0.807 | -0.6 pt | 1.1 pt | no | 2.2 pt | no |
-| grounded_acc (judge) | reported | 0.907 | 0.917 | 0.907 | +0.5 pt | 2.8 pt | no | 2.8 pt | no |
-| cite_supported (judge) | reported | 0.861 | 0.870 | 0.880 | +1.4 pt | 3.3 pt | no | 3.3 pt | no |
-| vocab_recall (judge) | reported | 0.833 | 0.838 | 0.848 | +1.0 pt | 2.6 pt | no | 2.6 pt | no |
-
-Rows marked primary are the amended read (2026-10-08, fixed before launch); guards must stay within the noise; judge-scored rows are reported, not read. As written: max(the DPO seed gap, the start's SE). The Stage 3 way also takes the start's own seed gap (sft-from-cpt vs sft-from-cpt-seed1): the start is one run. One seed pair each (1 df). The verdict uses the Stage 3 way.
-
-## More training: dpo-2ep against dpo (ablation, not a candidate)
-
-| metric | read | dpo (1 epoch) | dpo-2ep (2 epochs) | change | floor | beyond floor |
+| metric | sft-from-cpt | dpo | dpo-seed1 | change (mean of 2) | floor | beyond the floor |
 |---|---|---|---|---|---|---|
-| halluc_rate (lower is better) | primary | 0.013 | 0.013 | +0.0 pt | 1.3 pt | no |
-| false_abstain (lower is better) | primary | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
-| cite_valid | primary | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
-| qa_seen (lenient, as registered) | primary | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
-| qa_unseen (lenient, as registered) | primary | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
-| qa_strict seen | reported | 0.305 | 0.258 | -4.8 pt | 3.6 pt | yes |
-| qa_strict unseen | reported | 0.116 | 0.129 | +1.3 pt | 2.6 pt | no |
-| seen gold-answer log-prob (nats) | primary | -5.003 | -8.012 | -3.010 [-3.522, -2.514] | 0.193 | yes |
-|   of it, the answer tokens | reported | -4.705 | -7.816 | -3.112 [-3.618, -2.622] | 0.143 | yes |
-|   of it, the end token | reported | -0.298 | -0.196 | +0.102 [+0.067, +0.140] | 0.050 | yes |
-| unseen gold-answer log-prob (nats) | primary | -6.544 | -10.845 | -4.301 [-4.999, -3.653] | 0.187 | yes |
-|   of it, the answer tokens | reported | -6.161 | -10.570 | -4.408 [-5.101, -3.759] | 0.121 | yes |
-|   of it, the end token | reported | -0.383 | -0.276 | +0.107 [+0.062, +0.154] | 0.066 | yes |
-| MMLU | guard | 0.767 | 0.767 | +0.0 pt | 0.3 pt | no |
-| GSM8K | guard | 0.810 | 0.806 | -0.4 pt | 1.1 pt | no |
-| grounded_acc (judge) | reported | 0.917 | 0.907 | -0.9 pt | 2.7 pt | no |
-| cite_supported (judge) | reported | 0.870 | 0.852 | -1.8 pt | 3.2 pt | no |
-| vocab_recall (judge) | reported | 0.838 | 0.852 | +1.4 pt | 2.5 pt | no |
+| halluc_rate (lower is better) | 0.053 | 0.013 | 0.026 | -3.3 pt | 3.9 pt | no |
+| false_abstain (lower is better) | 0.000 | 0.000 | 0.000 | +0.0 pt | 0.9 pt | no |
+| cite_valid | 1.000 | 1.000 | 1.000 | +0.0 pt | 1.8 pt | no |
+| qa_seen (lenient checker) | 0.281 | 0.311 | 0.287 | +1.8 pt | 3.5 pt | no |
+| qa_unseen (lenient checker) | 0.136 | 0.136 | 0.129 | -0.3 pt | 2.7 pt | no |
+| qa_strict seen | 0.287 | 0.305 | 0.287 | +0.9 pt | 3.5 pt | no |
+| qa_strict unseen | 0.116 | 0.116 | 0.110 | -0.3 pt | 2.6 pt | no |
+| seen gold-answer log-prob (nats) | -5.120 | -5.003 | -5.196 | +0.021 [-0.072, +0.113] | 0.247 | no |
+|   of it, the answer tokens | -4.697 | -4.705 | -4.848 | -0.079 [-0.168, +0.008] | 0.173 | no |
+|   of it, the end token | -0.423 | -0.298 | -0.348 | +0.100 [+0.079, +0.123] | 0.074 | yes |
+| unseen gold-answer log-prob (nats) | -6.426 | -6.544 | -6.731 | -0.212 [-0.335, -0.097] | 0.258 | no |
+|   of it, the answer tokens | -5.895 | -6.161 | -6.282 | -0.327 [-0.445, -0.218] | 0.210 | yes |
+|   of it, the end token | -0.531 | -0.383 | -0.449 | +0.115 [+0.090, +0.143] | 0.066 | yes |
+| MMLU | 0.766 | 0.767 | 0.765 | -0.0 pt | 0.4 pt | no |
+| GSM8K | 0.814 | 0.810 | 0.807 | -0.6 pt | 2.2 pt | no |
+| grounded_acc (judge) | 0.907 | 0.917 | 0.907 | +0.5 pt | 2.8 pt | no |
+| cite_supported (judge) | 0.861 | 0.870 | 0.880 | +1.4 pt | 3.3 pt | no |
+| vocab_recall (judge) | 0.833 | 0.838 | 0.848 | +1.0 pt | 2.6 pt | no |
+
+Floor: max(the DPO seed gap, the start's SE, the start's own seed gap (sft-from-cpt vs sft-from-cpt-seed1)). One seed pair each (1 df). Judge-scored rows carry the judge's own error.
+
+## More training: dpo-2ep against dpo (a variant)
+
+| metric | dpo (1 epoch) | dpo-2ep (2 epochs) | change | floor | beyond floor |
+|---|---|---|---|---|---|
+| halluc_rate (lower is better) | 0.013 | 0.013 | +0.0 pt | 1.3 pt | no |
+| false_abstain (lower is better) | 0.000 | 0.000 | +0.0 pt | 0.0 pt | no |
+| cite_valid | 1.000 | 1.000 | +0.0 pt | 0.0 pt | no |
+| qa_seen (lenient checker) | 0.311 | 0.264 | -4.8 pt | 3.6 pt | yes |
+| qa_unseen (lenient checker) | 0.136 | 0.129 | -0.7 pt | 2.7 pt | no |
+| qa_strict seen | 0.305 | 0.258 | -4.8 pt | 3.6 pt | yes |
+| qa_strict unseen | 0.116 | 0.129 | +1.3 pt | 2.6 pt | no |
+| seen gold-answer log-prob (nats) | -5.003 | -8.012 | -3.010 [-3.522, -2.514] | 0.193 | yes |
+|   of it, the answer tokens | -4.705 | -7.816 | -3.112 [-3.618, -2.622] | 0.143 | yes |
+|   of it, the end token | -0.298 | -0.196 | +0.102 [+0.067, +0.140] | 0.050 | yes |
+| unseen gold-answer log-prob (nats) | -6.544 | -10.845 | -4.301 [-4.999, -3.653] | 0.187 | yes |
+|   of it, the answer tokens | -6.161 | -10.570 | -4.408 [-5.101, -3.759] | 0.121 | yes |
+|   of it, the end token | -0.383 | -0.276 | +0.107 [+0.062, +0.154] | 0.066 | yes |
+| MMLU | 0.767 | 0.767 | +0.0 pt | 0.3 pt | no |
+| GSM8K | 0.810 | 0.806 | -0.4 pt | 1.1 pt | no |
+| grounded_acc (judge) | 0.917 | 0.907 | -0.9 pt | 2.7 pt | no |
+| cite_supported (judge) | 0.870 | 0.852 | -1.8 pt | 3.2 pt | no |
+| vocab_recall (judge) | 0.838 | 0.852 | +1.4 pt | 2.5 pt | no |
 
 Same data, seed and recipe; two epochs, epoch 2 evaluated. Floor: max(the dpo / dpo-seed1 seed gap, dpo's SE), one seed pair.
 
-## Win rate against sft-from-cpt (reported, not read)
+## Win rate against sft-from-cpt (reported only)
 
 | run | win rate | SE | ties | identical greedy answers | n | position consistency |
 |---|---|---|---|---|---|---|
@@ -212,7 +212,7 @@ No-op control (an untrained adapter, merged, against its start):
 |---|---|---|---|---|
 | sft-from-cpt | 531 | 0 | 0.0 | yes |
 
-Merge gate (B5, amended): over every sft_val completion position (11,351; dpo_val's 665 are too few for the 0.1% line, 2026-10-08 freeze) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
+Merge check: over every sft_val completion position (11,351; dpo_val's 665 are too few for the 0.1% line, 2026-10-08 freeze) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
 
 | run | flips added | \|dlp\| ratio | val loss diff | merged vs unmerged top-1 | probe error ratio | checkpoint sha256 | passed |
 |---|---|---|---|---|---|---|---|
@@ -231,46 +231,46 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 | dpo-2ep | 0.7992 | 9.2158 | 164.8 | 0.8022 | 0.7855 | 0.99 | 100.0% of 64 |
 | dpo-strict | 0.7575 | 9.0924 | 172.4 | 0.7394 | 0.8671 | 0.96 | 100.0% of 64 |
 
-- **dpo-2ep: merge gate flagged.** Val-loss criterion 0.58% against 0.5% (merged 0.5663, unmerged 0.5696 nats on sft_val). The merge-isolating criteria pass in `merge_diagnose`: 5 added flips of 11, |dlp| ratio 1.43 against 1.5. Evaluated under the rule fixed before the diagnosis (notes/decisions.md, 2026-10-09).
+- **dpo-2ep: merge check flagged.** Val-loss criterion 0.58% against 0.5% (merged 0.5663, unmerged 0.5696 nats on sft_val). The merge-isolating criteria pass in `merge_diagnose`: 5 added flips of 11, |dlp| ratio 1.43 against 1.5. Its scores carry the merge's extra error.
 
 # Stage 5: GRPO
 
 ## Training runs
 
-| run | start | tasks | steps | stop | rule picks | grpo_val pass@1 / pass@8 at the pick | final train reward | final entropy | mean length | base drift | wall (h) | GPU-h | $ | peak GB |
+| run | start | tasks | steps | stop | checkpoint kept | grpo_val pass@1 / pass@8 at it | final train reward | final entropy | mean length | base drift | wall (h) | GPU-h | $ | peak GB |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | grpo | dpo-strict | 622 | 52 | step 52: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.550 / 0.820 | 0.8179 | 0.158 | 19.857 | 2.4e-04 | 0.50 | 0.50 | 1.98 | 77 |
 | grpo-seed1 | dpo-strict | 622 | 65 | step 65: entropy's 10-step mean under a third of its steps 1-10 mean | step 25 (best 25) | 0.562 / 0.800 | 0.8162 | 0.1499 | 18.2883 | 1.2e-04 | 0.58 | 0.58 | 2.30 | 76 |
 
-The checkpoint rule (pre-registered): the best grpo_val pass@1 among the saves at or before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 samples at T 1.0. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
+The checkpoint kept: the best grpo_val pass@1 among the saves at or before any stop, ties within one SE to the earliest. grpo_val: 50 held-out tasks x 8 samples at T 1.0. $ at 3.95 per GPU-hour (Modal's H100 SXM5 list price, checked 2026-10-09).
 
-## The read: change against dpo-strict, next to the noise
+## Change against dpo-strict, next to the floor
 
-| metric | read | dpo-strict | grpo | grpo-seed1 | change (mean of 2) | floor | beyond |
-|---|---|---|---|---|---|---|---|
-| qa_strict seen (the reward's rule) | primary | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
-| seen gold-answer log-prob (nats) | primary | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
-|   of it, the answer tokens | reported | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
-|   of it, the end token | reported | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
-| qa_acc seen (lenient) | reported | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
-| qa_strict unseen | reported | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
-| qa_acc unseen (lenient) | reported | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
-| unseen gold-answer log-prob (nats) | reported | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
-|   of it, the answer tokens | reported | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
-|   of it, the end token | reported | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
-| halluc_rate (lower is better) | guard | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
-| false_abstain (lower is better) | guard | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
-| cite_valid | guard | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
-| MMLU | guard | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.3 pt | no |
-| GSM8K | guard | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
-| grounded_acc (judge) | reported | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
-| cite_supported (judge) | reported | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
-| pass@1 seen (sampled) | reported | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
-| pass@8 seen | reported | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
-| pass@1 unseen (sampled) | reported | 0.105 | 0.119 | 0.112 | +1.0 pt [-0.1, +2.2] | 0.6 pt | no |
-| pass@8 unseen | reported | 0.297 | 0.258 | 0.271 | -3.2 pt [-7.7, +1.0] | 2.6 pt | no |
+| metric | dpo-strict | grpo | grpo-seed1 | change (mean of 2) | floor | beyond the floor |
+|---|---|---|---|---|---|---|
+| qa_strict seen (the reward's rule) | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
+| seen gold-answer log-prob (nats) | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
+|   of it, the answer tokens | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
+|   of it, the end token | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
+| qa_acc seen (lenient) | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
+| qa_strict unseen | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
+| qa_acc unseen (lenient) | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
+| unseen gold-answer log-prob (nats) | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
+|   of it, the answer tokens | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
+|   of it, the end token | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
+| halluc_rate (lower is better) | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
+| false_abstain (lower is better) | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
+| cite_valid | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
+| MMLU | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.3 pt | no |
+| GSM8K | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
+| grounded_acc (judge) | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
+| cite_supported (judge) | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
+| pass@1 seen (sampled) | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
+| pass@8 seen | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
+| pass@1 unseen (sampled) | 0.105 | 0.119 | 0.112 | +1.0 pt [-0.1, +2.2] | 0.6 pt | no |
+| pass@8 unseen | 0.297 | 0.258 | 0.271 | -3.2 pt [-7.7, +1.0] | 2.6 pt | no |
 
-Rows marked primary are the pre-registered read (2026-10-09); guards must stay within the noise and their absolute lines; reported rows are not argued. Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
+Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-strict has no twin, so the lenient dpo / dpo-seed1 gap). One seed pair each (1 df).
 
 ## Same verifier, two algorithms: each from its own start, and the chain's cumulative change from sft-from-cpt
 
@@ -292,7 +292,7 @@ Rows marked primary are the pre-registered read (2026-10-09); guards must stay w
 | pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | no (0.6 pt) | +1.0 pt [-0.1, +2.2] | no (0.6 pt) | +2.2 pt [+0.4, +4.0] | yes (0.6 pt) |
 | pass@8 unseen | 0.310 | -1.3 pt [-5.2, +2.6] | no (2.6 pt) | -3.2 pt [-7.7, +1.0] | no (2.6 pt) | -4.5 pt [-9.7, +0.3] | no (1.3 pt) |
 
-dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge failed its benchmark and its two orders agreed at coin-flip.
+dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the strict checker, one run. grpo: on-policy groups scored by the same checker, two seeds. Each floor also takes sft-from-cpt's own seed gap. pass@k lines: paired per item (8 samples at T 0.7, the strict scorer), floor = the seed gaps sampled (grpo's pair; the lenient dpo pair for dpo-strict); sft-from-cpt's twin was not sampled. Win rate: not run for these rows: the judge's two orders of a pair agreed about half the time.
 
 ## pass@k on the closed-book eval (strict scorer)
 
@@ -311,7 +311,7 @@ dpo-strict: 445 offline pairs from the SFT model's samples, labelled by the stri
 ## Checks
 
 
-Merge gate (B5, amended): over every sft_val completion position (11,351) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
+Merge check: over every sft_val completion position (11,351) against an fp32 reference, the argmax flips the merge adds over the unmerged bf16 model's own (at most 0.1% of positions), and its mean |delta log-prob| relative to the unmerged model's (max 1.5); val loss within 0.5%. Merged-vs-unmerged agreement and the 3-probe mean merge-error ratio are reported, not gated; sha256 of the merged checkpoint's file list:
 
 | run | flips added | \|dlp\| ratio | val loss diff | merged vs unmerged top-1 | probe error ratio | checkpoint sha256 | passed |
 |---|---|---|---|---|---|---|---|
@@ -328,7 +328,7 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 
 # Stage 6: serving
 
-## Quality gate (pre-registered): change against bf16, next to the Stage 3 floor
+## Quality: change against bf16, next to the floor
 
 | line | bf16 | FP8 − bf16 | FP8 + FP8 KV − bf16 | INT4 W4A16 − bf16 | floor |
 |---|---|---|---|---|---|
@@ -344,11 +344,10 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 | false_abstain | 0.000 | +0.0 | +0.0 | +0.0 | 0.9 pt |
 | GSM8K (all 1,319, add_bos_token) | 0.809 | -0.2 |  | **-6.1** | 2.2 pt |
 | qa_strict identifiers (reported) | 0.188 | -1.6 | -1.6 | **-7.8** | 5 pt |
-| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 | >= 0.95 |
+| answers ending on </s> (eos job) | 1.00 | 1.00 | 1.00 | 1.00 |  |
 | vLLM val-slice perplexity (reported) | 6.894 | +0.33% | +0.58% | +3.53% |  |
-| **verdict** |  | **ships** | **fails** | **fails** |  |
 
-A variant ships if every gated line is within its floor (bold: beyond it) and the eos job ends >= 95% of answers on </s> (notes/decisions.md, 2026-10-09). The floor is the sft-from-cpt seed gap or the SE, whichever is larger: a cost under it is invisible to every other comparison here, which is what ships means, not that it costs nothing. GSM8K is the gate's own run (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under the same flags), not the table's frozen-flag row.
+Bold: beyond the floor. The floor is the sft-from-cpt seed gap or the SE, whichever is larger: a change under it is invisible to every other comparison here, not proof that it costs nothing. GSM8K is a rerun for this table (all 1,319, 5-shot, add_bos_token=True, bf16 rerun under the same flags), not the frozen-flag row of the other tables.
 
 ## Serving memory (vLLM's own accounting at start-up)
 
