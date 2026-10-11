@@ -87,7 +87,6 @@ CAVEATS = [
     "Retrieval is untested",  # the grounded eval supplies the gold passage
     "Chat behaviour beyond the test is untested",  # no instruction-following or safety evals
     "No structural engineer saw items or outputs",  # no domain-expert review
-    "No minimum detectable effect was set",  # the eval was not sized for 3-point gains
     "are fixtures and are never trained on",  # rule 13
 ]
 

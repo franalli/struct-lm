@@ -2444,9 +2444,9 @@ HEADLINE_ROWS = [
     ("dpo-strict", "DPO, corrected labels (served, bf16)"),
     ("grpo", "GRPO (not served)"),
     ("grpo-seed1", "GRPO, seed 1"),
-    ("dpo-strict-fp8", "served model in FP8 (passed the quality check)"),
-    ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (failed the quality check)"),
-    ("dpo-strict-w4a16", "INT4 W4A16 (failed the quality check)"),
+    ("dpo-strict-fp8", "served model in FP8 (served near full load)"),
+    ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (not served)"),
+    ("dpo-strict-w4a16", "INT4 (not served)"),
 ]
 BASE_FORMAT = {"base-8b-hf", "cpt-8b", "cpt-8b-seed1", "cpt-8b-replay10", "cpt-8b-full"}
 BLANKS = {  # block -> (runs, why their cells are blank), printed under the table
@@ -2475,8 +2475,8 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
         (
             "dpo-strict-fp8, dpo-strict-fp8kv, dpo-strict-w4a16",
             (
-                "have no lm-eval or perplexity run with the "
-                "settings the other rows used; their quality-check GSM8K (run with a start-of-text token) and perplexity are in "
+                "have no general-benchmark or perplexity run with the settings the other rows "
+                "used; their GSM8K rerun (with a start-of-text token) and perplexity are in "
                 "[`docs/stage6.md`](docs/stage6.md)"
             ),
         ),
@@ -2485,7 +2485,7 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
             (
                 "latency was measured for some runs only; the two sources use different prompts, so "
                 "compare rows within one source; FP8-KV's and INT4's serving-benchmark rows weren't "
-                "run (Modal spend limit)"
+                "run (the cloud GPU budget ran out)"
             ),
         ),
     ],
@@ -2556,13 +2556,22 @@ def headline_latency(run: str) -> tuple[str, str, str]:
     return "", "", ""
 
 
-def headline_cell(m: dict, key: str, kind: str) -> str:
+def headline_cell(m: dict, key: str, kind: str, n: int = 0) -> str:
+    """A rate in %, gold_lp in nats, a perplexity as is. A KPI rate over `n` items is snapped to
+    its count first: metrics.json keeps 4 places, so 3/76 is stored as 0.0395 and would print 4.0."""
     v = m.get(key)
     if v is None:
         return ""
     if kind in LP_PART:
         return f"{v:.2f}"
+    if kind == "kpi" and n:
+        v = round(v * n) / n
     return f"{v:.2f}" if kind == "ppl" else f"{v * 100:.1f}"
+
+
+def rate_n(m: dict, extra, sizes: dict) -> int:
+    """The item count behind a KPI rate: the run's own count for a task, the half's size else."""
+    return (m.get("n", {}).get(extra) or sizes.get(extra, 0)) if isinstance(extra, str) else 0
 
 
 def headline_floor(m: dict, pair: tuple[str, str], key: str, kind: str, extra, sizes) -> str:
@@ -2596,7 +2605,9 @@ def headline_tables() -> dict[str, str]:
             if run not in m:
                 continue
             fmt = " [base format]" if run in BASE_FORMAT else ""
-            values = [headline_cell(m[run], k, kind) for _, k, kind, _ in cols]
+            values = [
+                headline_cell(m[run], k, kind, rate_n(m[run], x, sizes)) for _, k, kind, x in cols
+            ]
             if latency:
                 values += headline_latency(run)
             if not any(values):  # a row with no number in this table (left out, named below)
@@ -2662,7 +2673,7 @@ STEP_MEASURES = [  # (label, metrics key, kind, noise() extra), as HEADLINE
     ("MMLU (%)", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
     ("GSM8K (%)", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
     (
-        "GSM8K, the quality check's run (%)",
+        "GSM8K, rerun with a start-of-text token (%)",
         "gsm8k",
         "gate",
         ("gsm8k", "exact_match_stderr,strict-match"),
@@ -2735,7 +2746,10 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
         ("passk", "winrate"),
         [
             "The floor is SFT's (the gap between its two seeds, or the standard error if larger).",
-            "The judge's preference is reported only: that judge failed its own accuracy check.",
+            (
+                "The judge's preference is reported only: shown the same pair in both orders, it "
+                "gave the same verdict only about half the time."
+            ),
             "DPO, 2 epochs has no sampled score: it was an ablation.",
         ],
     ),
@@ -2757,9 +2771,9 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
         [
             "The floor is SFT's (the gap between its two seeds, or the standard error if larger).",
             (
-                "The quality check reran GSM8K with one start-of-text token for every variant; FP8 + "
-                "FP8 KV cache's run, and its and INT4's latency runs, weren't done (Modal spend "
-                "limit)."
+                "GSM8K was rerun with one start-of-text token for each version; FP8 + FP8 KV "
+                "cache's rerun, and its and INT4's speed tests, weren't run (the cloud GPU budget "
+                "ran out)."
             ),
             "Latency is the median on one H100, one request at a time, mean of two runs.",
         ],
@@ -2769,7 +2783,7 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
 
 def step_extra(kind: str, run: str) -> str:
     """A cell read from its own file: pass@1 on the taught half (results/passk), the DPO win
-    rate against SFT (results/winrate), the quality check's GSM8K (s6_metrics) or the serving
+    rate against SFT (results/winrate), the serving GSM8K rerun (s6_metrics) or the serving
     bench's medians at one request (headline_latency, Stage 6's H100 rows only)."""
     if kind == "passk":
         f = Path("results/passk") / f"{run}.json"
@@ -2804,7 +2818,10 @@ def step_tables() -> dict[str, str]:
                 cells = [step_extra(kind, r) for r, _ in cols]
                 floor = headline_floor(m, pair, key, "lm", extra, sizes) if kind == "gate" else ""
             else:
-                cells = [headline_cell(m[r], key, kind) if r in m else "" for r, _ in cols]
+                cells = [
+                    headline_cell(m[r], key, kind, rate_n(m[r], extra, sizes)) if r in m else ""
+                    for r, _ in cols
+                ]
                 floor = headline_floor(m, pair, key, kind, extra, sizes)
             if any(cells):
                 lines.append("| " + " | ".join([label, *cells, floor]) + " |")

@@ -16,9 +16,11 @@ usual training steps, and is then compressed and served:
 5. **Serving:** the model is compressed to fewer bits per number and tested for quality and speed.
 
 Every step is compared with the untouched model (**Base**) and with Mistral's own chat version of
-the same model (**Instruct**). Each section below says what the step does, shows one real example
-of its training data, explains how its training works, and gives all its scores and its training
-curves.
+the same model (**Instruct**). Each training section below says what the step does, shows one
+real example of its training data, explains how its training works, and gives all its scores and
+its training curves. Each section ends with a link to its full write-up in `docs/`, the working record kept as
+the step ran: it has more detail, and some of its figures split a measure differently (for
+example, a log-probability that includes the end-of-answer token).
 
 ## In brief
 
@@ -30,16 +32,17 @@ curves.
 - **It learned the facts it was fine-tuned on.** With no passages, it answers 28.7% of questions
   on those facts after SFT, against Instruct's 11.4%.
 - **Reading the documents taught it little it could recall.** On facts that appear only in the
-  documents, it scores 11.6% after SFT, the same as the untrained Base. Reading made the right
-  answers more probable to the model, but rarely probable enough to become its answer. The
-  exception is questions answered by a document or section number, which reading improved.
+  documents, it scores 11.6% after SFT, the same as the untrained Base; fine-tuning without reading
+  first drops that to 8.4%. Reading made the right answers more probable to the model, but rarely
+  probable enough to become its answer. Questions answered by a document or section number are the
+  exception: reading improved those.
 - **Preference training and reinforcement learning didn't reliably improve accuracy or behaviour
   beyond the noise.** Both made a right answer more likely to come up when the model's answer is drawn
   at random, and both made the right answers to document-only facts less probable. The
   reinforcement-learning model was not served.
-- **Compressing the weights to 8 bits (FP8) changed no checked score beyond the noise.** Also
-  compressing the attention cache to 8 bits did, and so did compressing the weights to 4 bits
-  (INT4).
+- **Compressing the model's numbers to 8 bits (FP8) changed no score beyond the noise.** Also
+  compressing its memory of the conversation to 8 bits lowered one score, and compressing the
+  numbers to 4 bits (INT4) lowered several.
 
 The main models side by side. "Taught" facts are those the fine-tuning data covers, and
 "document-only" facts are the rest. The log-probability column measures how likely the model finds
@@ -53,9 +56,9 @@ differences smaller than it are treated as noise. The next section explains each
 |---|---|---|---|---|---|---|---|
 | `base-8b-hf` | Ministral 3 8B Base [base format] | 12.6 | 11.6 | -6.36 | 84.3 | 89.5 | 79.3 |
 | `instruct-8b` | Ministral 3 8B Instruct | 11.4 | 7.7 | -7.71 | 89.8 | 1.3 | 85.5 |
-| `sft-from-base` | SFT on Base (control) | 23.9 | 8.4 | -6.20 | 92.6 | 6.6 | 79.2 |
+| `sft-from-base` | SFT on Base (control) | 24.0 | 8.4 | -6.20 | 92.6 | 6.6 | 79.2 |
 | `sft-from-cpt` | CPT → SFT | 28.7 | 11.6 | -5.89 | 90.7 | 5.3 | 81.4 |
-| `dpo-strict` | CPT → SFT → DPO (served) | 30.5 | 11.0 | -6.27 | 92.6 | 4.0 | 80.9 |
+| `dpo-strict` | CPT → SFT → DPO (served) | 30.5 | 11.0 | -6.27 | 92.6 | 3.9 | 80.9 |
 | `grpo` | CPT → SFT → DPO → GRPO (not served) | 29.9 | 9.7 | -7.54 | 93.5 | 1.3 | 82.0 |
 |  | *floor, chat rows: gap between two SFT seeds, or the standard error* | 3.5 | 2.6 | 0.21 | 2.8 | 3.9 | 2.2 |
 <!-- headline-summary:end -->
@@ -65,6 +68,26 @@ differences smaller than it are treated as noise. The next section explains each
 *Blue: the line that was served. Grey: other runs, for comparison. The names in brackets are the
 run names in the tables; `base-8b-hf` is the Base re-saved in the same file format as the trained
 models, so that all of them load the same way.*
+
+## Words used here
+
+| word | meaning |
+|---|---|
+| token | a word or piece of a word; models read and write text one token at a time |
+| weights | the billions of numbers inside the model; training adjusts them, and "frozen" weights are left as they are |
+| LoRA adapter | a small set of extra weights trained on top of frozen ones (its "rank", 64 here, sets its size); "merging" adds it into the main weights for serving |
+| loss | a score of how wrong the model's guesses are; training lowers it. Training loss is measured on the examples being trained on, validation loss on held-out examples it never trains on, which shows whether it is learning or just memorising |
+| epoch | one pass over all the training data |
+| seed | the number that fixes training's random choices; two "twin" runs differ only in their seed |
+| temperature | how much randomness the model uses when picking each token: 0 always takes the most likely one, and higher values give more varied answers |
+| log-probability, nats | how likely the model finds an answer, on a logarithmic scale (natural log, in "nats"); closer to zero is more likely |
+| perplexity | how surprised the model is by a text; lower means it predicts the text better |
+| standard error, confidence interval | how much a score could move if the test questions were redrawn; a 95% confidence interval is the range it would likely fall in, and "paired" means two models are compared question by question |
+| start-of-text token | a special token that marks the start of a text; many models expect it |
+| judge | a large model asked to grade an answer |
+| bf16, FP8, INT4 | ways of storing the model's numbers: bf16 is the format it was trained in, FP8 uses half as many bits per number and INT4 a quarter; fewer bits make the model smaller and faster but less precise |
+| KV cache | the model's memory of the conversation so far |
+| H100, Modal | the GPU (graphics chip) that ran everything, rented from the cloud service Modal |
 
 ## How the model was tested
 
@@ -95,9 +118,11 @@ gold answer: EM 1110-2-4203
   provided passages." counts as declining.
 - **By a judge,** where no rule can: Mistral Large 3, set to answer the same way every time
   (temperature 0), decides whether a grounded answer or a definition is correct, and whether any
-  other reply to an unanswerable question answers it anyway. Its verdicts were spot-checked by
-  hand, but the judge itself was never formally benchmarked. The same model with a different
-  prompt was also tried as a labeller of training data, and that use failed its test (see DPO).
+  other reply to an unanswerable question answers it anyway. It sees the source passage and
+  answers one yes-or-no question per answer. Its verdicts were spot-checked by hand, but it was
+  never formally benchmarked, so the judged columns carry more uncertainty than the rule-checked
+  ones. The same model, prompted to rank several answers at once, was also tried as a labeller of
+  training data, and missed most known flaws (see DPO).
 
 **Taught and document-only facts.** Before fine-tuning, the closed-book questions were split in two
 by source passage. For the **taught** half (167 questions), the fine-tuning data may use the same
@@ -109,7 +134,7 @@ is a document or section number, such as EM 1110-2-4203. The closed-book set gre
 items after continued pre-training; the new items were checked before any model answered them,
 and every model whose weights still existed was re-run on the larger set.
 
-**For reference,** Mistral Large 3 itself answers 26.4% of the taught half and 25.8% of the
+**For reference,** Mistral Large 3 itself answers 26.3% of the taught half and 25.8% of the
 document-only half with no passages (run through Mistral's API, closed-book only).
 
 **General benchmarks,** to see whether the model forgets general skills: MMLU (multiple-choice
@@ -122,24 +147,28 @@ without a start-of-text token, so the scores compare with each other but not wit
 - **Perplexity:** how surprised the model is by text it hasn't trained on; lower is better. It is
   measured on held-out document text and on general web text (FineWeb-Edu).
 - **Gold answer's log-probability:** the model gives every possible answer a probability. This is
-  the natural logarithm of the probability it gives the correct answer, in units called nats.
-  Closer to zero is better, and each extra nat makes the answer e times (nearly three times) as
-  likely. It moves before accuracy does, so it shows learning too small to change which answer the
-  model gives. The full tables also show the end-of-answer token's part separately.
+  the natural logarithm of the probability it gives the correct answer's own tokens, in units
+  called nats. Closer to zero is better, and each extra nat makes the answer e times (nearly three
+  times) as likely. It moves before accuracy does, so it shows learning too small to change which
+  answer the model gives. The full tables also show the end-of-answer token's log-probability, in
+  separate columns.
 - **Sampled accuracy:** the model normally gives its single most likely answer. Sampled accuracy
   instead draws 8 answers at random from its probabilities (temperature 0.7) and counts how many
   are right on average, so it shows right answers becoming more likely before they become the top
   choice. It is a measure added after the fact, once DPO's results were in.
 
-**The noise floor.** Training has randomness: the starting values of the trained weights and the
-order of the examples, both set by a "seed". The runs the comparisons rest on were each trained
-twice with different seeds (CPT on documents only, SFT from both starting points, the first DPO
-runs and GRPO). A difference counts only if it is larger than the gap between a pair of twin runs,
-or than the measure's standard error (the uncertainty from testing on a limited number of
-questions), whichever is larger. Runs trained once, such as the served model, are read against the
-same floor. The floor is about one standard deviation, so it is a screen, not a proof. With 155 to
-167 questions per half, it comes to 2.6 to 3.5 points on closed-book accuracy, so smaller gains
-can't be seen. The statements below compare single runs unless they say they use both twins.
+**The noise floor.** Training has randomness, so the same recipe run twice gives slightly
+different scores. Twin runs were trained for CPT on documents only, for SFT from both starting
+points, for the first DPO runs and for GRPO; the CPT run used next and the served DPO run were
+trained once. A difference counts only if it is larger than the noise floor: the gap between a
+pair of twins, or the measure's standard error if that is larger. One floor serves each kind of
+model. For models tested as base models (Base and CPT) it comes from the CPT twins; for every chat
+model (Instruct, SFT, DPO, GRPO and the compressed versions) it comes from the SFT twins. The DPO and
+GRPO twins are shown in their tables for comparison. The floor is about one standard deviation, so
+it is a screen, not a proof. With 155 to 167 questions per half, it comes to 2.6 to 3.5 points on
+closed-book accuracy, so smaller gains can't be seen. Floors and gaps are compared before rounding,
+so a gap read off the rounded tables can differ from it in the last digit. The statements below compare single
+runs unless they say they use both twins.
 
 ## The documents
 
@@ -189,7 +218,7 @@ among the wheels at either side of the runway.
 | measure | Base | CPT + 10% general text (used next) | CPT, documents only | CPT, documents only, seed 1 | CPT, all weights | noise floor |
 |---|---|---|---|---|---|---|
 | closed-book, taught facts (%) | 12.6 | 15.0 | 15.6 | 13.2 |  | 2.8 |
-| closed-book, document-only facts (%) | 11.6 | 11.0 | 13.6 | 12.9 |  | 2.7 |
+| closed-book, document-only facts (%) | 11.6 | 11.0 | 13.5 | 12.9 |  | 2.7 |
 | closed-book, document and section numbers (%) | 7.8 | 12.5 | 12.5 | 12.5 |  | 4.1 |
 | gold answer's log-probability, taught facts (nats) | -6.28 | -5.93 | -5.84 | -5.84 |  | 0.03 |
 | gold answer's log-probability, document-only facts (nats) | -6.36 | -5.70 | -5.68 | -5.70 |  | 0.03 |
@@ -219,7 +248,12 @@ among the wheels at either side of the runway.
   (13.2%). Reading made the text familiar, but mostly didn't make the model able to recall it.
 - **Document and section numbers are the exception:** all three LoRA runs answered 12.5% of them,
   against Base's 7.8%, beyond the 4.1-point floor.
-- **General skills held:** MMLU, GSM8K and HellaSwag stayed within the floor. General-text
+- **With passages, the CPT models did worse than Base** (tested as base models, which don't cite
+  well before SFT). The run used next got 7 fewer of the 108 grounded questions right and cited
+  validly on 7 fewer, and answered 3 more of the 76 unanswerable questions, all beyond the floor. SFT later
+  set this behaviour anew.
+- **General skills mostly held:** for the run used next, MMLU, GSM8K and HellaSwag stayed within the
+  floor, and the documents-only run's MMLU dropped just past it (76.4% against 76.7%). General-text
   perplexity rose 0.40% without the general text mixed in (beyond the 0.23% floor) and fell 2.24%
   with it.
 
@@ -229,11 +263,12 @@ among the wheels at either side of the runway.
   general-text perplexity, measured on the same kind of web text it was trained on. With it,
   grounded accuracy was 6.5 points below Base's (floor 3.7), lower than either documents-only twin.
   It was kept because it adds only 10% more tokens, and after SFT the grounded scores of the two
-  starting points are within the floor of each other.
+  starting points are within the floor of each other on average over their twins.
 - **A small add-on (LoRA), not training all the weights.** The all-weights run (two GPUs, one run)
   gained about as much on held-out text but memorised more: perplexity on its own training text
-  fell 22%, against LoRA's 8%. Its general-text perplexity rose 1.19% (LoRA's: 0.40%), and its GSM8K
-  score fell 3.0 points (floor 1.1).
+  fell 22%, against LoRA's 8%. It lost more general skill: general-text perplexity rose 1.19%
+  (LoRA's: 0.40%), GSM8K fell 3.0 points (floor 1.1) and MMLU fell to 76.2% from 76.7%. Its grounded
+  and definition scores rose beyond the floor (88.9% and 74.3%, against 84.3% and 70.5%).
 
 ![CPT loss curves](results/curves/cpt.png)
 
@@ -285,14 +320,14 @@ assistant: 10 percent
 <!-- step-sft:start -->
 | measure | Base | Instruct | SFT on Base | SFT on Base, seed 1 | SFT on CPT (used next) | SFT on CPT, seed 1 | noise floor |
 |---|---|---|---|---|---|---|---|
-| closed-book, taught facts (%) | 12.6 | 11.4 | 23.9 | 23.4 | 28.7 | 25.8 | 3.5 |
+| closed-book, taught facts (%) | 12.6 | 11.4 | 24.0 | 23.4 | 28.7 | 25.7 | 3.5 |
 | closed-book, document-only facts (%) | 11.6 | 7.7 | 8.4 | 7.7 | 11.6 | 11.0 | 2.6 |
 | closed-book, document and section numbers (%) | 7.8 | 3.1 | 10.9 | 14.1 | 20.3 | 23.4 | 5.0 |
 | closed-book, taught facts, sampled (%, mean of 8 answers) |  | 7.9 |  |  | 21.3 |  |  |
 | gold answer's log-probability, taught facts (nats) | -6.28 | -7.31 | -4.97 | -4.87 | -4.70 | -4.52 | 0.17 |
 | gold answer's log-probability, document-only facts (nats) | -6.36 | -7.71 | -6.20 | -6.20 | -5.89 | -5.68 | 0.21 |
 | grounded: answer correct (%, judge) | 84.3 | 89.8 | 92.6 | 89.8 | 90.7 | 93.5 | 2.8 |
-| grounded: citations name only given passages (%) | 12.0 | 83.3 | 100.0 | 99.1 | 100.0 | 98.2 | 1.8 |
+| grounded: citations name only given passages (%) | 12.0 | 83.3 | 100.0 | 99.1 | 100.0 | 98.1 | 1.8 |
 | grounded: cited passages support the answer (%, judge) | 8.3 | 78.7 | 87.0 | 88.0 | 86.1 | 88.0 | 3.3 |
 | grounded: answerable question declined (%) ↓ | 0.9 | 7.4 | 0.0 | 0.9 | 0.0 | 0.9 | 0.9 |
 | unanswerable: answered anyway (%) ↓ | 89.5 | 1.3 | 6.6 | 1.3 | 5.3 | 1.3 | 3.9 |
@@ -315,15 +350,24 @@ assistant: 10 percent
   95% confidence interval (−1.3 to +9.0) includes 0, and the untrained Base also scores 11.6%.
 - **With passages:** it cites only given passages 100% of the time, against 83.3% (a format check,
   on a format SFT trained on), and refuses no answerable question (Instruct refuses 7.4%). Its
-  grounded accuracy is level with Instruct's (90.7% against 89.8%).
-- **Unanswerable questions:** its hallucination is worse than Instruct's: it answered 4 of 76
-  anyway (5.3%), against Instruct's 1 (1.3%). Its twin run also answered only 1, so the gap equals
-  the gap between twins and is within the floor.
-- **What CPT added:** the two runs that started from CPT find the right answers to document-only
-  facts more probable than the two that started from Base (−5.89 and −5.68 nats, against −6.20 for
-  both): a gap of 0.41 nats (95% CI +0.23 to +0.60), from only two runs of each. On accuracy, SFT on
-  Base fell below the Base's own document-only score (8.4% and 7.7%, against 11.6%), while SFT on
-  CPT kept it (11.6% and 11.0%).
+  grounded accuracy is level with Instruct's (90.7% against 89.8%); the judge finds its citations
+  back its answers more often (86.1% against 78.7%) and its definitions right more often (83.3%
+  against 78.6%), both beyond the floor.
+- **General benchmarks:** Instruct, a different chat-tuned model, does better on GSM8K (85.5%
+  against 81.4%) and slightly better on HellaSwag, and slightly worse on MMLU, all beyond the floor.
+  Against Base, SFT on CPT is within the floor on MMLU and GSM8K and slightly lower on HellaSwag
+  (79.4% against 80.1%).
+- **Unanswerable questions:** its hallucination is worse than Instruct's, though only within the
+  floor: it answered 4 of 76 anyway (5.3%), against Instruct's 1 (1.3%), and its own twin run also
+  answered only 1.
+- **What CPT added,** comparing the two SFT starting points twin by twin:
+  - SFT on CPT answered more document-only questions (11.6% and 11.0%, against 8.4% and 7.7%) and
+    more document-number questions (20.3% and 23.4%, against 10.9% and 14.1%), beyond the floor in
+    both pairs. Against the untrained Base, though, the CPT runs only held its 11.6%, while the
+    runs without CPT fell below it.
+  - The right answers to document-only facts are more probable after CPT (−5.89 and −5.68 nats,
+    against −6.20 for both): a gap of 0.41 nats (95% CI +0.23 to +0.60), from only two runs of
+    each.
 
 ![SFT loss curves](results/curves/sft.png)
 
@@ -342,7 +386,8 @@ training question several times, and its right and wrong answers were paired: 44
 A judge was tried as a labeller too: Mistral Large 3, asked to rank several answers at once. Before
 it labelled anything, it was tested on answers whose flaws were already known from reading them
 against their passages. It caught only 28% of the flawed grounded answers and 9% of the flawed
-definitions, so no judge labelled any training pair.
+definitions, so no judge labelled any training pair. The first labels, before the correction
+described below, came from 506 pairs, 458 of them closed-book.
 
 **Training data sample:** one pair, both answers sampled from the SFT model (from
 `data/dpo/strict/train.jsonl`):
@@ -375,7 +420,7 @@ rejected: 5 percent      (wrong)
 <!-- step-dpo:start -->
 | measure | SFT (start) | DPO, first labels | DPO, first labels, seed 1 | DPO, corrected labels (served) | DPO, 2 epochs | noise floor |
 |---|---|---|---|---|---|---|
-| closed-book, taught facts (%) | 28.7 | 30.5 | 28.7 | 30.5 | 25.8 | 3.5 |
+| closed-book, taught facts (%) | 28.7 | 30.5 | 28.7 | 30.5 | 25.7 | 3.5 |
 | closed-book, document-only facts (%) | 11.6 | 11.6 | 11.0 | 11.0 | 12.9 | 2.6 |
 | closed-book, document and section numbers (%) | 20.3 | 20.3 | 17.2 | 18.8 | 14.1 | 5.0 |
 | closed-book, taught facts, sampled (%, mean of 8 answers) | 21.3 | 24.7 | 24.2 | 24.9 |  |  |
@@ -385,7 +430,7 @@ rejected: 5 percent      (wrong)
 | grounded: citations name only given passages (%) | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 1.8 |
 | grounded: cited passages support the answer (%, judge) | 86.1 | 87.0 | 88.0 | 86.1 | 85.2 | 3.3 |
 | grounded: answerable question declined (%) ↓ | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.9 |
-| unanswerable: answered anyway (%) ↓ | 5.3 | 1.3 | 2.6 | 4.0 | 1.3 | 3.9 |
+| unanswerable: answered anyway (%) ↓ | 5.3 | 1.3 | 2.6 | 3.9 | 1.3 | 3.9 |
 | definitions correct (%, judge) | 83.3 | 83.8 | 84.8 | 82.4 | 85.2 | 2.6 |
 | judge prefers its answer to SFT's (%, 50 = even) |  | 52 | 52 | 54 | 52 |  |
 | MMLU (%) | 76.6 | 76.7 | 76.5 | 76.7 | 76.8 | 0.4 |
@@ -395,14 +440,14 @@ rejected: 5 percent      (wrong)
 | perplexity, general web text ↓ | 8.06 | 8.07 | 8.07 | 8.06 | 8.11 | 0.07% |
 
 - The floor is SFT's (the gap between its two seeds, or the standard error if larger).
-- The judge's preference is reported only: that judge failed its own accuracy check.
+- The judge's preference is reported only: shown the same pair in both orders, it gave the same verdict only about half the time.
 - DPO, 2 epochs has no sampled score: it was an ablation.
 <!-- step-dpo:end -->
 
 **What it found** (against SFT on CPT, its starting point):
 - **No accuracy or behaviour measure improved beyond the floor.** The served run ("corrected
-  labels") scored 30.5% on taught facts against 28.7%, and answered 4.0% of unanswerable questions
-  against 5.3%.
+  labels") scored 30.5% on taught facts against 28.7%, and answered 3 unanswerable questions of 76
+  against 4.
 - **The first-label runs answered fewer unanswerable questions** (1.3% and 2.6%, against 5.3%).
   Over the two twins the drop is 3.3 points, within the 3.9-point floor; the larger single drop
   equals the floor exactly (both are 3 questions of 76).
@@ -410,7 +455,8 @@ rejected: 5 percent      (wrong)
   for the gain: +1.2 to +6.0 points). The served model doesn't benefit: it always gives its single
   most likely answer.
 - **The right answers to document-only facts became less probable:** −5.89 to −6.27 nats, beyond
-  the 0.21 floor. On taught facts the change (−4.70 to −4.81) is within the floor.
+  the 0.21 floor. On taught facts the change (−4.70 to −4.81) is within the floor. Perplexity on
+  held-out document text rose slightly, beyond the floor (6.87 to 6.88).
 - **The end-of-answer token became more probable** (the full tables' end-token columns): the model
   learned to stop sooner.
 - **The first labels were wrong in places.** The first labeller accepted any fragment of the gold
@@ -420,9 +466,12 @@ rejected: 5 percent      (wrong)
   "corrected labels" run, the one served.
 - **Two epochs instead of one** (one run, against one epoch on the first labels) pushed the right
   answers down: their log-probability fell 3.1 nats on taught facts and 4.4 on document-only ones,
-  and taught accuracy fell from 30.5% to 25.8%.
-- **The judge's preference** (reported only, since that judge failed its test) is about even: it
-  prefers DPO's answer to SFT's 52 to 54% of the time.
+  taught accuracy fell from 30.5% to 25.7%, and perplexity on held-out document text rose (6.88 to
+  6.97). Merging this run's adapter into the model changed its outputs measurably, so its scores
+  carry extra error.
+- **The judge's preference** is about even: shown DPO's and SFT's answers side by side, it prefers
+  DPO's 52 to 54% of the time. It is reported only: shown the same pair in both orders, it gave the
+  same verdict only 40 to 54% of the time.
 
 ![DPO training curves](results/curves/dpo.png)
 
@@ -473,11 +522,12 @@ fifteen percent  0.1
   so it is pushed up and the seven wrong answers are pushed down.
 - **The reference model:** none. GRPO can add a penalty for drifting away from the starting model
   (the DPO model), but it was set to zero here.
-- **A limit on each update:** a cap (called the clip) stops one step from changing an answer's
-  probability too much. It never came into play here, because each batch of answers was used for
-  only one update.
-- **Checkpoints:** a test on 50 held-out questions ran every 25 steps, and the best-scoring saved
-  step was kept: step 25 in both runs. As before, only a new LoRA adapter is trained, with a
+- **A limit on each update:** a cap (called the clip) stops one update from moving the model too
+  far from the version that wrote the answers. Here each batch of answers was used for one update
+  only, so the model being updated always was the version that wrote them, and the cap never came
+  into play.
+- **Checkpoints:** a test on 50 held-out questions ran every 25 steps, and the saved step with the
+  best sampled accuracy on them was kept: step 25 in both runs. As before, only a new LoRA adapter is trained, with a
   learning rate of 1e-5.
 
 **Scores:**
@@ -492,10 +542,10 @@ fifteen percent  0.1
 | gold answer's log-probability, taught facts (nats) | -4.81 | -5.52 | -5.52 | 0.17 |
 | gold answer's log-probability, document-only facts (nats) | -6.27 | -7.54 | -7.65 | 0.21 |
 | grounded: answer correct (%, judge) | 92.6 | 93.5 | 91.7 | 2.8 |
-| grounded: citations name only given passages (%) | 100.0 | 100.0 | 98.2 | 1.8 |
+| grounded: citations name only given passages (%) | 100.0 | 100.0 | 98.1 | 1.8 |
 | grounded: cited passages support the answer (%, judge) | 86.1 | 88.0 | 88.9 | 3.3 |
-| grounded: answerable question declined (%) ↓ | 0.0 | 0.0 | 1.8 | 0.9 |
-| unanswerable: answered anyway (%) ↓ | 4.0 | 1.3 | 1.3 | 3.9 |
+| grounded: answerable question declined (%) ↓ | 0.0 | 0.0 | 1.9 | 0.9 |
+| unanswerable: answered anyway (%) ↓ | 3.9 | 1.3 | 1.3 | 3.9 |
 | definitions correct (%, judge) | 82.4 | 84.3 | 85.2 | 2.6 |
 | MMLU (%) | 76.7 | 76.7 | 76.7 | 0.4 |
 | GSM8K (%) | 80.9 | 82.0 | 80.2 | 2.2 |
@@ -508,23 +558,27 @@ fifteen percent  0.1
 
 **What it found** (against the DPO model it started from, two twin runs):
 - **Accuracy and behaviour mostly stayed within the floor:** taught facts 29.9% and 28.7%, against
-  30.5%. One twin moved beyond it on two measures: it began declining some answerable questions
-  (1.8%, against a 0.9-point floor), and it scored higher on definitions (85.2% against 82.4%, floor
-  2.6).
+  30.5%. One twin moved beyond it on two measures: it began declining some answerable questions (2
+  of 108, against a 0.9-point floor), and it scored higher on definitions (85.2% against 82.4%,
+  floor 2.6).
 - **Sampled accuracy on taught facts rose** from 24.9% to 27.8% and 28.1% (95% CI for the gain, the
   mean of its two seeds: +1.3 to +5.0 points).
 - **The right answers became less probable:** on document-only facts from −6.27 to −7.54 and −7.65
-  nats, and on taught facts from −4.81 to −5.52, both far beyond the floor.
-- **Both runs stopped early, at steps 52 and 65, when the model's output entropy collapsed.**
-  Entropy measures how varied its answers are: its 8 answers to a question became nearly identical,
-  which leaves nothing to compare. Seed 1 was first stopped at step 34 by a rule reading one batch;
-  the rule was rewritten after it fired, and the run resumed to step 65.
+  nats, and on taught facts from −4.81 to −5.52, both far beyond the floor. Perplexity rose beyond
+  the floor on held-out document text (6.88 to 6.93) and on web text (8.06 to 8.09).
+- **Both runs stopped, at steps 52 and 65, when the model's output entropy collapsed.** Entropy
+  measures how varied its answers are: its 8 answers to a question became nearly identical, which
+  leaves nothing to compare. The stopping rule fires when the average entropy over the last 10
+  steps falls below a third of its value over the first 10. Seed 1 was first stopped at step 34 by
+  an earlier rule that read a single batch; the rule was rewritten after it fired, and the run
+  resumed to step 65.
 - **Not served.**
 
 ![GRPO training curves](results/curves/grpo.png)
 
-*Reward, output entropy and validation accuracy over training: reward climbs as entropy collapses,
-and the share of held-out questions answered right by any of 8 tries falls.*
+*Reward, output entropy and validation accuracy over training: reward climbs as entropy collapses.
+On held-out questions, the share answered right by at least one of 8 tries falls, because the 8
+tries become the same answer.*
 
 Full write-up: [`docs/stage5.md`](docs/stage5.md).
 
@@ -538,17 +592,15 @@ three ways:
   far) in 8 bits;
 - **INT4:** weights in 4 bits (GPTQ, a common method, tuned on 512 domain examples).
 
-A compressed version passes the quality check if none of the checked measures (closed-book
-accuracy, the right answers' log-probability, grounded accuracy, citations, refusals, made-up
-answers and GSM8K) differs from bf16's by more than the floor, and it still ends its answers
-properly.
+Each version was tested on the domain test, on GSM8K (rerun with a start-of-text token, for all
+but FP8 + FP8 KV cache) and on speed. The comparisons below are against bf16.
 
 **Scores:**
 
 <!-- step-serving:start -->
 | measure | bf16, uncompressed (served at low load) | FP8 (served near full load) | FP8 + FP8 KV cache | INT4 | noise floor |
 |---|---|---|---|---|---|
-| closed-book, taught facts (%) | 30.5 | 29.3 | 26.4 | 27.5 | 3.5 |
+| closed-book, taught facts (%) | 30.5 | 29.3 | 26.3 | 27.5 | 3.5 |
 | closed-book, document-only facts (%) | 11.0 | 9.7 | 11.6 | 8.4 | 2.6 |
 | closed-book, document and section numbers (%) | 18.8 | 17.2 | 17.2 | 10.9 | 5.0 |
 | gold answer's log-probability, taught facts (nats) | -4.81 | -4.82 | -4.87 | -5.12 | 0.17 |
@@ -557,11 +609,11 @@ properly.
 | grounded: citations name only given passages (%) | 100.0 | 100.0 | 100.0 | 100.0 | 1.8 |
 | grounded: cited passages support the answer (%, judge) | 86.1 | 85.2 | 84.3 | 84.3 | 3.3 |
 | grounded: answerable question declined (%) ↓ | 0.0 | 0.0 | 0.0 | 0.0 | 0.9 |
-| unanswerable: answered anyway (%) ↓ | 4.0 | 5.3 | 6.6 | 4.0 | 3.9 |
+| unanswerable: answered anyway (%) ↓ | 3.9 | 5.3 | 6.6 | 3.9 | 3.9 |
 | definitions correct (%, judge) | 82.4 | 82.9 | 83.3 | 77.6 | 2.6 |
 | MMLU (%) | 76.7 |  |  |  | 0.4 |
 | GSM8K (%) | 80.9 |  |  |  | 2.2 |
-| GSM8K, the quality check's run (%) | 80.9 | 80.7 |  | 74.8 | 2.2 |
+| GSM8K, rerun with a start-of-text token (%) | 80.9 | 80.7 |  | 74.8 | 2.2 |
 | HellaSwag (%) | 79.6 |  |  |  | 0.6 |
 | perplexity, held-out document text ↓ | 6.88 |  |  |  | 0.08% |
 | perplexity, general web text ↓ | 8.06 |  |  |  | 0.07% |
@@ -569,22 +621,26 @@ properly.
 | time per output token, one request (ms) ↓ | 6.90 | 4.70 |  |  |  |
 
 - The floor is SFT's (the gap between its two seeds, or the standard error if larger).
-- The quality check reran GSM8K with one start-of-text token for every variant; FP8 + FP8 KV cache's run, and its and INT4's latency runs, weren't done (Modal spend limit).
+- GSM8K was rerun with one start-of-text token for each version; FP8 + FP8 KV cache's rerun, and its and INT4's speed tests, weren't run (the cloud GPU budget ran out).
 - Latency is the median on one H100, one request at a time, mean of two runs.
 <!-- step-serving:end -->
 
 **What it found:**
-- **FP8 changed no checked measure beyond the floor.**
-- **FP8 + FP8 KV cache** dropped taught-fact accuracy from 30.5% to 26.4% (floor 3.5).
-- **INT4** dropped GSM8K from 80.9% to 74.8% (floor 2.2), and the right answers' log-probability by
-  about twice the floor. It was tuned on domain text only, which may be the cause.
-- **Speed:** FP8 produces each token faster (4.70 against 6.90 ms) but takes twice as long to the
-  first token at low load (35.2 against 17.9 ms), which is unexplained. With 64 requests at once,
-  FP8 handles 22% more requests per second (all requests counted, not only those within a latency
-  limit).
-- **In practice:** bf16 is served at up to 16 requests per second, the highest rate tested, where its
-  faster first token matters; FP8 near the GPU's limit, where its extra throughput does.
-  [`DEPLOY.md`](DEPLOY.md) has the serving commands, the load tests and the cost per request.
+- **FP8 changed no score beyond the floor.**
+- **FP8 + FP8 KV cache** dropped taught-fact accuracy from 30.5% to 26.3% (floor 3.5).
+- **INT4** dropped GSM8K from 80.9% to 74.8% (floor 2.2), document-number questions from 18.8% to
+  10.9%, definitions from 82.4% to 77.6%, and the right answers' log-probability by about twice the
+  floor; document-only facts fell just past the floor (11.0% to 8.4%). It was tuned on domain text
+  only, which may be the cause.
+- **Speed, one request at a time:** FP8 produces each token faster (4.70 against 6.90 ms) but takes
+  twice as long to the first token (35.2 against 17.9 ms), which is unexplained.
+- **Speed under load:** two load tests were run. With a fixed number of requests in flight (1 to
+  64), FP8 completes 22% more requests per second at 64 (all requests counted, not only those
+  within a latency limit). With requests arriving at a fixed rate (up to 16 per second, the
+  highest rate tested), bf16 keeps up, and its first token stays faster.
+- **So the model is served** in bf16 at arrival rates up to 16 requests per second, and in FP8 when
+  traffic nears the GPU's limit. [`DEPLOY.md`](DEPLOY.md) has the serving commands, the load tests
+  and the cost per request.
 
 Full write-up: [`docs/stage6.md`](docs/stage6.md).
 
@@ -592,9 +648,9 @@ Full write-up: [`docs/stage6.md`](docs/stage6.md).
 
 **Served: "DPO, corrected labels" (`dpo-strict`),** in bf16 at low load and FP8 near full load.
 Its accuracy and behaviour are within the floor of the SFT model it started from, but the right
-answers to document-only facts are 0.38 nats less probable. It is served because each step's model
-was carried into the next by default, not on merit. SFT on CPT is the better choice, since it
-doesn't have that loss; switching needs its own FP8 quality check.
+answers to document-only facts are 0.38 nats less probable. It is served because each training
+step started from the one before and the step after it, GRPO, wasn't kept: not on merit. SFT on
+CPT is the better choice, since it doesn't have that loss; switching needs its own FP8 tests.
 
 **Use and limits:**
 - **Use it grounded:** answering from retrieved passages, with citations, and have an engineer
@@ -608,8 +664,7 @@ doesn't have that loss; switching needs its own FP8 quality check.
 - **No domain experts:** Mistral Large 3 wrote the test and most of the SFT data, which could favour
   SFT on taught facts, and Claude reviewed the items. No structural engineer saw items or outputs.
 - **The test is too small for 3-point gains:** with 155 to 167 questions per half and two seeds,
-  the floors are 2.6 to 3.5 points and paired confidence intervals about ±5 to ±7 points. No
-  minimum detectable effect was set.
+  the floors are 2.6 to 3.5 points and paired confidence intervals about ±5 to ±7 points.
 
 ## What went wrong, and what next
 
@@ -619,10 +674,11 @@ doesn't have that loss; switching needs its own FP8 quality check.
    less than a point apart swapped order; none of the comparisons above involves any of them.
 2. **The strict checker had three holes, each found and fixed:** answer fragments (found by
    checking the labeller's passes), comma-separated lists (found by reading the code), and years
-   within 2% of the gold (found by checking GRPO's highest-reward answers; only this one was
-   exploited in training, on one question). Each fix has a test, listed in
+   within 2% of the gold (found by checking GRPO's highest-reward answers; only this one turned up
+   in answers GRPO rewarded, on one question). Each fix has a test, listed in
    [`docs/verifiers.md`](docs/verifiers.md).
-3. **The judge failed as a labeller** (see DPO), so no judge labels training data.
+3. **The judge missed most known flaws as a labeller** (see DPO), so no judge labels training
+   data.
 4. **GRPO's entropy collapsed** (see GRPO).
 5. **FP8's slower first token** is unexplained (see Serving).
 6. **The general benchmarks have sent no start-of-text token since the first baseline.** Rows still
@@ -632,18 +688,16 @@ doesn't have that loss; switching needs its own FP8 quality check.
    published ([Weights](#weights)).
 
 **Lessons on method:**
-- **Decide when to stop, or which checkpoint to keep, from a trend over several measurements, not
-  from one.** Four such rules here each read a single measurement: a numeric check on the merged
-  weights, the loss at the first step, the validation loss DPO's checkpoint was chosen by, and
-  GRPO's entropy on one batch. Three were changed, two of them after seeing what they decided,
-  GRPO's among them.
+- **Decide when to stop training from a trend over several measurements, not from one.** GRPO's
+  second run was first stopped by one batch's entropy reading; the rule was rewritten after it
+  fired.
 - **Split a measure into its parts before comparing it.** DPO made the end-of-answer token more
   likely while making the answer's own tokens less likely; summed, the two partly cancel. The
   tables show them separately.
 - **Count the starting model's own twin gap in the floor when comparing two trained runs.** The
   repo did this only after DPO's results were in; the tables here use it throughout.
 - **Fix the test before the first training run.** The closed-book set grew after CPT, so every
-  earlier model had to be re-run.
+  earlier model still available had to be re-run.
 
 **Next, most important first:**
 1. A licence-clean SFT set, then retraining and publishing the weights ([Weights](#weights)).
@@ -657,7 +711,7 @@ doesn't have that loss; switching needs its own FP8 quality check.
    if needed.
 6. An extra loss term that keeps DPO's chosen answers from becoming less likely (RPO).
 7. A judge that checks each claim of a grounded answer against its passage, tested before use.
-8. Diagnose FP8's slow first token, and run the serving tests that weren't run: FP8 KV cache's GSM8K
+8. Diagnose FP8's slow first token, and run the serving tests not yet run: FP8 KV cache's GSM8K
    and speed, INT4's speed, and n-gram speculative decoding (a speed-up that guesses upcoming
    tokens from earlier text).
 9. INT4 tuned on mixed text, or made with another method (AWQ).
@@ -680,23 +734,23 @@ floor as those trained twice.
 |---|---|---|---|---|---|---|---|---|
 | `base-8b-hf` | Ministral 3 8B Base [base format] | 12.6 | 11.6 | 7.8 | -6.28 | -6.36 | -0.44 | -0.47 |
 | `instruct-8b` | Ministral 3 8B Instruct (Mistral's chat model) | 11.4 | 7.7 | 3.1 | -7.31 | -7.71 | -0.70 | -0.87 |
-| `mistral-large-3` | Mistral Large 3 (API, closed-book only) | 26.4 | 25.8 | 40.6 |  |  |  |  |
-| `cpt-8b` | CPT, documents only [base format] | 15.6 | 13.6 | 12.5 | -5.84 | -5.68 | -0.40 | -0.45 |
+| `mistral-large-3` | Mistral Large 3 (API, closed-book only) | 26.3 | 25.8 | 40.6 |  |  |  |  |
+| `cpt-8b` | CPT, documents only [base format] | 15.6 | 13.5 | 12.5 | -5.84 | -5.68 | -0.40 | -0.45 |
 | `cpt-8b-seed1` | CPT, documents only, seed 1 [base format] | 13.2 | 12.9 | 12.5 | -5.84 | -5.70 | -0.40 | -0.45 |
 | `cpt-8b-replay10` | CPT + 10% general text (used next) [base format] | 15.0 | 11.0 | 12.5 | -5.93 | -5.70 | -0.43 | -0.46 |
-| `sft-from-base` | SFT on Base (control) | 23.9 | 8.4 | 10.9 | -4.97 | -6.20 | -0.44 | -0.58 |
+| `sft-from-base` | SFT on Base (control) | 24.0 | 8.4 | 10.9 | -4.97 | -6.20 | -0.44 | -0.58 |
 | `sft-from-base-seed1` | SFT on Base, seed 1 | 23.4 | 7.7 | 14.1 | -4.87 | -6.20 | -0.38 | -0.54 |
 | `sft-from-cpt` | SFT on CPT (used next) | 28.7 | 11.6 | 20.3 | -4.70 | -5.89 | -0.42 | -0.53 |
-| `sft-from-cpt-seed1` | SFT on CPT, seed 1 | 25.8 | 11.0 | 23.4 | -4.52 | -5.68 | -0.35 | -0.48 |
+| `sft-from-cpt-seed1` | SFT on CPT, seed 1 | 25.7 | 11.0 | 23.4 | -4.52 | -5.68 | -0.35 | -0.48 |
 | `dpo` | DPO, first labels | 30.5 | 11.6 | 20.3 | -4.70 | -6.16 | -0.30 | -0.38 |
 | `dpo-seed1` | DPO, first labels, seed 1 | 28.7 | 11.0 | 17.2 | -4.85 | -6.28 | -0.35 | -0.45 |
-| `dpo-2ep` | DPO, 2 epochs (variant; its merged weights failed a numeric check) | 25.8 | 12.9 | 14.1 | -7.82 | -10.57 | -0.20 | -0.28 |
+| `dpo-2ep` | DPO, 2 epochs (variant; its merged weights failed a numeric check) | 25.7 | 12.9 | 14.1 | -7.82 | -10.57 | -0.20 | -0.28 |
 | `dpo-strict` | DPO, corrected labels (served, bf16) | 30.5 | 11.0 | 18.8 | -4.81 | -6.27 | -0.32 | -0.42 |
 | `grpo` | GRPO (not served) | 29.9 | 9.7 | 20.3 | -5.52 | -7.54 | -0.27 | -0.41 |
 | `grpo-seed1` | GRPO, seed 1 | 28.7 | 10.3 | 18.8 | -5.52 | -7.65 | -0.30 | -0.45 |
-| `dpo-strict-fp8` | served model in FP8 (passed the quality check) | 29.3 | 9.7 | 17.2 | -4.82 | -6.27 | -0.32 | -0.44 |
-| `dpo-strict-fp8kv` | FP8 + FP8 KV cache (failed the quality check) | 26.4 | 11.6 | 17.2 | -4.87 | -6.33 | -0.33 | -0.45 |
-| `dpo-strict-w4a16` | INT4 W4A16 (failed the quality check) | 27.5 | 8.4 | 10.9 | -5.12 | -6.70 | -0.30 | -0.36 |
+| `dpo-strict-fp8` | served model in FP8 (served near full load) | 29.3 | 9.7 | 17.2 | -4.82 | -6.27 | -0.32 | -0.44 |
+| `dpo-strict-fp8kv` | FP8 + FP8 KV cache (not served) | 26.3 | 11.6 | 17.2 | -4.87 | -6.33 | -0.33 | -0.45 |
+| `dpo-strict-w4a16` | INT4 (not served) | 27.5 | 8.4 | 10.9 | -5.12 | -6.70 | -0.30 | -0.36 |
 |  | *floor, base-format rows: gap between two CPT seeds, or the standard error* | 2.8 | 2.7 | 4.1 | 0.03 | 0.03 | 0.01 | 0.01 |
 |  | *floor, chat rows: gap between two SFT seeds, or the standard error* | 3.5 | 2.6 | 5.0 | 0.17 | 0.21 | 0.07 | 0.05 |
 
@@ -719,16 +773,16 @@ floor as those trained twice.
 | `sft-from-base` | SFT on Base (control) | 92.6 | 100.0 | 87.0 | 6.6 | 0.0 | 83.3 |
 | `sft-from-base-seed1` | SFT on Base, seed 1 | 89.8 | 99.1 | 88.0 | 1.3 | 0.9 | 82.9 |
 | `sft-from-cpt` | SFT on CPT (used next) | 90.7 | 100.0 | 86.1 | 5.3 | 0.0 | 83.3 |
-| `sft-from-cpt-seed1` | SFT on CPT, seed 1 | 93.5 | 98.2 | 88.0 | 1.3 | 0.9 | 85.7 |
+| `sft-from-cpt-seed1` | SFT on CPT, seed 1 | 93.5 | 98.1 | 88.0 | 1.3 | 0.9 | 85.7 |
 | `dpo` | DPO, first labels | 91.7 | 100.0 | 87.0 | 1.3 | 0.0 | 83.8 |
 | `dpo-seed1` | DPO, first labels, seed 1 | 90.7 | 100.0 | 88.0 | 2.6 | 0.0 | 84.8 |
 | `dpo-2ep` | DPO, 2 epochs (variant; its merged weights failed a numeric check) | 90.7 | 100.0 | 85.2 | 1.3 | 0.0 | 85.2 |
-| `dpo-strict` | DPO, corrected labels (served, bf16) | 92.6 | 100.0 | 86.1 | 4.0 | 0.0 | 82.4 |
+| `dpo-strict` | DPO, corrected labels (served, bf16) | 92.6 | 100.0 | 86.1 | 3.9 | 0.0 | 82.4 |
 | `grpo` | GRPO (not served) | 93.5 | 100.0 | 88.0 | 1.3 | 0.0 | 84.3 |
-| `grpo-seed1` | GRPO, seed 1 | 91.7 | 98.2 | 88.9 | 1.3 | 1.8 | 85.2 |
-| `dpo-strict-fp8` | served model in FP8 (passed the quality check) | 90.7 | 100.0 | 85.2 | 5.3 | 0.0 | 82.9 |
-| `dpo-strict-fp8kv` | FP8 + FP8 KV cache (failed the quality check) | 93.5 | 100.0 | 84.3 | 6.6 | 0.0 | 83.3 |
-| `dpo-strict-w4a16` | INT4 W4A16 (failed the quality check) | 89.8 | 100.0 | 84.3 | 4.0 | 0.0 | 77.6 |
+| `grpo-seed1` | GRPO, seed 1 | 91.7 | 98.1 | 88.9 | 1.3 | 1.9 | 85.2 |
+| `dpo-strict-fp8` | served model in FP8 (served near full load) | 90.7 | 100.0 | 85.2 | 5.3 | 0.0 | 82.9 |
+| `dpo-strict-fp8kv` | FP8 + FP8 KV cache (not served) | 93.5 | 100.0 | 84.3 | 6.6 | 0.0 | 83.3 |
+| `dpo-strict-w4a16` | INT4 (not served) | 89.8 | 100.0 | 84.3 | 3.9 | 0.0 | 77.6 |
 |  | *floor, base-format rows: gap between two CPT seeds, or the standard error* | 3.7 | 4.6 | 3.7 | 3.3 | 0.0 | 3.1 |
 |  | *floor, chat rows: gap between two SFT seeds, or the standard error* | 2.8 | 1.8 | 3.3 | 3.9 | 0.9 | 2.6 |
 
@@ -757,15 +811,15 @@ floor as those trained twice.
 | `dpo-strict` | DPO, corrected labels (served, bf16) | 76.7 | 80.9 | 79.6 | 6.88 | 8.06 | 17.9 | 6.90 | H100, serving benchmark |
 | `grpo` | GRPO (not served) | 76.7 | 82.0 | 79.8 | 6.93 | 8.09 | 25.5 | 6.70 | 1 sample, GPU not recorded |
 | `grpo-seed1` | GRPO, seed 1 | 76.7 | 80.2 | 79.8 | 6.93 | 8.09 |  |  |  |
-| `dpo-strict-fp8` | served model in FP8 (passed the quality check) |  |  |  |  |  | 35.2 | 4.70 | H100, serving benchmark |
+| `dpo-strict-fp8` | served model in FP8 (served near full load) |  |  |  |  |  | 35.2 | 4.70 | H100, serving benchmark |
 |  | *floor, base-format rows: gap between two CPT seeds, or the standard error* | 0.3 | 1.1 | 0.4 | 0.02% | 0.23% |  |  |  |
 |  | *floor, chat rows: gap between two SFT seeds, or the standard error* | 0.4 | 2.2 | 0.6 | 0.08% | 0.07% |  |  |  |
 
 **Blank cells:**
 - `mistral-large-3` has no numbers: it is an API reference, run closed-book only.
 - `instruct-8b` has no perplexity: it wasn't measured.
-- `dpo-strict-fp8`, `dpo-strict-fp8kv`, `dpo-strict-w4a16` have no lm-eval or perplexity run with the settings the other rows used; their quality-check GSM8K (run with a start-of-text token) and perplexity are in [`docs/stage6.md`](docs/stage6.md).
-- Latency was measured for some runs only; the two sources use different prompts, so compare rows within one source; FP8-KV's and INT4's serving-benchmark rows weren't run (Modal spend limit).
+- `dpo-strict-fp8`, `dpo-strict-fp8kv`, `dpo-strict-w4a16` have no general-benchmark or perplexity run with the settings the other rows used; their GSM8K rerun (with a start-of-text token) and perplexity are in [`docs/stage6.md`](docs/stage6.md).
+- Latency was measured for some runs only; the two sources use different prompts, so compare rows within one source; FP8-KV's and INT4's serving-benchmark rows weren't run (the cloud GPU budget ran out).
 <!-- headline-general:end -->
 
 [`docs/results.md`](docs/results.md) also has the earlier, lenient checker's columns, MMLU's four
@@ -823,7 +877,7 @@ dataset hashes.
 | the corpus: 246 US federal documents | public domain (17 U.S.C. § 105); 27 reproduce third-party material (photo credits, figures), each hand-checked; copyrighted standards excluded | URLs and sha256 of the 251 candidates in [`data/sources.csv`](data/sources.csv); no PDFs |
 | FineWeb-Edu (CPT general text) | ODC-By | not redistributed |
 | Mistral output (test questions, SFT) | the customer's under Mistral's Commercial Terms (§3.1); labelled model-written (§3.2) | committed |
-| Tülu 3 mixture: 500 general examples, 50 prompts for a response-variety check | ODC-BY-1.0; subsets below | row ids only (the withdrawn set's as sha256); `make sft-replay` rebuilds them |
+| Tülu 3 mixture: 500 general examples, 50 prompts used to measure how varied answers are | ODC-BY-1.0; subsets below | row ids only (the withdrawn set's as sha256); `make sft-replay` rebuilds them |
 | Ministral 3 8B Base | Apache 2.0 | not redistributed |
 
 <!-- replay-licences:start -->
@@ -857,7 +911,7 @@ dataset hashes.
   - swap those 54 records: OASST1 for No Robots, and a math source with an unrestricted licence
     and no GSM8K test overlap;
   - retrain SFT and DPO, and compress to FP8 again;
-  - rerun the quality check.
+  - rerun the tests.
 - **Until then:** the checkpoints stay on the Modal volume.
 
 ### Demo
