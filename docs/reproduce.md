@@ -40,7 +40,7 @@ The 246 source PDFs are re-fetched from `data/sources.csv` (URL and sha256 per d
 |---|---|---|
 | `train/modal_train.py` `image` | CPT, SFT, DPO, merge | torch 2.13.0, transformers 5.16.1, TRL 0.29.1, PEFT 0.21.0, accelerate 1.15.0, mistral-common 1.12.0 |
 | `train/modal_train.py` `grpo_image` | GRPO (colocated rollouts) | the above plus vLLM 0.30.0 |
-| `eval/modal_app.py` `image` | KPI generations, lm-eval, latency, the Stage 6 gate and bench | vLLM 0.29.0 (recorded with torch 2.13.0+cu130), lm-eval ≥ 0.4.13 (0.4.13 recorded); transformers < 5.17 and mistral-common ≥ 1.8.6 are ranges, not pins |
+| `eval/modal_app.py` `image` | KPI generations, lm-eval, latency, the Stage 6 quality checks and bench | vLLM 0.29.0 (recorded with torch 2.13.0+cu130), lm-eval ≥ 0.4.13 (0.4.13 recorded); transformers < 5.17 and mistral-common ≥ 1.8.6 are ranges, not pins |
 | `serve/modal_serve.py` `quant_image` | FP8 and INT4 quantization | llmcompressor 0.14.0 (writes compressed-tensors 0.19.0; vLLM 0.29 reads it with 0.17.0) |
 
 - **Every merged config carries `"apply_yarn_scaling": false`** (`train/merge.py`). Without it,
@@ -97,7 +97,7 @@ The corpus steps are in [`stage1.md`](stage1.md).
 | CPT  | `train/cpt.py`  | `data/processed/{train,val}.jsonl` (+ `replay.jsonl` for the replay ablation) | next-token on domain text |
 | SFT  | `train/sft.py`  | `data/sft/{train,sft_val}.jsonl` `{"prompt": [...], "completion": [...]}` | completion-only loss |
 | DPO  | `train/dpo.py`  | `data/dpo/{train,val}.jsonl` `{"prompt","chosen","rejected"}` + token ids | verifiable preference pairs (sigmoid DPO) |
-| GRPO | `train/grpo.py` | `data/grpo/{train,val}.jsonl` `{"prompt", "verifier", ...}` (Stage 4 pool prompts in the probe's window) | rule-based reward: format gate, strict correctness, length (`train/grpo_rewards.py`) |
+| GRPO | `train/grpo.py` | `data/grpo/{train,val}.jsonl` `{"prompt", "verifier", ...}` (Stage 4 pool prompts in the probe's window) | rule-based reward: format check, strict correctness, length (`train/grpo_rewards.py`) |
 
 **Who wrote the training data.** The SFT questions and completions were written by Mistral Large 3
 (`mistral-large-2512`) and Mistral Medium 3.5 (`mistral-medium-2604`, 25% of completions), apart from
@@ -146,7 +146,7 @@ re-run `download.py`, which records each file's sha256 and page count in `data/s
 (`stats.py` adds each document's final token count).
 `chunks.jsonl` is built only from the documents pinned in `eval/tasks/eval_docs.txt`, so adding
 sources never resamples the eval; never build SFT data from chunks in `eval/tasks/eval_chunk_ids.txt`,
-except the seen half listed in `eval/tasks/sft_seen_chunks.txt` (rule 10, `data/scripts/sft_guard.py`).
+except the seen half listed in `eval/tasks/sft_seen_chunks.txt` (`data/scripts/sft_guard.py`).
 
 ### Train
 
@@ -167,22 +167,22 @@ $M run --detach train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 
 ```
 
 SFT is wired (a config with `stage: sft`; `train/sft.py`, pre-tokenised by `train/sft_data.py`).
-DPO is wired (`stage: dpo`, `train/dpo.py`); GRPO (`grpo.py`) is not yet.
+DPO is wired (`stage: dpo`, `train/dpo.py`), and so is GRPO (`stage: grpo`, `train/grpo.py`).
 
 ```bash
-# Stage 3: SFT (the set must match data/sft/SHA256SUMS on the volume), B4 and the merge gate run in
-# the chain; chat checkpoints are evaluated with --chat
+# Stage 3: SFT (the set must match data/sft/SHA256SUMS on the volume); the epoch choice
+# (--merge-from b4) and the merge check run in the chain; chat checkpoints are evaluated with --chat
 for f in train.jsonl sft_val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/sft/$f data/sft/$f; done
 $M run --detach train/modal_train.py --config train/configs/sft.yaml --run-name sft-from-cpt \
   --merge-from b4 --chat --steps train,merge,mergecheck,ppl,eval,latency,sample
 # Stage 4: DPO on verifiable preferences. Pairs from the SFT model's own samples (make dpo-data,
 # then the probe/benchmark/pool sampling jobs, then make dpo-pairs: CLAUDE.md, Stage 4); the set
 # must match data/dpo/SHA256SUMS on the volume; the checkpoint rule (--merge-from rule) and the
-# merge gate (on sft_val) run in the chain
+# merge check (on sft_val) run in the chain
 for f in train.jsonl val.jsonl SHA256SUMS; do $M volume put --force struct-lm data/dpo/$f data/dpo/$f; done
 $M run --detach train/modal_train.py --config train/configs/dpo.yaml --run-name dpo \
   --merge-from rule --chat --steps noop,train,merge,mergecheck,ppl,eval,latency,sample
-.venv/bin/python eval/winrate.py dpo sft-from-cpt   # reported only: the judge failed its benchmark
+.venv/bin/python eval/winrate.py dpo sft-from-cpt   # judged win rate, reported only (the judge's benchmark: docs/verifiers.md)
 ```
 
 ### Evaluate (repeat per stage, including the base and instruct baselines)
@@ -221,7 +221,7 @@ What each KPI task measures:
 | `grounded` | 4 passages (gold, neighbours, off-doc distractor) | citations are provided ids; judge checks support | `cite_valid`, `cite_supported` |
 | `adversarial` | 3 related passages without the answer | exact abstain phrase, else judge | `halluc_rate` |
 
-### Quantize, gate, serve, benchmark (Stage 6)
+### Quantize, check quality, serve, benchmark (Stage 6)
 
 ```bash
 python serve/bench_data.py      # the bench request sets from the eval prompts (pinned: serve/bench_manifest.json)
@@ -251,7 +251,7 @@ eval/     make_tasks.py (task generation), tasks/*.jsonl (KPI tasks + rejects.js
           run_lm_eval.sh, modal_app.py (Modal H100 runner)
 train/    one script per stage + common.py, merge.py, configs/*.yaml
 serve/    serve_vllm.sh (the served config), quantize.py (FP8 / GPTQ W4A16), modal_serve.py
-          (quantize, quality gate, H100 bench), bench_data.py + bench_manifest.json (request sets),
+          (quantize, quality checks, H100 bench), bench_data.py + bench_manifest.json (request sets),
           served_check.py (template ids, served-vs-eval smoke), bench_latency.py (Stages 2-5)
 results/  all committed: table.md (one row per run), runs/<run>/{generations,scored}.jsonl +
           metrics.json, judge_cache.jsonl, lm_eval/<run>/**/results_*.json, bench/, curves/.

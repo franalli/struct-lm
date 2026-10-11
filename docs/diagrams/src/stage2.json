@@ -104,7 +104,7 @@
   "groups": [
     {
       "id": "controls",
-      "label": "controls and ablation B",
+      "label": "controls and variants",
       "members": [
         "seed",
         "full"

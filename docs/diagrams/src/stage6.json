@@ -16,7 +16,7 @@
     },
     {
       "id": "gate",
-      "label": "quality gate against bf16 (Stage 3\nfloors, GSM8K with one BOS):\nFP8 passes; FP8-KV and INT4 fail",
+      "label": "quality against bf16 (the SFT floor;\nGSM8K with a start-of-text token):\nFP8 within the floor; FP8-KV and INT4 beyond it",
       "type": "component",
       "color": "red"
     },

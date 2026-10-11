@@ -5,7 +5,7 @@ Every scored checkpoint, from [`results/table.md`](../results/table.md) (copied 
 `train/report.py`), on eval v3: domain_qa has 322 items (v2's 325 minus the three that shared a
 few-shot item's passage), the other tasks are unchanged. Every row was rescored on v3 from its
 saved generations. The earlier tables are frozen:
-- [`results/table_v2.md`](../results/table_v2.md): the 325-item set, as Stage 2 was first read;
+- [`results/table_v2.md`](../results/table_v2.md): the 325-item set, as Stage 2 was first reported;
 - [`results/table_v1.md`](../results/table_v1.md) and [`results/table_v1.1.md`](../results/table_v1.1.md):
   the 130-item set.
 
@@ -28,14 +28,15 @@ passage in the prompt.
   point value, a fraction read as its first number, a child section by containment.
   - Re-scored with the strict checker written for Stage 5's reward, each 8B row drops 0 to 1.6
     points and Large 3 1.9 ([`results/qa_strict/evals.md`](../results/qa_strict/evals.md)).
-  - No ordering changes, so the table keeps `qa_acc`; Stage 5's read uses the strict column.
-- **The column to watch is Stage 3's seen half.** SFT synthesis supplies exposures to those facts;
-  the unseen half shows whether anything transfers.
+  - Five pairs of rows less than a point apart change order; the table keeps `qa_acc`, and Stage
+    5 and later report the strict column.
+- **From Stage 3 on, the two halves are reported apart.** SFT synthesis supplies exposures to the
+  seen half's facts; the unseen half shows whether anything transfers.
 
 - **Task scores** come from the frozen eval, with judge columns scored locally:
   - **Two scorers:** every `qa_*` column is shown lenient (`scorers.qa_correct`, what
     `results/table.md` stores) and strict (`scorers.qa_strict`, 2026-10-09, re-scored from the saved
-    generations by `eval/qa_strict.py`). The strict column is the read from Stage 5 on.
+    generations by `eval/qa_strict.py`). Stage 5 and later report the strict column.
   - `qa_num`, `qa_ident` and `qa_term` split `qa_acc` by answer kind (`eval/qa_rules.py`):
     values, identifiers (document ids and article numbers) and terms, which include everything
     else. A hand audit of 169 misses found 2 scoring errors, both fixed, so the low scores are
@@ -62,7 +63,7 @@ passage in the prompt.
   number here is comparable with a published one.
 - **The Stage 6 rows** (`dpo-strict-fp8`, `-fp8kv`, `-w4a16`) are the quantized serving variants of
   `dpo-strict`. They have no lm-eval or perplexity columns; their GSM8K (with one BOS) and vLLM
-  perplexity lines are in the Stage 6 gate under [Serving](stage6.md).
+  perplexity are in the Stage 6 quality checks under [Serving](stage6.md).
 - **Perplexity** is from `eval/perplexity.py` (lower is better). `ppl_postcutoff` covers the 13
   federal reports published after the base model.
 
@@ -140,30 +141,32 @@ Items per task: domain_qa 322, grounded 108, vocab 210, adversarial 76, qa_numbe
 | grpo | 0.767 | 0.728 | 0.703 | 0.859 | 0.814 | 0.820 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
 | grpo-seed1 | 0.767 | 0.728 | 0.702 | 0.859 | 0.813 | 0.802 | 0.798 | 5.84 | 6.93 | 8.09 | 6.34 |
 
-qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa_* (strict) is `scorers.qa_strict` (2026-10-09, the GRPO reward's rule: the whole gold, one candidate, units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. No ordering changes between the two.
+qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa_* (strict) is `scorers.qa_strict` (2026-10-09, the GRPO reward's rule: the whole gold, one candidate, units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. On overall closed-book accuracy, 5 pairs of rows change order, each within 0.3 points between the two.
 <!-- results-table:end -->
 
 **Stage 2 (CPT) earned little.**
 - **Perplexity:** held-out perplexity fell 2.3%, and documents published in 2026 gained 0.4%.
-- **Task scores:** no pass/fail score moved outside the noise.
+- **Task scores** (each item right or wrong): closed-book accuracy of the run carried forward
+  stayed within the floor; with passages it did worse (grounded_acc, below).
 - **Gold answers:** closed-book gold answers to facts from the documents it read became about 1.8x
-  more probable (`gold_lp` +0.59 nats per answer, +0.56 of it in the answer tokens), which SFT can
-  build on.
-- **Why `cpt-8b-replay10` goes forward:** ablation A's rule adopted replay on MMLU +0.2 against a
-  0.1 seed floor, which is noise (MMLU's own SE is 0.34). Its general-perplexity gain (−2.24%) is
-  in-distribution, since the general val is FineWeb-Edu, the replay's source, and it cost
-  grounded_acc −6.5 against a 3.7 floor. Kept: cheap, and matching the main run elsewhere.
-  *(Corrected 2026-10-10: this read "LoRA with replay costs almost nothing in forgetting".)*
+  more probable (`gold_lp` +0.59 nats per answer, +0.56 of it in the answer tokens).
+- **Why `cpt-8b-replay10` goes forward:** replay (10% general text) was picked on MMLU, where it
+  scored +0.2 points over `cpt-8b`: within the floor, since MMLU's standard error (0.34) is larger
+  than the twins' 0.1 gap. Its general-perplexity gain (−2.24%) is in-distribution, since the
+  general val is FineWeb-Edu, the replay's source, and its grounded_acc was 6.5 points below
+  Base's, beyond the 3.7-point floor. Kept: cheap, and matching the main run elsewhere.
+  *(Corrected 2026-10-10: this said "LoRA with replay costs almost nothing in forgetting".)*
 
 **Stage 3 (SFT):**
-- **Holds:**
+- **Behaviour:**
   - The model stops: 159 ms against 1,753 ms end to end.
   - It cites better than Instruct and never refuses an answerable question.
-  - The recall formats overfit in epoch 2, which the pre-registered rule caught on every run.
+  - The recall formats overfit in epoch 2 on every run (their validation loss rose), so every run
+    kept its epoch-1 checkpoint; the epoch is chosen on that validation loss.
 - **Retention, not capability:**
   - The seen half's closed-book score is retention: 28.7% from 15.0% on the strict checker, on
     facts that were in the training set.
-  - The unseen half moved inside the noise.
+  - The unseen half stayed within the floor of the CPT model SFT started from.
 
   | closed-book, strict checker | seen half (167) | unseen half (155) | identifiers (64) |
   |---|---|---|---|
@@ -171,76 +174,78 @@ qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa
   | sft-from-cpt | 28.7% | 11.6% | 20.3% |
 
   (Lenient, as first reported: 11.4% / 8.4% / 3.1% and 28.1% / 13.5% / 20.3%; identifiers don't
-  change under the strict rule. No ordering changes.)
-- **Attribution:** SFT did its job, behaviour and the facts it was shown, and did not erase CPT's
-  knowledge. It did not generalise to unseen facts, which was never a target; only more varied CPT
-  exposure acts on those.
+  change under the strict rule.)
+- **Attribution:** SFT changed behaviour and the facts it was shown, and did not erase CPT's
+  knowledge. It did not generalise to unseen facts.
 - **CPT's contribution survives SFT:**
   - unseen-half `gold_lp` is +0.46 nats over the SFT-only control (arm means of two seeds each),
     +0.41 of it in the answer tokens: knowledge, not format;
   - every CPT-arm run is above every base-arm run (1 in 6 by permutation);
   - the 3.6 SD multiple is indicative: each arm's run variance rests on one seed pair (1 df per
     arm);
-  - pass/fail closed-book accuracy doesn't resolve it, strict or lenient.
+  - closed-book accuracy, scored right or wrong, separates the arms by 3.2 points on the strict
+    checker, past the floor, but the CPT arm only held Base's score while the base arm fell below
+    it.
 - **Going forward:** `sft-from-cpt` (epoch 1) is the Stage 3 checkpoint; `train/configs/dpo.yaml`
   starts from it.
 
 **Stage 4 (DPO on verifiable preferences):**
-- **One epoch is indistinguishable from the SFT start** on every pre-registered line, with the
-  start's own seed gap in the floor.
-  - Sampled accuracy, measured after the fact (a reported line): seen pass@1 +3.1 points, pass@8
-    flat.
+- **One epoch is within the floor of the SFT start** on closed-book accuracy, hallucination,
+  citations, the judged scores, the benchmarks and the composite `gold_lp`. The floor includes the
+  start's own seed gap, a term added after these results were in.
+  - Hallucination (4 → 1-2 of 76) and unseen gold_lp (−0.21 nats) are within the floor.
+  - Sampled accuracy, measured after the fact: seen pass@1 +3.1 points, pass@8 flat.
   - Split after the fact: on the answer tokens the unseen cost is −0.33 nats, beyond the floor; the
     end token rose +0.12 (a format shift the composite netted against it).
-  - Read as written, hallucination (4 → 1-2 of 76) and unseen gold_lp (−0.21 nats) cleared the
-    noise at 1.3× and 1.1×.
   - 58 of 100 greedy answers are byte-identical to SFT's.
-- **Two epochs (`dpo-2ep`, ablation) fit the pairs and displaced the chosen answers.**
+- **Two epochs (`dpo-2ep`, one run) fit the pairs and displaced the chosen answers.**
   - seen qa_acc −4.8 points against one epoch (strict and lenient alike);
   - gold-answer log-probability −3.0 nats (seen) and −4.3 nats (unseen);
   - dpo_val `rewards/chosen` −0.23.
   - That is the RLHF Book's ch. 8 preference displacement, measured on verifier-labelled pairs.
-- **The judge failed its benchmark:** recall 0.28 (grounded) and 0.09 (definition), position and
-  self-preference biases, pairwise order agreement at chance. Every pair is verifier- or
-  rule-labelled: 506, against 114 as registered, 458 of them closed-book.
+- **The LLM judge labels no pairs.** On its benchmark it showed recall 0.28 (grounded) and 0.09
+  (definition), position and self-preference biases, and pairwise order agreement at chance. Every
+  pair is labelled by the verifier or a rule: 506, 458 of them closed-book.
 - **The label audit (2026-10-09):**
   - 79 of the 458 closed-book chosen labels were wrong under the strict checker written before
     Stage 5's reward.
-  - Retrained on strict labels, `dpo-strict` is still SFT within noise on seen accuracy and
+  - Retrained on strict labels, `dpo-strict` is still within the floor of SFT on seen accuracy and
     hallucination. Label noise was not why DPO didn't move.
-  - Its unseen gold-answer log-probability fell 0.27 nats, at the floor. Split after the fact, that
-    is −0.38 on the answer tokens (beyond the floor) behind an end-token gain of +0.11: DPO also
-    shifted the format toward stopping.
+  - Its unseen gold-answer log-probability fell 0.27 nats, just past the floor. Split after the
+    fact, that is −0.38 on the answer tokens (beyond the floor) behind an end-token gain of +0.11:
+    DPO also shifted the format toward stopping.
 - **Going forward:** `dpo-strict` (seed 0, strict labels) is the Stage 4 checkpoint and
   `train/configs/grpo.yaml` starts from it. Stage 5 compares offline pairs against on-policy groups
   on the same strict verifier.
 
 **Stage 5 (GRPO with verifiable rewards):**
-- **Training:** 622 in-window tasks with a rule-based reward. Both seeds collapsed (stopped at 52
-  and 65) and kept step 25.
+- **Training:** 622 tasks, chosen so the DPO model got between 1 and 7 of 8 tries right, with a
+  rule-based reward. In both seeds the output entropy collapsed (training stopped at steps 52 and
+  65), and each kept its step-25 checkpoint.
 - **Sharpening, not knowledge** (against `dpo-strict`):
-  - greedy accuracy unchanged;
-  - sampled pass@1 +3.1 points on seen items, with pass@8 −3.6 (inside the noise);
+  - greedy accuracy within the floor;
+  - sampled pass@1 +3.1 points on seen items, with pass@8 −3.6 (within the floor);
   - gold-answer log-probability −0.67 nats seen and −1.33 unseen, all in the answer tokens;
-  - hallucination 3 → 1 of 76 is inside what reseeding does.
+  - hallucination 3 → 1 of 76, within the floor.
 - **Why it collapsed:** the colocated loop is synchronous with one update per batch, so
   Magistral's clip-higher had no ratio to bind, and β was 0.
 - **Three verifier holes caught in one day:**
   - fragments, by auditing the checker's passes;
   - comma lists, by reading its code;
-  - years within 2%, by the hack audit.
+  - years within 2%, by the audit of the highest-reward answers.
   - Only the last was learned, on one task.
 - **Going forward:** `stage5-final` stays `dpo-strict`.
-  - CPT and SFT delivered; DPO and GRPO at this scale did not clear the floor on the primary lines.
-    GRPO's checkpoint was set aside; DPO's carried forward as the SFT model within noise.
-    *(Corrected 2026-10-10: this read "the pre-registered rules rejected both"; no rule set
-    DPO's checkpoint aside.)*
+  - CPT raised the gold answers' probability and SFT the seen half's accuracy; at this scale,
+    neither DPO nor GRPO moved closed-book accuracy beyond the floor. GRPO's checkpoint was set
+    aside; DPO's carried forward, within the floor of the SFT model.
+    *(Corrected 2026-10-10: this said a fixed rule set both checkpoints aside; no rule set DPO's
+    checkpoint aside.)*
   - Both sharpened sampled accuracy by about 3 points from their own starts; DPO did so at
     a small calibration cost (0.11 / 0.38 nats on the answer tokens), GRPO at a large one (0.71 /
     1.32).
-  - Stage 6 serves `dpo-strict`, the SFT model within noise, in bf16 or FP8 (W8A8) by load: FP8
-    passed the pre-registered quality gate on every line; INT4 and an FP8 KV cache did not
-    ([Serving](stage6.md)).
+  - Stage 6 serves `dpo-strict`, within the floor of the SFT model, in bf16 or FP8 (W8A8) by load:
+    FP8 changed no quality score beyond the floor; INT4 and an FP8 KV cache each lowered some
+    beyond it ([Serving](stage6.md)).
 
 **What the whole chain shows: on unseen facts, probability went up once, at CPT.** Every number in
 this paragraph is
@@ -251,15 +256,17 @@ CIs.
     items for `cpt-8b`);
   - +0.41 [+0.23, +0.60] across the Stage 3 arms, CPT's gain surviving SFT.
 - **That gain is text familiarity, not recall:**
-  - It is about what CPT's rise on all corpus text predicts: 0.086 nats per token over 4.69
-    answer tokens (`results/summary_stats.json`).
-  - The arms' strict unseen accuracy differs by 3.2 points, which doesn't resolve.
+  - It is about the size of CPT's rise on all corpus text: 0.086 nats per token over 4.69 answer
+    tokens (`results/summary_stats.json`).
+  - The arms' strict unseen accuracy differs by 3.2 points, past the floor, but the CPT arm only
+    held Base's score while the base arm fell below it.
 - **Every stage after it that can be measured lowered them:**
   - DPO by 0.38 [0.27, 0.50];
   - GRPO by 1.32 [1.08, 1.58].
-  - SFT's own change can't be read, since it moves the model from base format to chat format.
+  - SFT's own change can't be measured this way, since it moves the model from base format to
+    chat format.
 - **The trade:** each later stage bought behaviour with some of that probability. The on-policy
   optimiser cost more than the offline one, on one run pair each.
 
-*(Corrected 2026-10-10: this paragraph read "knowledge went in once, at CPT" before the per-token
+*(Corrected 2026-10-10: this paragraph said "knowledge went in once, at CPT" before the per-token
 check, notes/decisions.md, Stage 7.)*

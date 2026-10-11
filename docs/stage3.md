@@ -1,9 +1,9 @@
 # Stage 3: supervised fine-tuning (SFT)
 
-![Stage 3: supervised fine-tuning, its inputs, steps, the rules that decided and its output](diagrams/stage3.svg)
+![Stage 3: supervised fine-tuning, its inputs, steps, the choices made and its output](diagrams/stage3.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
 **Result: SFT taught the facts it showed and the behaviours, and CPT's head start survived it.**
 - **Seen facts:** strict closed-book 28.7% against stock Instruct's 11.4%, retention of facts that
@@ -11,12 +11,15 @@ and gates that decided; gray, external models, controls and ablations.
 - **Unseen facts:** 11.6% against 7.7%. The gap clears the 2.6-point floor, but its paired 95% CI,
   [−1.3, +9.0], includes 0, and the untrained base also scores 11.6%.
 - **CPT's contribution:** in all four pairings of a CPT-start run with a base-start run, the CPT
-  run's unseen gold answers are more probable. Accuracy doesn't resolve the difference at this size.
+  run's unseen gold answers are more probable. Unseen accuracy is also higher in the CPT arm,
+  beyond the floor, but that gap is the base arm falling below its untrained start; the CPT arm
+  stayed level with its own.
 - **With passages, against Instruct:** citations only to given passages 100% against 83.3% (a
   format check, on a format SFT trained on) and no false refusals against its 7.4%, with grounded
   accuracy level. Hallucination is 4 of 76 against its 1 of 76, the
-  same 3-item gap as between this run's two seeds, so not beyond the floor.
-- **One epoch, by rule:** the recall formats overfit in epoch 2 in all four runs.
+  same 3-item gap as between this run's two seeds, so within the floor.
+- **One epoch kept:** validation loss on the recall formats rose in epoch 2 in all four runs, so
+  each run kept its first epoch.
 
 The findings, and what is weaker than this summary makes it, follow the tables.
 
@@ -24,10 +27,10 @@ Supervised fine-tuning on a synthetic, fully read instruction set: the CPT check
 (`cpt-8b-replay10`) and, as the control for what CPT bought, the base (`base-8b-hf`), each with
 the same set, config and data order, and each run twice (seeds 0 and 1) so the noise floor is
 measured on both arms.
-Everything below was fixed before training, including the checkpoint rule, the merge gate and how
-the results are read. It is in [`notes/decisions.md`](../notes/decisions.md) (2026-10-06, Stage 3b),
-with the two amendments made after the smoke run and the merge gate's, all before the evals they
-govern.
+The setup, the epoch rule and the merge check are recorded in
+[`notes/decisions.md`](../notes/decisions.md) (2026-10-06, Stage 3b), with every change made to
+them: the step-1 loss check and the epoch rule were changed after the smoke run, before any main
+run, and the merge check was rewritten after it failed on sft-from-cpt, before that run's evals.
 
 **The data:** SFT set v1, 2,516 records (train 2,436, sft_val 80), dataset hash `70f47740`
 (`data/sft/SHA256SUMS`).
@@ -47,7 +50,7 @@ govern.
   Tulu 3 Persona subsets with Claude-written answers are excluded (rule 13).
 - **sft_val** is the loss curve only, not a metric.
 
-**The training run** (`train/configs/sft.yaml`; reasons in the pre-registration):
+**The training run** (`train/configs/sft.yaml`; reasons in `notes/decisions.md`, 2026-10-06):
 
 | item | value |
 |---|---|
@@ -55,7 +58,7 @@ govern.
 | format | Mistral chat, `<s>[INST] prompt [/INST] answer </s>`, no system prompt, pre-tokenised by mistral-common exactly as the eval's `--chat` path renders it; loss on the answer and its `</s>` only |
 | LoRA | r 64, alpha 128, dropout 0.05, all seven projections of the language model (178M trainable) |
 | optimiser and schedule | AdamW, LR 1e-4 linear to 0, 3% warmup, 32 sequences per step, 2 epochs (154 steps), one H100 |
-| checkpoint rule | epoch 2 unless the closed-book or definition sft_val loss rose from epoch 1 to epoch 2 |
+| epoch kept | epoch 2, unless the closed-book or definition sft_val loss rose from epoch 1 to epoch 2; then epoch 1 |
 | gradient weight by format | token-weighted loss: replay 75%, grounded 16%, closed-book 4.6%, definition 4.3%, abstain 0.7% of the 179k completion tokens |
 
 The training loss is token-weighted, so the 500 replay answers (general Tulu 3 instructions, long
@@ -146,10 +149,11 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 1. **At 2,436 records, the recall formats overfit in the second epoch, in all four runs.**
    - Closed-book and definition val loss bottomed at the end of epoch 1 and rose through epoch 2,
      while train loss kept falling: the set was being memorised.
-   - The pre-registered rule (amended before training to read those formats, not the mixture mean)
-     caught it on every run and took epoch 1.
-   - For a domain SFT set this size, one epoch is the budget, and the recall formats are where to
-     watch for overfitting.
+   - The epoch rule reads those two formats' val loss, not the mixture mean (it was changed to
+     that after the smoke run, before training). Their loss rose in every run, so every run kept
+     epoch 1.
+   - On a domain SFT set this size, a second epoch memorised, and the recall formats are where it
+     showed.
 2. **It stops.**
    - Every KPI answer, 98.75% of sampled answers and 100% of bench requests end on `</s>`.
    - End-to-end latency at one request is 159 ms, against the CPT checkpoint's 1,753 ms: it stops
@@ -159,19 +163,24 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - False refusals on answerable grounded questions: 0% against Instruct's 7.4%.
    - Grounded accuracy matches Instruct (90.7% vs 89.8%).
    - *(Note 2026-10-10: the first and third lines are judge-scored. From Stage 4 on, after the
-     preference judge failed its benchmark, judge-scored lines are reported, not read
-     (`notes/decisions.md`, 2026-10-08). The rule-scored line, `cite_valid`, checks format only
-     (every citation names a given passage, 100% against Instruct's 83.3%), not whether the passage
-     backs the answer.)*
-4. **General ability is intact.** MMLU, GSM8K and HellaSwag are within noise of each start.
+     preference judge caught few of the known flaws in its benchmark, judge-scored lines are reported but no conclusion rests
+     on them alone (`notes/decisions.md`, 2026-10-08). The rule-scored line, `cite_valid`,
+     checks format only (every citation names a given passage, 100% against Instruct's 83.3%), not
+     whether the passage backs the answer.)*
+4. **General benchmarks move little.** MMLU is within the floor of each start in all four runs.
+   GSM8K is too, except sft-from-cpt, which is above its start by more than the floor. HellaSwag is
+   within it for both seed-1 runs; both seed-0 runs sit below their starts by about the floor's
+   width.
 5. **SFT repaired the passage reading that CPT eroded.**
    - Raw-text CPT cost few-shot passage reading: grounded_acc went from 0.843 for the base to 0.778
-     for `cpt-8b-replay10`, 1.8x the 3.7-point noise. Eroded instruction behaviour is a known cost
+     for `cpt-8b-replay10`, 1.8x the 3.7-point floor. Eroded instruction behaviour is a known cost
      of continued pre-training.
    - SFT took both arms to 0.90-0.94 (one run, sft-from-base-seed1, at 0.898, level with
      Instruct), so the cost didn't carry into the chain.
 6. **CPT's contribution survives SFT.**
-   - **The rule:** it passes the pre-registered rule.
+   - **Against the floor:** on unseen `gold_lp` (the whole gold answer, end token included), the
+     difference of the arm means, +0.464 nats, is beyond the 0.258-nat floor (the gap between the
+     SFT twins on this half), and its per-item CI excludes 0.
    - **Consistency:** it holds in all four pairings of a CPT-start run with a base-start run, and
      on both halves.
    - **The seed-matched pairs are the cleanest comparisons.** Each seed used the same data order and
@@ -181,29 +190,31 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - **The run-variance estimate rests on one seed pair per arm,** so the SD multiple is indicative.
      A third seed per arm is what would turn it into a test.
 
-   | unseen-half `gold_lp`, CPT arm − base arm (2 seeds each) | value |
+   | unseen-half `gold_lp` (whole gold answer, end token included), CPT arm − base arm (2 seeds each) | value |
    |---|---|
    | difference of arm means (nats per answer) | +0.464 |
    | per-item 95% CI | [+0.276, +0.660], 68% of items up |
    | the four single-run pairs | +0.355, +0.315, +0.612, +0.573 |
-   | run-variance floor from both seed gaps (0.258, 0.039) | 0.130, so 3.6 SD |
+   | run-variance SD of the difference, from both seed gaps (0.258, 0.039) | 0.130, so 3.6 SD |
    | the same with the CPT arm's gap on both arms | 0.182, so 2.5 SD |
    | seen half, difference of arm means | +0.332 (2.3 SD) |
 
    - **The SD multiples aren't sigmas.** They rest on 1 degree of freedom per arm, so read them as
      indicative, not as a p-value.
    - **The robust statement is the rank one.** Every CPT run beats every base run, and the smallest
-     of the four pair differences (+0.32) exceeds the CPT arm's own seed gap (0.258). With 2 runs
-     per arm, that ordering has an exact permutation probability of 1 in 6.
-   - **Pass/fail:** unseen qa_acc is 11.3% against 8.1% between the arm means on the strict
-     checker (13.2% against 10.3% lenient), inside the binomial noise: reported, not argued. The effect lives in the probabilities, as Stage 2's did.
+     of the four pair differences (+0.32) exceeds the floor, the CPT arm's own seed gap (0.258).
+     With 2 runs per arm, that ordering has an exact permutation probability of 1 in 6.
+   - **Accuracy:** unseen qa_acc is 11.3% against 8.1% between the arm means on the strict
+     checker (13.2% against 10.3% lenient), beyond the floor. That gap is the base arm falling
+     below its start, not the CPT arm rising (see the strict-checker section below). The effect
+     of CPT itself lives in the probabilities, as Stage 2's did.
    - **Identifiers are the line that holds across stages.**
      - Stage 2's CPT moved them most per answer. Per token (+0.127 nats) they were second to terms
        (+0.147, a wide interval on 38 items); per answer they lead because they are the longest
        answers.
      - After SFT, the CPT arm leads the base arm on qa_ident by +9.4 points on the strict checker
-       (0.219 vs 0.125; +8.6 lenient, 0.219 vs 0.133). That is on 64 items, with a standard error
-       of about 5 points per run.
+       (0.219 vs 0.125; +8.6 lenient, 0.219 vs 0.133). That is on 64 items, beyond the floor,
+       which here is the standard error of about 5 points per run.
    - **The design is blocked by seed, and the seed shows.**
      - Seed 1 beats seed 0 in both arms: on seen `gold_lp` (−5.25 vs −5.41 base, −4.87 vs −5.12
        CPT), on unseen `gold_lp` (−6.74 vs −6.78, −6.17 vs −6.43), on qa_ident (strict and lenient), and on final train
@@ -231,7 +242,13 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 
    Strict is the checker written for Stage 5's reward (`scorers.qa_strict`, 2026-10-09). The
    lenient counts are what this section first reported (`qa_correct`): ranges, fraction first
-   numbers and child sections pass there. No ordering changes.
+   numbers and child sections are credited there. No ordering changes.
+
+   - **Identifiers, all 64:** sft-from-cpt 0.203 against Instruct's 0.031 (strict and lenient
+     agree), beyond the floor, and mostly on the seen half (the table's last two rows).
+   - **Definitions (vocab, judge-scored), both halves pooled:** 0.833 against Instruct's 0.786,
+     beyond the floor. The results table's vocab_seen and vocab_unseen rows put the gain on the
+     seen half; the unseen half is within the floor.
 
    - **Terms are 38 items, so read them as counts.** Correct answers are 2 for instruct-8b, base and
      CPT, 0 and 2 for sft-from-base s0/s1, 1 and 4 for sft-from-cpt s0/s1, and 7 for Large 3. As a
@@ -242,7 +259,7 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
      same items (lenient: 28.1% against 27.5%). These are facts that were in the training set, and
      Large 3 never saw them.
    - **Unseen half:** 11.6% against Instruct's 7.7% (strict, 18 against 12 of 155; lenient 13.5%
-     against 8.4%). The +3.9 points clear the Stage 3 floor (2.6), but the paired item-bootstrap
+     against 8.4%). The +3.9 points clear the floor (2.6), but the paired item-bootstrap
      95% CI, [−1.3, +9.0], includes 0, and the untrained `base-8b-hf` also gets 18 of 155. The lead
      is Instruct's deficit, not something training added. Every unseen identifier it gets right,
      its CPT start already had. *(Corrected 2026-10-10: this line read "sits inside the noise
@@ -251,72 +268,63 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    - 500 general Tulu 3 answers are 20% of the records, but their long completions are 75% of the
      token-weighted loss. The closed-book and definition records the seen half measures are 9%.
    - The run was mostly general instruction tuning with a domain component.
-3. **Hallucination on unanswerable questions is 4 of 76 against Instruct's 1 of 76** (5.3% vs 1.3%).
-   The seed twin also has 1 of 76, so the difference is a few items, at the edge of the run-to-run
-   spread. Both are inside the pre-registered target (< 20%).
-4. **Diversity passes its line on length-confounded numbers.**
-   - **The numbers:** distinct-4 −4.7% and entropy −8.0% against Instruct, inside the
-     pre-registered 10%.
+3. **Hallucination on unanswerable questions is 4 of 76 against Instruct's 1 of 76** (5.3% vs 1.3%);
+   it declined the rest (94.7%). The seed twin also has 1 of 76, so the 3-item difference equals
+   the gap between the two seeds: within the floor.
+4. **Diversity is lower than Instruct's, on length-confounded numbers.**
+   - **The numbers:** distinct-4 −4.7% and entropy −8.0% against Instruct.
    - **The confound:** answers are half Instruct's length, a style the teacher's short completions
      taught. Pooled entropy and distinct-4 move with length.
    - **Why it matters for Stage 4:** if 4 samples per prompt at T 0.7 come out near-identical, DPO
      pairs have no margin. It is checked on the first 20 prompts before sampling the pool.
-5. **Two gates were amended before the evals they govern** (both recorded in `decisions.md`).
-   - **The step-1 loss band** assumed recall answers. It is now read per format.
-   - **The merge gate's 3 probes** (295 positions) put a 99% line 2 flips from failing. The CPT
-     run's merge failed on 4 flips of near-tie noise. The amended gate compares the merge against an
-     fp32 reference over all 11,351 positions: it adds 5 flips to bf16's own 74. Every gated
-     checkpoint's sha256 matches the one evaluated.
-   - **sft-from-base-seed1's merge** passed the amended gate at its line: exactly 11 added flips of 11
-     allowed, with log-prob error 0.98x and val loss within 0.02%.
+5. **Two checks were rewritten during the stage** (both recorded in `decisions.md`).
+   - **The step-1 loss check,** a sanity range for the first training step's loss, assumed recall
+     answers, and the smoke run's mixed batch fell outside it. It was rewritten per format after
+     the smoke run, before any main run.
+   - **The merge check's first version, 3 probes** (295 positions), put its 99% line 2 flips from
+     failing. The CPT run's merge failed it on 4 flips of near-tie noise. The check was then
+     rewritten, before that run's evals: it compares the merge against an fp32 reference over all
+     11,351 positions, and the merge adds 5 flips to bf16's own 74. Every checked checkpoint's
+     sha256 matches the one evaluated.
+   - **sft-from-base-seed1's merge** passed the rewritten check at its limit: exactly 11 added flips
+     of 11 allowed, with log-prob error 0.98x and val loss within 0.02%.
 
-**Scored against its pre-registered targets:** every B7 target passes. Two rows below aren't B7
-targets and are marked as such.
-
-| target (B7, fixed before training, unless marked) | result | verdict |
-|---|---|---|
-| CPT's advantage survives SFT (unseen `gold_lp` beyond the floor) | +0.46 nats, all four pairings positive | pass; the SD multiple rests on one seed pair per arm |
-| beat Instruct on identifiers | 0.203 vs 0.031 (strict and lenient agree) | pass |
-| beat Instruct on vocab | 0.833 vs 0.786 | pass, narrowly (1.5x the noise) |
-| match Instruct on grounded and citation | grounded 0.907 vs 0.898; cite_supported 0.861 vs 0.787 | pass; beats on citation (both judge-scored: the note under What holds, 3) |
-| guards: no half below its start by more than the noise; MMLU and GSM8K within noise + 1 point | lenient (as scored then): all four runs (the base arm's unseen half 0.110 / 0.097 against its start's 0.116). Strict (2026-10-09): the CPT arm passes, but the base arm's unseen half is 0.084 / 0.077 against 0.116, 3.2-3.9 points down against a 2.7-point noise | pass as scored then; under the strict checker it fails for the base arm, the control (its unseen hedges, above), not for the chain |
-| abstain: > 80% on unanswerable, < 5% false refusals | 94.7%; 0% | pass |
-| diversity within 10% of Instruct | distinct-4 −4.7%, entropy −8.0% | pass, length-confounded |
-| stops before the cap; latency (B5/B6 checks, not B7) | 100%; 159 ms vs 1,753 ms | pass |
-| hallucination against Instruct (not a target: B7 listed Instruct's 0.013 as a reference, and its abstain target is above) | 4 of 76 vs 1 of 76 | worse, inside the run-to-run spread (the seed twin has 1 of 76) |
-
-**The guard that fails under the strict checker is a second line of evidence for what CPT bought.**
-- **The base arm hedged:** SFT from the base lost 3 to 4 points of unseen strict accuracy, and its
-  lenient-only passes were hedges, ranges and fractions where the gold was one number.
+**Under the strict checker, the base arm lost unseen accuracy and the CPT arm did not: a second
+measurement of what CPT bought.**
+- **The base arm hedged:** SFT from the base lost 3 to 4 points of unseen strict accuracy (0.084 /
+  0.077 against its start's 0.116, 3.2-3.9 points down, beyond the 2.6-point floor), and the
+  answers only the lenient scorer credited were hedges, ranges and fractions where the gold was one
+  number. On the lenient scorer, the one used when these runs were first scored, the base arm's
+  unseen half was within the floor of its start (0.110 / 0.097 against its start's 0.116).
 - **The CPT arm did not.**
 - **That is Gekhman et al. (2024) in miniature:** SFT on facts the model doesn't hold teaches it to
   hedge or invent, and the CPT arm held them. It sits beside unseen `gold_lp` (+0.41 nats on the
   answer tokens) as evidence for CPT.
 - **Caveat:** one seed pair per arm (1 df).
 
-**What SFT did, and what it didn't.** SFT did its job, behaviour and the facts it was shown, and
-it did not erase CPT's knowledge. It did not generalise to unseen facts, which was never a
-target.
-- **Behaviour is SFT's own, and the deliverable.** Answer form, citations that are valid and
+**What SFT did, and what it didn't.** SFT taught behaviour and the facts it was shown, and it did
+not erase CPT's knowledge. It did not generalise to unseen facts.
+- **Behaviour is SFT's own.** Answer form, citations that are valid and
   supported, abstaining without over-refusing, and stopping. This is where it beats Instruct
   outright.
 - **The facts it was shown are SFT's own too.** The seen half doubled in both arms: 0.150 → 0.281
   from CPT and 0.126 → 0.245 from the base. Most of that gain is SFT teaching the facts in its
   data, not CPT's knowledge surfacing.
 - **What is CPT-specific is the arm difference.** SFT preserved CPT's knowledge and made it usable
-  in chat form. Starting from CPT rather than the base is worth +0.46 nats on unseen `gold_lp` (+0.41 of it in the answer tokens [+0.23, +0.60], +0.06 in the end token),
-  +3.6 points on the seen half and +8.6 on identifiers (about 1.7 SE). It is real by the rule and
-  smaller than the seen-half gain.
+  in chat form. Starting from CPT rather than the base is worth +0.46 nats on unseen `gold_lp`
+  (the whole gold answer, end token included; +0.41 of it in the answer tokens [+0.23, +0.60],
+  +0.06 in the end token), +3.6 points on the seen half and +8.6 on identifiers (about 1.7 SE). It
+  is beyond the floor and smaller than the seen-half gain.
   - Unseen accuracy differs by +3.2 points between the arms on the strict checker (0.113 vs 0.081;
-    +2.9 lenient, 0.133 vs 0.104). That is inside the binomial noise, so it isn't the evidence;
-    `gold_lp` is.
+    +2.9 lenient, 0.133 vs 0.104). That is beyond the floor, but it is the base arm falling (below),
+    not the CPT arm gaining, so it isn't the evidence for CPT; `gold_lp` is.
   - Whether this is "the same" knowledge CPT added (+0.66 nats over the base, in base format; +0.66 in the answer tokens)
     can't be computed across the format split. The arm difference is consistent with it.
 - **SFT added no unseen knowledge in either arm.**
-  - Unseen accuracy moved 0.110 → 0.113 for the CPT arm (strict; 0.133 lenient), inside the noise.
-  - **The base arm's unseen accuracy fell 0.116 → 0.081 on the strict checker** (0.104 lenient), which
-    is beyond the noise.
-    - Its lenient-only passes on unseen items were hedges: two ranges ("12 to 18 inches" for "12
+  - Unseen accuracy moved 0.110 → 0.113 for the CPT arm (strict; 0.133 lenient), within the floor.
+  - **The base arm's unseen accuracy fell 0.116 → 0.081 on the strict checker,** beyond the floor
+    (0.104 lenient, within it).
+    - The unseen answers only the lenient scorer credited were hedges: two ranges ("12 to 18 inches" for "12
       in.", "10 to 12 feet" for "10 feet"), a fraction read as its first number ("1/2 inch" for "1
       in.") and a child section.
     - The control arm learned to hedge where it didn't know, and the lenient scorer credited it.
@@ -331,8 +339,7 @@ target.
 - **The lever for the unseen half is upstream.**
   - Only more, and more varied, CPT exposure acts on unseen facts here: paraphrased and
     restructured corpus text, not one pass over concatenated documents (Stage 2's "what I would
-    do differently", item 3). DPO and GRPO shape behaviour on prompts, as SFT does, and won't move
-    it.
+    do differently", item 3). DPO and GRPO shape behaviour on prompts, as SFT does.
   - Mistral Large 3 answers 28.4% of the same unseen questions, so the questions are answerable.
     The ceiling here is how much the weights know.
 
@@ -343,18 +350,18 @@ target.
      half measures 9%, so the run was mostly Tulu training.
    - It surfaced only after the smoke run, from a number misread on the smoke batch.
    - Per-record or per-format weighting, or a replay token cap, decided with the data, would have
-     aimed the gradient at the facts.
-2. **Give both arms of the control a seed twin from the start.** "What CPT bought" was first read
-   against a noise floor from one arm, at 1.4 SD. The base arm's twin (0.5 GPU-h) put it at an
-   indicative 3.6 SD (one seed pair per arm). It should have been in the plan, not added after the
-   read.
-3. **Size a gate's sample for its threshold, and reference it to the exact function.**
+     put more of the gradient on the facts.
+2. **Give both arms of the control a seed twin from the start.** "What CPT bought" was first
+   measured against run-to-run noise from one arm only, at 1.4 SD. The base arm's twin (0.5 GPU-h)
+   was added after that first result; with it, the difference is an indicative 3.6 SD (one seed
+   pair per arm). Both twins belonged in the design from the start.
+3. **Size a check's sample for the line it draws, and reference it to the exact function.**
    - A 99% agreement line on 295 positions is two flips from failing.
    - Comparing two bf16 models measures bf16's own near-tie noise.
-   - The fp32-referenced, full-set comparison costs a few GPU minutes and should have been the gate
+   - The fp32-referenced, full-set comparison costs a few GPU minutes and should have been the check
      from the start.
-4. **Pre-register sanity bands per format.** A mixture's token mean hides the formats that matter,
-   and the step-1 band failed for that reason, not for a bug.
+4. **Set sanity ranges per format before the first run.** A mixture's token mean hides the formats
+   that matter, and the smoke run fell outside the step-1 range for that reason, not for a bug.
 5. **Find the minimum, don't bracket it.** All four runs overfit in epoch 2. An eval every ~15
    steps on the recall formats would locate the best step, rather than choosing between two epoch
    ends.
@@ -368,8 +375,8 @@ target.
   non-abstain prompts collapsed.*
 - **Weight the loss per format.** SFT's token-weighted loss gives the 500 replay answers 75% of the
   gradient and the closed-book and definition records, the ones the seen half measures, 9%.
-  Normalising per record or per format, or capping replay's share, would aim the gradient at the
-  domain facts. It wasn't changed for Stage 3, whose set and loss were frozen before training.
+  Normalising per record or per format, or capping replay's share, would put more of the gradient
+  on the domain facts. It wasn't changed for Stage 3, whose set and loss were frozen before training.
 - **Padding-free batches with FlashAttention-2.** SFT trained at about 1.8k tokens/s against
   Stage 2's 5.9k. That is the cost of no packing: each micro-batch is padded to its longest record,
   and SDPA computes on the padding. `padding_free` with FA2 (a flash-attn build in the image)

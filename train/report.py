@@ -39,6 +39,7 @@ diversity. They go into the README's <!-- stage4-tables --> block.
 
 import argparse
 import hashlib
+import itertools
 import json
 import math
 import statistics
@@ -462,6 +463,25 @@ RESULT_BLOCKS = (
 )
 
 
+def order_swaps() -> str:
+    """How many pairs of rows the strict checker puts in the other order from the lenient one on
+    overall closed-book accuracy, and how far apart (lenient) the widest such pair is."""
+    strict = json.loads(QA_STRICT.read_text()) if QA_STRICT.exists() else {}
+    pts = {}
+    for run, sc in strict.items():
+        m = load_metrics(run)
+        if m and None not in (m.get("qa_acc"), sc.get("qa_strict")) and not sc.get("partial"):
+            pts[run] = (m["qa_acc"], sc["qa_strict"])
+    gaps = [
+        abs(pts[a][0] - pts[b][0])
+        for a, b in itertools.combinations(sorted(pts), 2)
+        if (pts[a][0] - pts[b][0]) * (pts[a][1] - pts[b][1]) < 0
+    ]
+    if not gaps:
+        return "no pair of rows changes order"
+    return f"{len(gaps)} pairs of rows change order, each within {max(gaps) * 100:.1f} points"
+
+
 def results_table(path: Path = Path("results/table.md")) -> str:
     """results/table.md without its smoke-test rows, as three tables: closed-book knowledge,
     work with the passages given, and general benchmarks with perplexity. One table of 26 columns
@@ -503,8 +523,8 @@ def results_table(path: Path = Path("results/table.md")) -> str:
     out.append(
         "qa_* (lenient) is `scorers.qa_correct`, the column `results/table.md` stores; qa_* (strict) "
         "is `scorers.qa_strict` (2026-10-09, the GRPO reward's rule: the whole gold, one candidate, "
-        "units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. No "
-        "ordering changes between the two."
+        "units compared), re-scored from every row's saved generations by `eval/qa_strict.py`. On "
+        f"overall closed-book accuracy, {order_swaps()} between the two."
     )
     return "\n\n".join(out)
 
@@ -1596,6 +1616,9 @@ def stage4_md(runs: dict, usd: float) -> str:
 GRPO_PAIR = ("grpo", "grpo-seed1")
 QA_STRICT = Path("results/qa_strict/evals.json")
 PASSK = Path("results/passk")
+# GRPO's floors take the start's seed gap (dpo-strict has no twin: the dpo pair's) and, as every
+# chat model's floor does, the SFT twins' gap
+GRPO_FLOOR = (DPO_PAIR, SFT_SEED_PAIR)
 GRPO_ROWS = [  # (label, metrics key, kind, noise() extra, group)
     ("qa_strict seen (the reward's rule)", "qa_strict_seen", "kpi", "qa_seen", "primary"),
     ("seen gold-answer log-prob (nats)", "gold_lp_seen", "lp", "seen", "primary"),
@@ -1693,16 +1716,17 @@ def passk_change(start: str, runs, metric: str, half: str, gap_pairs=()) -> list
 
 def grpo_delta_table() -> str:
     """Each GRPO run against the start (dpo-strict) and the mean change of the two seeds. Floor:
-    max(the GRPO seed gap, the start's SE, the start's own seed gap). dpo-strict has no twin, so
-    its gap is the lenient dpo / dpo-seed1 pair's (2026-10-09). One seed pair each: 1 df."""
-    m = metrics_with_strict((GRPO_START, *GRPO_PAIR, *DPO_PAIR))
+    max(the GRPO seed gap, the start's SE, the start's own seed gap, the SFT twins' gap). dpo-strict
+    has no twin, so its gap is the lenient dpo / dpo-seed1 pair's (2026-10-09). One seed pair
+    each: 1 df."""
+    m = metrics_with_strict((GRPO_START, *GRPO_PAIR, *DPO_PAIR, *SFT_SEED_PAIR))
     if not all(r in m for r in (GRPO_START, *GRPO_PAIR)):
         return ""
     sizes = half_sizes()
     head = ["metric", GRPO_START, *GRPO_PAIR, "change (mean of 2)", "floor", "beyond the floor"]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for label, key, kind, extra, _ in GRPO_ROWS:
-        row = change_row(m, label, key, kind, extra, GRPO_START, GRPO_PAIR, (DPO_PAIR,), sizes)
+        row = change_row(m, label, key, kind, extra, GRPO_START, GRPO_PAIR, GRPO_FLOOR, sizes)
         if row is None:
             continue
         vals = [m[r].get(key) for r in (GRPO_START, *GRPO_PAIR)]
@@ -1734,7 +1758,7 @@ def two_algorithm_table() -> str:
     sizes = half_sizes()
     groups = [  # (start, runs, start's seed pairs for the floor)
         (DPO_START, (GRPO_START,), (SFT_SEED_PAIR, DPO_PAIR)),
-        (GRPO_START, GRPO_PAIR, (DPO_PAIR,)),
+        (GRPO_START, GRPO_PAIR, GRPO_FLOOR),
         (DPO_START, GRPO_PAIR, (SFT_SEED_PAIR,)),
     ]
     head = ["metric", DPO_START, "DPO from its own start (sft-from-cpt)", "beyond (floor)",
@@ -1990,10 +2014,13 @@ S6_GATE = [  # (label, key, "rate" in points or "lp" in nats, floor)
 ]
 S6_REPORTED = [("qa_strict identifiers (reported)", "qa_strict_ident", "rate", 5.0)]
 S6_EOS_PASS = 0.95
+S6_QUALITY = {  # the cost table's words for s6_gate's verdicts
+    "ships": "no change beyond the floor",
+    "fails": "changes beyond the floor",
+    "incomplete": "not fully measured",
+}
 # decode bytes per token / 3.35 TB/s at concurrency 1 (7.42B linear + 0.54B untied lm_head params)
 S6_ITL_FLOOR_MS = {"bf16": 4.75, "fp8": 2.5, "fp8kv": 2.5, "w4a16": 1.5}
-# Step 0's estimate of concurrent 8,192-token sequences at --gpu-memory-utilization 0.90
-S6_EST_CONCURRENCY = {"bf16": 44, "fp8": 50, "fp8kv": 100, "w4a16": 53}
 # The Mistral Small 4 announcement's API price, $ per million (input, output) tokens, and its
 # minimum self-hosting hardware (4x HGX H100; 2x H200 or 1x DGX B200), checked 2026-10-09
 SMALL4_USD_PER_MTOK = (0.15, 0.60)
@@ -2189,7 +2216,7 @@ def s6_spec_table() -> str:
 
 def s6_memory_table() -> str:
     head = ["variant", "GPU", "weights (vLLM, GiB)", "KV cache (GiB)", "KV cache tokens",
-            "8,192-token sequences: vLLM / Step 0 estimate"]  # fmt: skip
+            "8,192-token sequences"]  # fmt: skip
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for v in s6_variants():
         f = SERVE / "bench" / v / "server.json"
@@ -2201,7 +2228,7 @@ def s6_memory_table() -> str:
             S6_LABEL[v], f"{s['gpu']} (driver {s['driver']}, vLLM {s['vllm']})",
             f1(srv.get("weights_gib"), "{:.2f}"), f1(srv.get("kv_cache_gib"), "{:.2f}"),
             f1(srv.get("kv_cache_tokens"), "{:,.0f}"),
-            f"{f1(srv.get('max_concurrency_8192'), '{:.1f}')} / {S6_EST_CONCURRENCY[v]}",
+            f1(srv.get("max_concurrency_8192"), "{:.1f}"),
         ]) + " |")  # fmt: skip
     return "\n".join(lines) if len(lines) > 2 else ""
 
@@ -2210,7 +2237,7 @@ def s6_cost_table(usd: float, verdict: dict) -> str:
     """$ per 1,000 requests at each variant's goodput-maximising concurrency, against the Mistral
     API at Small 4's listed prices for the same tokens, and the sustained load at which one H100
     costs what the API would."""
-    head = ["variant", "gate", "best concurrency", "goodput (req/s)", "$ / 1k requests (1 H100)",
+    head = ["variant", "quality against bf16", "best concurrency", "goodput (req/s)", "$ / 1k requests (1 H100)",
             "API $ / 1k requests (Small 4 prices)", "break-even sustained req/s"]  # fmt: skip
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     p_in, p_out = SMALL4_USD_PER_MTOK
@@ -2228,7 +2255,7 @@ def s6_cost_table(usd: float, verdict: dict) -> str:
         n_out = s6_mean(reps, "total_output_tokens") / s6_mean(reps, "completed")
         api_per_req = (n_in * p_in + n_out * p_out) / 1e6
         lines.append("| " + " | ".join([
-            S6_LABEL[v], "reference" if v == "bf16" else verdict.get(v, "not run"), str(c),
+            S6_LABEL[v], "reference" if v == "bf16" else S6_QUALITY.get(verdict.get(v), "not run"), str(c),
             f"{g:.1f}", f"{usd / (g * 3600) * 1000:.4f}", f"{api_per_req * 1000:.4f}",
             f"{usd / 3600 / api_per_req:.1f}",
         ]) + " |")  # fmt: skip
@@ -2313,11 +2340,13 @@ def s6_deploy_blocks(usd: float) -> dict[str, str]:
     """DEPLOY.md's generated blocks: the same tables as the README's Stage 6 section."""
     gate, verdict = s6_gate()
     rows = [
-        f"| {S6_LABEL[v]} | {'reference' if v == 'bf16' else verdict.get(v, 'not run')} |"
+        f"| {S6_LABEL[v]} | {'reference' if v == 'bf16' else S6_QUALITY.get(verdict.get(v), 'not run')} |"
         for v in S6_RUN
         if v == "bf16" or v in verdict
     ]
-    variants = "| variant | quality gate |\n|---|---|\n" + "\n".join(rows) if verdict else ""
+    variants = (
+        "| variant | quality against bf16 |\n|---|---|\n" + "\n".join(rows) if verdict else ""
+    )
     blocks = {
         "deploy-variants": variants,
         "deploy-gate": gate,

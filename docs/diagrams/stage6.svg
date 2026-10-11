@@ -25,9 +25,9 @@
     <tspan x="200" dy="20">FP8 KV cache as a serving flag</tspan>
   </text>
   <text x="200" y="468" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
-    <tspan x="200" dy="0">quality gate against bf16 (Stage 3</tspan>
-    <tspan x="200" dy="20">floors, GSM8K with one BOS):</tspan>
-    <tspan x="200" dy="20">FP8 passes; FP8-KV and INT4 fail</tspan>
+    <tspan x="200" dy="0">quality against bf16 (the SFT floor;</tspan>
+    <tspan x="200" dy="20">GSM8K with a start-of-text token):</tspan>
+    <tspan x="200" dy="20">FP8 within the floor; FP8-KV and INT4 beyond it</tspan>
   </text>
   <text x="200" y="678" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
     <tspan x="200" dy="0">bench bf16 and FP8 on one pinned H100:</tspan>

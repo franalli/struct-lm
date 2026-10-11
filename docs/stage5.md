@@ -1,15 +1,16 @@
 # Stage 5: GRPO with verifiable rewards
 
-![Stage 5: GRPO with verifiable rewards, its inputs, steps, the rules that decided and its output](diagrams/stage5.svg)
+![Stage 5: GRPO with verifiable rewards, its inputs, steps, the choices made and its output](diagrams/stage5.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
 **Result: GRPO sharpened what the model already answered and added no knowledge.**
-- **Both seeds collapsed and stopped early.** They stopped on entropy collapse (steps 52 and 65:
-  entropy under a third of its start while the train reward climbed from 0.5 to 0.83), and the
-  pre-registered rule kept step 25 of each.
-- **Against `dpo-strict`:**
+- **Both seeds' entropy collapsed, and the stop rule ended them at steps 52 and 65.** That rule
+  stops a run when entropy's 10-step mean falls under a third of its steps 1-10 mean; meanwhile the
+  train reward climbed from 0.5 to 0.83. The checkpoint kept in each run is step 25, the save with
+  the best validation pass@1.
+- **Against `dpo-strict`, where it started:**
   - greedy closed-book accuracy is unchanged (strict, seen −1.2 points, floor 3.6);
   - sampled pass@1 rose 3.1 points on seen items (paired CI [+1.3, +5.0]) while pass@8 fell 3.6,
     inside the noise. That is DeepSeekMath's sharpening signature;
@@ -17,22 +18,20 @@ and gates that decided; gray, external models, controls and ablations.
     −1.32 on the answer tokens; the end token barely moved), beyond the
     floor: the cost of that sharpening;
   - hallucination 3 → 1 of 76 is noise: the SFT twins sit at 4 and 1, the DPO twins at 1 and 2.
-- **The expected +3 to +8 points on seen accuracy (strict) did not happen,** so `stage5-final` stays
-  `dpo-strict`, as the rule requires.
-- **Serving is greedy, so GRPO's only gain is one serving doesn't use.** That gain is sampled
-  accuracy at T 0.7, and it cost calibration on every fact.
-- **The chain's verdict:** CPT and SFT delivered; DPO and GRPO at this scale did not clear the
-  floor on the primary lines. GRPO's checkpoint was set aside; DPO's carried forward as the SFT
-  model within noise. *(Corrected 2026-10-10: this read "the pre-registered rules rejected
-  both"; no rule set DPO's checkpoint aside.)*
+- **GRPO was not served; the chain carries `dpo-strict` forward (`stage5-final`).** Serving is
+  greedy, so GRPO's only gain is one serving doesn't use. That gain is sampled accuracy at T 0.7,
+  and it cost calibration on every fact.
+- **Across the chain:** at this scale neither DPO nor GRPO moved seen closed-book accuracy beyond
+  the floor. *(Corrected 2026-10-10: an earlier version said a rule set DPO's checkpoint aside;
+  none did.)*
   - Both sharpened sampled accuracy by about 3 points. DPO did so at a small calibration cost (0.11
     / 0.38 nats on the answer tokens), GRPO at a large one (0.71 / 1.32).
-  - The chain ends on `dpo-strict`, which is the SFT model within noise.
+  - The chain ends on `dpo-strict`, within the floor of the SFT model on accuracy and behaviour.
 
 Group Relative Policy Optimization from `dpo-strict`, with a fresh LoRA, on tasks the start
 sometimes solves. The policy writes every completion, rules score it, and no judge or reference
-model is involved. The plan, its corrections and the read were fixed before training
-([`notes/decisions.md`](../notes/decisions.md), 2026-10-09).
+model is involved. The procedure and the changes made to it during the runs are logged in
+[`notes/decisions.md`](../notes/decisions.md) (2026-10-09).
 
 ## The tasks
 
@@ -66,7 +65,7 @@ model is involved. The plan, its corrections and the read were fixed before trai
 
 `train/grpo_rewards.py`, one function per part, so TRL logs each one:
 
-- **Format (0.1, a gate: fail it and correctness is not read):**
+- **Format (0.1, and a gate: a wrong-format answer gets no correctness credit):**
   - every kind must end on `</s>`;
   - closed-book: exactly one line holding one candidate. The prompts ask for a bare value, so the
     gate is not an "Answer:" line;
@@ -80,7 +79,7 @@ model is involved. The plan, its corrections and the read were fixed before trai
 - **Tested before any sampling:** 41 reward fixtures, every hack case among them (two answers, an
   answer then a contradiction, a range, a wrong unit, a piece of the gold, citing all four
   passages, a stray bracket).
-- **Pinned on the Stage 4 pool:** the reward passes 1,305 of its 4,336 closed-book samples,
+- **Pinned on the Stage 4 pool:** the reward accepts 1,305 of its 4,336 closed-book samples,
   exactly the `dpo-strict` labels.
 
 ## The training run
@@ -93,49 +92,50 @@ model is involved. The plan, its corrections and the read were fixed before trai
 | Loss | `dapo` token-level, advantages scaled by the batch std, clip 0.2 / 0.28, no KL | Magistral, DAPO, Dr. GRPO |
 | Sampling | T 1.0, top-p 1.0, 256 tokens; truncated completions out of the loss | Magistral |
 | Optimiser | LoRA r 64 / α 128, LR 1e-5 constant after 10 warmup steps, 150 steps | RL runs are not decayed |
-| Rollouts | vLLM 0.30 colocated, 35% of the GPU, the repo's engine settings and the run's seed | rule 3 |
+| Rollouts | vLLM 0.30 colocated, 35% of the GPU, the repo's engine settings and the run's seed | same loading as the evals |
 | Precision | bf16, fp32 log-probs; truncated importance sampling against vLLM's log-probs | train/inference mismatch (ch. 6) |
-| Held out | `grpo_val` pass@1 and pass@8 at step 0 and every 25 steps, 8 samples per task | the checkpoint rule's input |
+| Held out | `grpo_val` pass@1 and pass@8 at step 0 and every 25 steps, 8 samples per task | picks the checkpoint kept |
 
-Three corrections the code forced on the plan:
+Three changes the trainer's code required:
 - **TRL builds the rollout engine without the repo's tokenizer, config and image settings.** It is
   wrapped to add them, along with the run's seed (TRL seeds every run's sampler with 0).
 - **No sleep mode.** TRL reloads the weights from disk when it wakes a sleeping engine, which would
   have discarded each step's LoRA sync and sampled from the start every step.
-- **The engine takes 35% of the GPU, not 25%.** Its own bf16 weight copy alone is 17.8 GB.
+- **The engine takes 35% of the GPU.** Its own bf16 weight copy alone is 17.8 GB.
 
 The smoke run checked the sync:
 - step 1's importance-sampling ratio was 0.9997;
 - after updates at 10× the learning rate, the ratio stayed at 1.00 and the vLLM-vs-policy log-prob
   gap didn't grow.
 
-**Checkpoint rule:** the best `grpo_val` pass@1 among the saves at or before any stop. A save
-within one SE of the best counts as a tie, and ties go to the earliest.
+**The checkpoint kept:** the save with the best `grpo_val` pass@1 among those at or before the
+stop. A save within one standard error of the best counts as a tie, and ties go to the earliest.
 
 **Stop rules:**
 - groups with zero reward spread above 80% for 10 steps;
-- entropy below a third of its start;
+- entropy's 10-step mean under a third of its steps 1-10 mean;
 - no new best `grpo_val` in two evaluations while the train reward rises.
 
 ![Stage 5 GRPO curves: train reward, grpo_val pass@1 and pass@8, length, entropy, zero-spread groups, and the vLLM-vs-policy log-prob gap](../results/curves/grpo.png)
 
-## The read: sharpening, not knowledge
+## Results: sharpening, not knowledge
 
-Pre-registered in `notes/decisions.md` (2026-10-09). The tables are below the figures. The floor is
-max(the GRPO seed gap, the start's SE, the start's own seed gap); `dpo-strict` has no twin, so the
-start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
+The tables are below the figures. The floor on each line is the largest of: the gap between the two
+GRPO seeds, the gap between the two SFT seeds (the floor for every chat model), the start's
+standard error, and the start's own seed gap (`dpo-strict` has no twin, so the lenient `dpo`
+pair's stands in). The SFT seeds were not sampled, so the pass@k lines use the other gaps. One
+seed pair each (1 df).
 
-1. **Primary:**
+1. **Seen facts:**
    - Seen strict accuracy: 0.305 → 0.299 / 0.287, −1.2 points against a 3.6-point floor. No
      change.
    - Seen gold-answer log-probability: −0.67 nats [−0.86, −0.49]; −0.71 [−0.89, −0.53] of it on the
-     answer tokens and +0.04 on the end token, so a calibration cost, not a format change. Beyond the floor in the wrong
-     direction.
-   - The expected +3 to +8 points did not come.
+     answer tokens and +0.04 on the end token, so a calibration cost, not a format change. A fall
+     beyond the floor.
 2. **pass@1 against pass@8** (322 closed-book items, 8 samples at T 0.7, the strict scorer, paired
    per item):
    - Seen: pass@1 +3.1 points [+1.3, +5.0], pass@8 −3.6 [−8.1, +0.9], maj@8 +0.6.
-   - Unseen: pass@1 +1.0 [−0.1, +2.2], pass@8 −3.2 [−7.7, +1.3].
+   - Unseen: pass@1 +1.0 [−0.1, +2.2], pass@8 −3.2 [−7.7, +1.0].
    - Sampled accuracy rose while coverage stayed within the noise and leaned down.
    - **The mechanism** (DeepSeekMath §5.2.2: RL sharpens the output distribution rather than
      adding capability):
@@ -147,18 +147,17 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
        answer is wrong 87% of the time (`qa_unseen` 0.129 lenient; 89% strict), so the unseen gold log-probability
        falls hardest.
 3. **Unseen:** strict accuracy −1.0 point (inside the noise). Gold-answer log-probability −1.33
-   nats [−1.61, −1.08]: −1.32 on the answer tokens, −0.01 on the end token. A cost, named as one,
-   through the mechanism above.
-4. **Guards:**
+   nats [−1.61, −1.08]: −1.32 on the answer tokens, −0.01 on the end token. A cost, through the
+   mechanism above.
+4. **General skills, behaviour and reward hacking:**
    - MMLU (0.767 / 0.767) and GSM8K are within the noise.
-   - Hallucination is 1 of 76 in both seeds. It carries no headline: the start sat at 3, the SFT
-     twins at 4 and 1 and the DPO twins at 1 and 2. A 2-item move is inside what reseeding does.
+   - Hallucination is 1 of 76 in both seeds, against the start's 3. A 2-item move is inside what
+     reseeding does: the SFT twins sit at 4 and 1 and the DPO twins at 1 and 2.
    - Length is −3% and 0%.
-   - The hack audit read 1 and 0 of 50: the one is the year hole above.
-   - `grpo-seed1` misses two absolute lines by one item each: false abstain 2 of 108 (line ≤ 1) and
-     `cite_valid` 0.982 (line 1.000). Both are inside the noise floor and equal to
-     `sft-from-cpt-seed1`'s own values.
-   - `grpo` meets every line.
+   - The reward-hacking audit found 1 and 0 of 50: the one is a wrong year the reward accepted
+     ([`verifiers.md`](verifiers.md) has the case).
+   - `grpo-seed1`: false abstain 2 of 108 and `cite_valid` 0.982. Both changes are inside the noise
+     floor and equal to `sft-from-cpt-seed1`'s own values. `grpo` equals the start on both.
 5. **Same verifier, two algorithms**, each measured from its own start:
 
    | | seen pass@1 | seen pass@8 | seen gold_lp, answer tokens | unseen gold_lp, answer tokens | end token (seen / unseen) |
@@ -178,17 +177,17 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
      without a brake in the objective looks like (item 6).
    - **Cumulative from SFT:** the chain reaches +6.6 points on seen pass@1 [+3.6, +9.8] with pass@8
      at −6.6 [−12.3, −0.9]. Greedy accuracy moved in neither stage, and neither added a fact.
-   - **Win rate:** not run for these rows. The judge failed its benchmark and its two orders agreed
-     at coin-flip, so the column stays empty.
-6. **Why it collapsed so fast: the repo imported Magistral's hyperparameters without the system
-   that makes them act.**
+   - **Win rate:** not run for these rows. Shown the same pair in both orders, the judge gave the
+     same verdict only about half the time, so the column stays empty.
+6. **Why both runs collapsed within 65 steps: the repo imported Magistral's hyperparameters
+   without the system that makes them act.**
    - **Where the ratio comes from:** Magistral's brake is a clip on the ratio between the
      trainer's policy and the generator's. That ratio departs from 1 because its generators run
      asynchronously, on stale weights.
    - **Here the ratio is always 1:** the colocated loop is synchronous, with one update per
      generation batch (μ = 1). The generator is the policy, so the ratio is identically 1 up to
      vLLM numerics.
-     - `clip_ratio/high_mean` read 0 at every step.
+     - `clip_ratio/high_mean` was 0 at every step.
      - ε_high 0.28 was inert by construction and gets no credit.
    - **Nothing bounded each step's change:** β was also 0, so only the learning rate and the stop
      rule limited it, and both runs collapsed inside 65 steps.
@@ -205,10 +204,11 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
 ## What I would do differently (Stage 5)
 
 1. **Write every stop rule on a moving window from the start.**
-   - The entropy rule read one batch, and one batch tracks its task mix.
-   - It stopped `grpo-seed1` at step 34 (0.14 against a 0.159 line) while the 10-step mean sat at
-     57% of the start.
-   - It is the fourth pre-registered threshold set on a point reading where a window was meant.
+   - The first entropy rule used one batch's entropy, and one batch tracks its task mix.
+   - It stopped `grpo-seed1` at step 34, when one batch's entropy fell to 0.14, under the cutoff of
+     0.159 (a third of the start), while the 10-step mean sat at 57% of the start. The rule was
+     rewritten on the 10-step mean after it fired, and the run resumed from its step-34 save.
+   - It was the project's fourth rule written on a single reading where a moving window was meant.
 2. **Import the system with the hyperparameters.**
    - Magistral's ε_high acts on the gap its asynchronous generators open. In a synchronous loop
      with one update per batch it is inert, and with β 0 nothing in the objective bounded a step.
@@ -220,7 +220,7 @@ start's gap is the lenient `dpo` pair's. One seed pair each (1 df).
    - Compute tasks (a formula from a passage, sampled inputs, a Python-checked answer) would have
      offered a skill GRPO can sharpen and that transfers to held-out items.
 4. **Make chain retries exclusive.** A Modal retry re-ran `grpo-seed1`'s training on a warm GPU
-   still holding the first run's engine, which failed for lack of memory. A pipeline that never
+   still holding the first run's engine, which ran out of memory. A pipeline that never
    re-enters the train step after it returns would have saved a relaunch.
 
 <!-- stage5-tables:start -->
@@ -238,21 +238,21 @@ The checkpoint kept: the best grpo_val pass@1 among the saves at or before any s
 | metric | dpo-strict | grpo | grpo-seed1 | change (mean of 2) | floor | beyond the floor |
 |---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
-| seen gold-answer log-prob (nats) | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
-|   of it, the answer tokens | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
-|   of it, the end token | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
+| seen gold-answer log-prob (nats) | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.247 | yes |
+|   of it, the answer tokens | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.173 | yes |
+|   of it, the end token | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.074 | no |
 | qa_acc seen (lenient) | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
 | qa_strict unseen | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
 | qa_acc unseen (lenient) | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
-| unseen gold-answer log-prob (nats) | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
-|   of it, the answer tokens | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
+| unseen gold-answer log-prob (nats) | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.258 | yes |
+|   of it, the answer tokens | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.210 | yes |
 |   of it, the end token | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
-| halluc_rate (lower is better) | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
+| halluc_rate (lower is better) | 0.040 | 0.013 | 0.013 | -2.6 pt | 3.9 pt | no |
 | false_abstain (lower is better) | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
 | cite_valid | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
-| MMLU | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.3 pt | no |
-| GSM8K | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
-| grounded_acc (judge) | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
+| MMLU | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.4 pt | no |
+| GSM8K | 0.809 | 0.820 | 0.802 | +0.2 pt | 2.2 pt | no |
+| grounded_acc (judge) | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.8 pt | no |
 | cite_supported (judge) | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
 | pass@1 seen (sampled) | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
 | pass@8 seen | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
@@ -266,16 +266,16 @@ Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-stri
 | metric | sft-from-cpt | DPO from its own start (sft-from-cpt) | beyond (floor) | GRPO from its own start (dpo-strict) | beyond (floor) | cumulative from sft-from-cpt (grpo) | beyond (floor) |
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
-| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
-|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.143) | -0.821 [-1.072, -0.579] | yes (0.173) |
-|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.050) | +0.140 [+0.110, +0.171] | yes (0.074) |
+| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.247) | -0.681 [-0.938, -0.436] | yes (0.247) |
+|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.173) | -0.821 [-1.072, -0.579] | yes (0.173) |
+|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.074) | +0.140 [+0.110, +0.171] | yes (0.074) |
 | qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
-| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
-|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.121) | -1.699 [-2.063, -1.363] | yes (0.210) |
+| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.258) | -1.603 [-1.975, -1.256] | yes (0.258) |
+|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.210) | -1.699 [-2.063, -1.363] | yes (0.210) |
 |   of it, the end token | -0.531 | +0.110 [+0.084, +0.138] | yes (0.066) | -0.013 [-0.068, +0.031] | no (0.066) | +0.097 [+0.052, +0.136] | yes (0.048) |
-| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
-| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
-| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |
+| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | no (3.9 pt) | -3.9 pt | no (3.9 pt) |
+| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.4 pt) | +0.1 pt | no (0.4 pt) |
+| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (2.2 pt) | -0.3 pt | no (2.2 pt) |
 | pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | yes (0.4 pt) | +3.1 pt [+1.3, +5.0] | yes (0.4 pt) | +6.6 pt [+3.6, +9.8] | yes (0.2 pt) |
 | pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | no (2.4 pt) | -3.6 pt [-8.1, +0.9] | no (2.4 pt) | -6.6 pt [-12.3, -0.9] | yes (0.0 pt) |
 | pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | no (0.6 pt) | +1.0 pt [-0.1, +2.2] | no (0.6 pt) | +2.2 pt [+0.4, +4.0] | yes (0.6 pt) |

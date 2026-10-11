@@ -26,7 +26,7 @@
   <polyline points="685,736 685,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
   <polyline points="1005,736 685,816" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
   <text x="533" y="590" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="14" fill="#495057" text-anchor="start">
-    <tspan x="533" dy="0">controls and ablation B</tspan>
+    <tspan x="533" dy="0">controls and variants</tspan>
   </text>
   <text x="190" y="90" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="middle">
     <tspan x="190" dy="0">19.4M-token train split</tspan>

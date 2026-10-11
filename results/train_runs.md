@@ -249,21 +249,21 @@ The checkpoint kept: the best grpo_val pass@1 among the saves at or before any s
 | metric | dpo-strict | grpo | grpo-seed1 | change (mean of 2) | floor | beyond the floor |
 |---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.305 | 0.299 | 0.287 | -1.2 pt | 3.6 pt | no |
-| seen gold-answer log-prob (nats) | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.193 | yes |
-|   of it, the answer tokens | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.143 | yes |
-|   of it, the end token | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.050 | no |
+| seen gold-answer log-prob (nats) | -5.130 | -5.784 | -5.819 | -0.671 [-0.858, -0.492] | 0.247 | yes |
+|   of it, the answer tokens | -4.811 | -5.517 | -5.519 | -0.707 [-0.888, -0.531] | 0.173 | yes |
+|   of it, the end token | -0.319 | -0.267 | -0.299 | +0.036 [+0.012, +0.059] | 0.074 | no |
 | qa_acc seen (lenient) | 0.299 | 0.293 | 0.281 | -1.2 pt | 3.6 pt | no |
 | qa_strict unseen | 0.110 | 0.097 | 0.103 | -1.0 pt | 2.6 pt | no |
 | qa_acc unseen (lenient) | 0.129 | 0.110 | 0.110 | -1.9 pt | 2.7 pt | no |
-| unseen gold-answer log-prob (nats) | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.187 | yes |
-|   of it, the answer tokens | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.121 | yes |
+| unseen gold-answer log-prob (nats) | -6.695 | -7.956 | -8.101 | -1.333 [-1.608, -1.076] | 0.258 | yes |
+|   of it, the answer tokens | -6.274 | -7.541 | -7.647 | -1.319 [-1.583, -1.078] | 0.210 | yes |
 |   of it, the end token | -0.421 | -0.415 | -0.454 | -0.013 [-0.068, +0.031] | 0.066 | no |
-| halluc_rate (lower is better) | 0.040 | 0.013 | 0.013 | -2.6 pt | 2.2 pt | yes |
+| halluc_rate (lower is better) | 0.040 | 0.013 | 0.013 | -2.6 pt | 3.9 pt | no |
 | false_abstain (lower is better) | 0.000 | 0.000 | 0.018 | +0.9 pt | 1.8 pt | no |
 | cite_valid | 1.000 | 1.000 | 0.982 | -0.9 pt | 1.8 pt | no |
-| MMLU | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.3 pt | no |
-| GSM8K | 0.809 | 0.820 | 0.802 | +0.2 pt | 1.7 pt | no |
-| grounded_acc (judge) | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.7 pt | no |
+| MMLU | 0.767 | 0.767 | 0.767 | -0.0 pt | 0.4 pt | no |
+| GSM8K | 0.809 | 0.820 | 0.802 | +0.2 pt | 2.2 pt | no |
+| grounded_acc (judge) | 0.926 | 0.935 | 0.917 | +0.0 pt | 2.8 pt | no |
 | cite_supported (judge) | 0.861 | 0.880 | 0.889 | +2.3 pt | 3.3 pt | no |
 | pass@1 seen (sampled) | 0.249 | 0.278 | 0.281 | +3.1 pt [+1.3, +5.0] | 0.4 pt | yes |
 | pass@8 seen | 0.449 | 0.413 | 0.413 | -3.6 pt [-8.1, +0.9] | 2.4 pt | no |
@@ -277,16 +277,16 @@ Floor: max(the GRPO seed gap, the start's SE, the start's own seed gap: dpo-stri
 | metric | sft-from-cpt | DPO from its own start (sft-from-cpt) | beyond (floor) | GRPO from its own start (dpo-strict) | beyond (floor) | cumulative from sft-from-cpt (grpo) | beyond (floor) |
 |---|---|---|---|---|---|---|---|
 | qa_strict seen (the reward's rule) | 0.287 | +1.8 pt | no (3.6 pt) | -1.2 pt | no (3.6 pt) | +0.6 pt | no (3.5 pt) |
-| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.193) | -0.681 [-0.938, -0.436] | yes (0.247) |
-|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.143) | -0.821 [-1.072, -0.579] | yes (0.173) |
-|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.050) | +0.140 [+0.110, +0.171] | yes (0.074) |
+| seen gold-answer log-prob (nats) | -5.120 | -0.010 [-0.102, +0.080] | no (0.247) | -0.671 [-0.858, -0.492] | yes (0.247) | -0.681 [-0.938, -0.436] | yes (0.247) |
+|   of it, the answer tokens | -4.697 | -0.114 [-0.203, -0.028] | no (0.173) | -0.707 [-0.888, -0.531] | yes (0.173) | -0.821 [-1.072, -0.579] | yes (0.173) |
+|   of it, the end token | -0.423 | +0.104 [+0.084, +0.127] | yes (0.074) | +0.036 [+0.012, +0.059] | no (0.074) | +0.140 [+0.110, +0.171] | yes (0.074) |
 | qa_strict unseen | 0.116 | -0.6 pt | no (2.6 pt) | -1.0 pt | no (2.6 pt) | -1.6 pt | no (2.6 pt) |
-| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.187) | -1.603 [-1.975, -1.256] | yes (0.258) |
-|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.121) | -1.699 [-2.063, -1.363] | yes (0.210) |
+| unseen gold-answer log-prob (nats) | -6.426 | -0.270 [-0.396, -0.157] | yes (0.258) | -1.333 [-1.608, -1.076] | yes (0.258) | -1.603 [-1.975, -1.256] | yes (0.258) |
+|   of it, the answer tokens | -5.895 | -0.380 [-0.504, -0.267] | yes (0.210) | -1.319 [-1.583, -1.078] | yes (0.210) | -1.699 [-2.063, -1.363] | yes (0.210) |
 |   of it, the end token | -0.531 | +0.110 [+0.084, +0.138] | yes (0.066) | -0.013 [-0.068, +0.031] | no (0.066) | +0.097 [+0.052, +0.136] | yes (0.048) |
-| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | yes (2.2 pt) | -3.9 pt | no (3.9 pt) |
-| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.3 pt) | +0.1 pt | no (0.4 pt) |
-| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (1.7 pt) | -0.3 pt | no (2.2 pt) |
+| halluc_rate (lower is better) | 0.053 | -1.3 pt | no (3.9 pt) | -2.6 pt | no (3.9 pt) | -3.9 pt | no (3.9 pt) |
+| MMLU | 0.766 | +0.1 pt | no (0.4 pt) | -0.0 pt | no (0.4 pt) | +0.1 pt | no (0.4 pt) |
+| GSM8K | 0.814 | -0.5 pt | no (2.2 pt) | +0.2 pt | no (2.2 pt) | -0.3 pt | no (2.2 pt) |
 | pass@1 seen (sampled) | 0.213 | +3.5 pt [+1.2, +6.0] | yes (0.4 pt) | +3.1 pt [+1.3, +5.0] | yes (0.4 pt) | +6.6 pt [+3.6, +9.8] | yes (0.2 pt) |
 | pass@8 seen | 0.479 | -3.0 pt [-7.8, +1.2] | no (2.4 pt) | -3.6 pt [-8.1, +0.9] | no (2.4 pt) | -6.6 pt [-12.3, -0.9] | yes (0.0 pt) |
 | pass@1 unseen (sampled) | 0.094 | +1.1 pt [+0.0, +2.4] | no (0.6 pt) | +1.0 pt [-0.1, +2.2] | no (0.6 pt) | +2.2 pt [+0.4, +4.0] | yes (0.6 pt) |
@@ -351,11 +351,11 @@ Bold: beyond the floor. The floor is the sft-from-cpt seed gap or the SE, whiche
 
 ## Serving memory (vLLM's own accounting at start-up)
 
-| variant | GPU | weights (vLLM, GiB) | KV cache (GiB) | KV cache tokens | 8,192-token sequences: vLLM / Step 0 estimate |
+| variant | GPU | weights (vLLM, GiB) | KV cache (GiB) | KV cache tokens | 8,192-token sequences |
 |---|---|---|---|---|---|
-| bf16 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 15.94 | 52.75 | 406,688 | 49.6 / 44 |
-| FP8 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 467,296 | 57.0 / 50 |
-| FP8 + FP8 KV | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 934,608 | 114.1 / 100 |
+| bf16 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 15.94 | 52.75 | 406,688 | 49.6 |
+| FP8 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 467,296 | 57.0 |
+| FP8 + FP8 KV | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 934,608 | 114.1 |
 
 ## Latency and throughput vs concurrency (`unique`: 360 eval requests, 60 / 30 / 10)
 
@@ -394,9 +394,9 @@ Same 108 questions in the same order; rag prompts are ~9% longer (gold passages 
 
 ## Cost
 
-| variant | gate | best concurrency | goodput (req/s) | $ / 1k requests (1 H100) | API $ / 1k requests (Small 4 prices) | break-even sustained req/s |
+| variant | quality against bf16 | best concurrency | goodput (req/s) | $ / 1k requests (1 H100) | API $ / 1k requests (Small 4 prices) | break-even sustained req/s |
 |---|---|---|---|---|---|---|
 | bf16 | reference | 32 | 28.1 | 0.0390 | 0.1266 | 8.7 |
-| FP8 | ships | 32 | 31.5 | 0.0348 | 0.1267 | 8.7 |
+| FP8 | no change beyond the floor | 32 | 31.5 | 0.0348 | 0.1267 | 8.7 |
 
 One H100 at $3.95/h (Modal's H100 SXM5 list price, $0.001097/s, checked 2026-10-09); Small 4's API at $0.15 / $0.6 per million input / output tokens and its self-hosting minimum of 4 H100s ($15.80/h before any request), both from Mistral's Small 4 announcement. Tokens per request are the bench mix's measured means. The break-even is the sustained load above which the GPU is cheaper than the API; below it, an idle GPU costs the same per hour.

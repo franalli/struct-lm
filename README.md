@@ -20,8 +20,10 @@ the same model (**Instruct**). Each training section below says what the step do
 real example of its training data, explains how its training works, and gives all its scores and
 its training curves. Each section ends with a link to its full write-up in `docs/`, which has more
 detail; some of its figures split a measure differently (for example, a log-probability that
-includes the end-of-answer token). The decisions made along the way, and when, are logged in
-[`notes/decisions.md`](notes/decisions.md).
+includes the end-of-answer token). The rules for reading each step's results (the noise floor,
+which checkpoint to keep, when to stop) were written down before the step ran. Every later
+change, with its date, is listed at the top of [`notes/decisions.md`](notes/decisions.md), and
+the ones that bear on a result are noted where that result appears.
 
 ## In brief
 

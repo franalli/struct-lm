@@ -1,41 +1,41 @@
 # Stage 4: DPO on verifiable preferences
 
-![Stage 4: DPO on verifiable preferences, its inputs, steps, the rules that decided and its output](diagrams/stage4.svg)
+![Stage 4: DPO on verifiable preferences, its inputs, steps, the choices made and its output](diagrams/stage4.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
-**Result: one epoch of DPO on 484 verifier-labelled pairs is indistinguishable from its SFT start
-on every pre-registered line; two epochs fit the pairs and displaced the chosen answers.** The
-stage's two findings are that displacement curve, measured end to end with no judge noise to
-blame, and the judge's failure, which is why every pair carries a verifier or rule label.
+**Result: one epoch of DPO on 484 verifier-labelled pairs left greedy accuracy, hallucination,
+citations, MMLU and GSM8K inside the floor of its SFT start, and moved only how the gold answer's
+log-probability splits (the end token up, the unseen answer tokens down); two epochs fit the pairs
+and displaced the chosen answers.** The stage's two findings are that displacement curve, measured
+end to end with no judge noise to blame, and the judge's low recall on known defects (0.28
+grounded, 0.09 definition), which is why every pair carries a verifier or rule label.
 
-**Amended 2026-10-09, post hoc and labelled: sampled accuracy moved.**
-- The pre-registered lines were greedy accuracy, gold log-probability and the guards, and they are
-  unchanged.
-- Sampled accuracy (pass@k, 8 samples at T 0.7) was not measured in Stage 4. Measured in Stage 5
-  as a reported line added after the fact, it moved:
+**Sampled accuracy, measured later (in Stage 5, a metric added after the fact).**
+- Stage 4's own tables (below) measure greedy accuracy and gold-answer log-probability.
+- Sampled accuracy (pass@k, 8 samples at T 0.7) was not measured in Stage 4. Measured in Stage 5:
   - seen pass@1 +3.1 points [+1.0, +5.5] for `dpo` and `dpo-seed1`, and +3.5 [+1.2, +6.0] for
     `dpo-strict`;
-  - pass@8 flat (−3.0, inside the noise).
+  - pass@8 flat (−3.0, inside the floor).
 - DPO sharpened sampled accuracy at a small calibration cost: `dpo-strict`'s gold-answer tokens
   fell 0.11 nats seen (inside the floor) and 0.38 unseen (beyond its 0.210 floor), while the end
-  token rose about 0.10, which the composite netted out. *(Corrected 2026-10-10: this line read
+  token rose about 0.10, which the composite netted out. *(Corrected 2026-10-10: this line said
   "almost no cost", written before `gold_lp` was split, `notes/decisions.md` 2026-10-09.)*
 
-**Amended 2026-10-09: 79 of the 458 closed-book chosen labels were wrong.** The audit was made when
-the closed-book verifier was about to become Stage 5's reward. Retrained on strict labels
-(`dpo-strict`, 445 pairs), DPO is still indistinguishable from SFT on seen accuracy and
+**The label audit (2026-10-09): 79 of the 458 closed-book chosen labels were wrong.** The audit
+was made when the closed-book verifier was about to become Stage 5's reward. Retrained on strict
+labels (`dpo-strict`, 445 pairs), DPO is still inside the floor of SFT on seen accuracy and
 hallucination, so label noise was not why it didn't move. `dpo-strict` is now Stage 4's
 checkpoint ([below](#the-label-audit-and-dpo-strict)).
 
 Direct preference optimisation from the Stage 3 checkpoint (sft-from-cpt, epoch 1), on pairs the
 SFT model wrote itself: every chosen and every rejected answer is one of its own samples, and a
-verifier or a rule decides which is which. It was planned with a Mistral Large 3 judge labelling
-grounded and definition answers. The judge failed its pre-registered benchmark (below), so it
-labels nothing, and the stage became DPO on verifiable preferences (the RLHF Book's ch. 11 case;
-Tülu 3's IF-constraint pairs are built the same way). The plan, the benchmark rule and the
-amendment, made after the benchmark and before any pool sample, are in
+verifier or a rule decides which is which. Before any pair was built, a Mistral Large 3 judge was
+benchmarked as the labeller for grounded and definition answers. It caught 28% of the known
+grounded defects and 9% of the definition ones (below), so it labels nothing, and the stage is DPO
+on verifiable preferences (the RLHF Book's ch. 11 case; Tülu 3's IF-constraint pairs are built
+the same way). That change, made after the benchmark and before any pool sample, is recorded in
 [`notes/decisions.md`](../notes/decisions.md) (2026-10-08).
 
 **The prompts:** 2,506 (`data/dpo/prompts.jsonl`, sha256 `a44cb6b3`): the SFT set's domain prompts
@@ -43,18 +43,19 @@ amendment, made after the benchmark and before any pool sample, are in
 the win rate and 125 for dpo_val.
 
 **The samples:** sft-from-cpt at T 0.7, 4 per closed-book prompt and 8 per grounded, definition
-and abstain prompt: 14,912, all ending on `</s>`. No collapse in the pre-registered probe (0 of 18
-non-abstain prompts).
+and abstain prompt: 14,912, all ending on `</s>`. No collapse in the probe run before sampling (0
+of 18 non-abstain prompts).
 
-## The judge failed its benchmark
+## The judge benchmark
 
 This is the strongest evidence in the repo for why the chain ends with verifiers only. Before any
 pair was labelled, the judge was measured on 166 SFT-builder answers whose defects a full-passage
-read had found or cleared (the 2026-10-05 rule). The A5 judge had passed every one of them one at
-a time. Here each was judged as it would be in the pool: listed with three of the student's own
-answers to the same prompt, all graded in one call.
+reading (the SFT set's audit of 2026-10-05) had found or cleared. The SFT builder's judge had
+accepted every one of them when grading them one at a time. Here each was judged as it would be in
+the pool: listed with three of the student's own answers to the same prompt, all graded in one
+call.
 
-| format | prompt variant | defects caught (recall) | clean answers passed | AUROC |
+| format | prompt variant | defects caught (recall) | clean answers accepted | AUROC |
 |---|---|---|---|---|
 | grounded (60 defects, 60 clean) | rubric as is | **0.28** | 0.92 | 0.66 |
 | | quote the supporting sentence first | 0.18 | 0.95 | 0.67 |
@@ -63,15 +64,14 @@ answers to the same prompt, all graded in one call.
 | | quote first | 0.09 | 0.83 | 0.51 |
 | | full page | 0.04 | 0.83 | 0.50 |
 
-- **The line was recall ≥ 0.5 at ok-pass ≥ 0.8.** Neither format passed, and no prompt variant
-  helped.
+- **No prompt variant raised recall** above the rubric as is (0.28 grounded, 0.09 definition).
 - **What it misses is the audit's kind of defect:** a dropped caveat, a gap in an OCR'd passage
   filled in, one example generalised into a rule. In several misses the judge's own reasoning
   names the flaw and the score is still 5 ("inaccurately expands PUD to 'Probable Ultimate
   Demand', which is not explicitly defined in the passage").
-- **Why a ~25% catch rate can't label pairs:** with ~10% defect prevalence, a judge "fail" at
-  this recall and ok-pass is a true defect only about a quarter of the time, so the rejected side
-  of judged pairs would be mostly good answers.
+- **Why a ~25% catch rate makes poor pair labels:** with ~10% defect prevalence, a judge
+  rejection at this recall and this rate of accepting clean answers is a true defect only about a
+  quarter of the time, so the rejected side of judged pairs would be mostly good answers.
 - **Three biases, measured:**
   - **list position:** the mean score falls about 0.5 point from the first answer to the fourth;
   - **self-preference:** the student's answers score 0.8 (grounded) and 2.1 (definition) points
@@ -85,8 +85,8 @@ answers to the same prompt, all graded in one call.
 - **Next step for a judge:** a per-claim support check (split the answer into claims, check each
   against its cited passage), benchmarked on the same labels before it labels anything.
 
-The listwise prompt (`data/scripts/sft_judge.py`, `judge_list`), with the format's A5 rubric
-inserted and each grade scored as the SFT builder's judge scores one:
+The listwise prompt (`data/scripts/sft_judge.py`, `judge_list`), with the format's SFT-builder
+rubric inserted and each grade scored as the SFT builder's judge scores one:
 
 ```text
 You are grading {n} answers to the same question, for a model that answers questions
@@ -117,29 +117,30 @@ Return JSON with one grade per answer, in answer order, each with its reasoning 
 Every label is a verifier or a rule (`data/scripts/dpo_score.py`, `dpo_pairs.py`):
 
 - **Closed-book:** the answer states the gold fact (the SFT builder's verifier, `same_fact`); the
-  chosen answer also passes a form check. `same_fact` was too lenient: it passed any piece of the
-  gold and judged multi-number golds on their first number, and 79 of the 458 closed-book chosen
-  labels fail the strict checker that replaced it ([the label audit](#the-label-audit-and-dpo-strict)).
+  chosen answer is also checked for form. `same_fact` was too lenient: it accepted any piece of
+  the gold and judged multi-number golds on their first number, and 79 of the 458 closed-book
+  chosen labels are wrong under the strict checker that replaced it
+  ([the label audit](#the-label-audit-and-dpo-strict)).
 - **Abstain:** declining on an unanswerable prompt over answering it.
-- **Grounded:** a rule-passing answer over one that cites an id it wasn't given, doesn't cite the
-  passage the question came from, or refuses an answerable question.
+- **Grounded:** an answer that follows the citation rules over one that cites an id it wasn't
+  given, doesn't cite the passage the question came from, or refuses an answerable question.
 - **Definition:** no pairs, since no verifier knows a definition's quality.
 
 | | closed-book | grounded | abstain | total |
 |---|---|---|---|---|
-| as registered (closed-book capped at half) | 57 | 51 | 6 | **114** |
-| as trained (cap lifted, judge out) | 458 | 42 | 6 | **506** |
+| first mix rule (closed-book capped at half) | 57 | 51 | 6 | **114** |
+| as trained (no cap, no judge) | 458 | 42 | 6 | **506** |
 | strict rebuild (`dpo-strict`, 2026-10-09) | 415 | 42 | 6 | **463** |
 
 - **Composition: DPO on seen facts.**
   - 458 of the 506 pairs are closed-book: one-line answers to prompts SFT already trained on.
   - Chosen and rejected share everything but the value: a median 5-token answer differing in a
     median 3 tokens ("48 months" against "36 months").
-  - Seen qa_acc didn't move beyond the noise even there (below), strict or lenient.
+  - Seen qa_acc didn't move beyond the floor even there (below), strict or lenient.
 - **Size:** 506 pairs (train 484, dpo_val 22), dataset hash `a899f7d2` (`data/dpo/SHA256SUMS`).
-  That is under smol's 1,000-pair floor for domain DPO; Tülu 3 used ~270k.
-- **The cap was a mix rule, not a validity rule.** Lifting it is a post-hoc amendment of the mix,
-  recorded as one.
+  For scale, Tülu 3 used ~270k.
+- **The cap balanced the mix; it never decided a label.** It was lifted after the judge benchmark
+  and before any pool sample, and the change is recorded in the decision log.
 - **Abstain:** 6 pairs, because the student answered only 2% of unanswerable samples.
 - **Self-preference:** chosen and rejected share a generator, so self-preference can't bias which
   answer is chosen.
@@ -161,29 +162,29 @@ The checks around it:
 
 ![Stage 4 DPO curves: loss, reward margin and reward accuracy (train as a moving average, dpo_val as points), and the chosen / rejected sequence log-probs; dpo-2ep in grey](../results/curves/dpo.png)
 
-## The read: one epoch is indistinguishable from the start
+## One epoch against the SFT start
 
-The table below reads every pre-registered line two ways. **The verdict uses the Stage 3 way**, as
-for the CPT-vs-base read: the start is one run of a noisy stage, so its own seed gap
-(sft-from-cpt against its twin) belongs in the floor.
+The table "Change against sft-from-cpt, next to the floor" (below) compares the mean of the two
+seeds with the SFT start. Its floor is the largest of the DPO seed gap, the start's SE and the
+start's own seed gap (sft-from-cpt against its twin, sft-from-cpt-seed1): the start is one run of
+a noisy stage, so its own seed gap belongs in the floor, as in the CPT-against-base comparison.
+That last term was added to the floor after these results were in (`notes/decisions.md`,
+2026-10-09).
 
-- **The rule as written** (max of the DPO seed gap and the start's SE) reads two lines as beyond
-  the noise:
-  - hallucination −3.3 pt against 2.6 (1.3×);
-  - unseen gold-answer log-probability −0.21 nats against 0.19 (1.1×).
-- **The split, measured after the fact (2026-10-09, post hoc):** DPO moved the answer's format as
-  well as its likelihood.
-  - **The end token rose:** +0.10 nats on seen facts and +0.12 on unseen, both beyond the noise.
+- **Hallucination and unseen gold-answer log-probability are inside the floor:** −3.3 against
+  3.9 pt, −0.21 against 0.258 nats.
+- **The split into answer tokens and end token (added after the fact, 2026-10-09):** DPO moved the
+  answer's format as well as its likelihood.
+  - **The end token rose:** +0.10 nats on seen facts and +0.12 on unseen, both beyond the floor.
     DPO made stopping after the gold more likely.
-  - **The answer tokens fell:** −0.08 on seen facts (inside the noise) and −0.33 [−0.45, −0.22] on
-    unseen, which is beyond the Stage 3-way floor (0.21).
-  - **The composite hid it:** it netted the two, which is why it read as inside the noise.
-- **With the start's seed gap in the floor, both fall inside:** −3.3 against 3.9 pt, −0.21
-  against 0.258 nats. No other primary line moves either way.
-- **Hallucination carries no headline:** 4 of 76 → 1 and 2, resting on 6 abstain pairs, and the
+  - **The answer tokens fell:** −0.08 on seen facts (inside the floor) and −0.33 [−0.45, −0.22] on
+    unseen, which is beyond the floor (0.21).
+  - **The composite hid it:** it netted the two, which is why it sits inside the floor.
+- **No other line in the table moves beyond the floor.**
+- **Hallucination:** 4 of 76 → 1 and 2, inside the floor. It rests on 6 abstain pairs, and the
   SFT start's own twin already sits at 1 of 76.
-- **Facts:** qa_seen +1.8 pt and qa_unseen −0.3 pt (the lenient scorer, as registered; strict
-  +0.9 and −0.3), inside the noise. That includes the seen facts the pairs were made of.
+- **Facts:** qa_seen +1.8 pt and qa_unseen −0.3 pt (the lenient checker; strict +0.9 and −0.3),
+  inside the floor. That includes the seen facts the pairs were made of.
 - **Unchanged:** false abstain (0 of 108), `cite_valid` (1.000), MMLU, GSM8K, answer length (−21%
   to +3%).
 - **The policy barely moved:** train loss 0.693 → 0.654, dpo_val margin 0.06, `rewards/chosen`
@@ -191,14 +192,14 @@ for the CPT-vs-base read: the start is one run of a noisy stage, so its own seed
   - 58 of 100 greedy answers are byte-identical to SFT's.
   - 82 of 100 win-rate comparisons are ties.
   - The win rate itself is 0.52 and 0.515 (SE 0.05), reported only.
-- **Serving:** not read here. The Stage 2-5 latency cells are single samples on an unrecorded GPU;
-  Stage 6 measures serving.
+- **Serving:** the Stage 2-5 latency cells are single samples on an unrecorded GPU, so this page
+  draws nothing from them; Stage 6 measures serving.
 
 ## The finding: the displacement curve
 
 `dpo-2ep` is the same data, seed and recipe for two epochs (62 steps, linear schedule over both,
-epoch 2 evaluated). It is an ablation, not a candidate, added post hoc because the one-epoch loss
-ended at 0.654 with the margin still rising.
+epoch 2 evaluated). It is an ablation, never a candidate for the stage's checkpoint, added after
+the one-epoch results because the one-epoch loss ended at 0.654 with the margin still rising.
 
 - **At 31 steps the policy barely moved:** dpo_val margin 0.06, `rewards/chosen` near zero.
 - **At 62 it fit the pairs and displaced the chosen answers:**
@@ -206,10 +207,10 @@ ended at 0.654 with the margin still rising.
   - the chosen answers lost about 2.3 nats on dpo_val (`rewards/chosen` −0.23 at β 0.1) and the
     rejected about 6.1, so the margin grew by pushing both down;
   - gold-answer log-probability fell 3.0 nats on seen facts and 4.3 on unseen (CIs
-    [−3.5, −2.5] and [−5.0, −3.7]), in the answer tokens, on 80% of items;
+    [−3.5, −2.5] and [−5.0, −3.7]), beyond the floor, in the answer tokens, on 80% of items;
   - seen qa_acc fell 4.8 points against one epoch (lenient 0.311 → 0.264, strict 0.305 → 0.258),
-    below the SFT start (0.281 lenient, 0.287 strict).
-- **Unchanged even then:** hallucination, false abstain, `cite_valid`, qa_unseen (strict and lenient), MMLU, GSM8K.
+    beyond the floor and below the SFT start (0.281 lenient, 0.287 strict).
+- **Inside the floor even then:** hallucination, false abstain, `cite_valid`, qa_unseen (strict and lenient), MMLU, GSM8K.
 - **What it is:** the preference displacement of the RLHF Book's ch. 8, measured end to end on a
   verifier-labelled set.
 - **Why the window is so narrow here:** with 484 near-duplicate pairs (chosen and rejected share
@@ -218,44 +219,45 @@ ended at 0.654 with the margin still rising.
   1. **an NLL anchor on the chosen answer:** RPO, `rpo_alpha` in the DPO literature (ch. 15),
      `loss_type: [sigmoid, sft]` in TRL 0.29.1;
   2. **pairs at a scale where one epoch is many steps.**
-- **The checkpoint rule picked wrong.** It read the dpo_val DPO loss, which kept falling (0.647 at
-  step 30 → 0.571) while dpo_val accuracy sat at 0.68 and `rewards/chosen` went negative. For DPO
-  the selector should be `rewards/chosen` ≥ 0 or val accuracy, never the loss. (No dpo_val eval
-  landed at step 31; step 30 stood in.)
+- **The checkpoint rule kept the displaced checkpoint.** It compared the dpo_val DPO loss, which
+  kept falling (0.647 at step 30 → 0.571) while dpo_val accuracy sat at 0.68 and
+  `rewards/chosen` went negative. For DPO the selector should be `rewards/chosen` ≥ 0 or val
+  accuracy, never the loss. (No dpo_val eval landed at step 31; step 30 stood in.)
 - **Its merge gate is flagged:**
-  - The val-loss criterion read 0.58% against 0.5%: merged 0.5663 against unmerged 0.5696 nats on
-    sft_val, 0.0033 apart.
+  - The val-loss criterion measured 0.58% against its 0.5% line: merged 0.5663 against unmerged
+    0.5696 nats on sft_val, 0.0033 apart.
   - The merge-isolating criteria pass: the merge adds 5 argmax flips against fp32 (11 allowed),
     and its |Δlp| is 1.43× the adapter's own (line 1.5).
   - The merge error's tail is longer than one epoch's (max 4.18 nats against 0.55), consistent
     with a bigger adapter delta cast to bf16.
-  - Evaluated under the rule fixed before the diagnosis (`notes/decisions.md`, 2026-10-09).
+  - It was evaluated with its row flagged, under a procedure set before the diagnosis
+    (`notes/decisions.md`, 2026-10-09).
 
 ## The label audit and dpo-strict
 
 **The verifier was audited before it became an RL reward.** The closed-book verifier that
-labelled these pairs was about to become Stage 5's reward, so its passes were read before
-anything optimised against it: the RLHF Book's ch. 14 lesson (an optimiser finds a proxy's
+labelled these pairs was about to become Stage 5's reward, so the answers it accepted were checked
+before anything optimised against it: the RLHF Book's ch. 14 lesson (an optimiser finds a proxy's
 slack) applied before the optimiser could.
 
-**What the audit found:** `same_fact` passed any piece of the gold ("Section" for
+**What the audit found:** `same_fact` accepted any piece of the gold ("Section" for
 "Section 17.8.2") and judged multi-number golds on their first number ("class 8" for "8 x 19").
 The strict checker that replaced it (`eval/scorers.qa_strict`, 88 fixtures in
 `tests/test_qa_strict.py`) works as follows:
 - **Values:** every gold number must be present, in a compatible unit, with no conflicting value.
 - **Identifiers:** the whole gold must be present, ending on its numbered token. A named document
-  passes ("AASHTO LRFD Article 6.5.4.2" for "6.5.4.2"); a fragment, or a parent or child section,
-  fails.
+  is accepted ("AASHTO LRFD Article 6.5.4.2" for "6.5.4.2"); a fragment, or a parent or child
+  section, is rejected.
 - **Terms:** the whole phrase, with up to three words of context.
-- **Every answer:** one candidate. An "or", or a range the gold lacks, fails, and so does a
+- **Every answer:** one candidate. An "or", or a range the gold lacks, is rejected, and so is a
   phrase answer that splits into several candidates on a comma, semicolon, slash, "or" or "and",
   unless it is the gold exactly.
-- **Read before use:** every changed verdict was read against its gold first (rule 8).
+- **Checked by hand before use:** every changed verdict was compared with its gold first.
 
 **Verifiers are adversarial objects once they become rewards. The repo found that out three times
 in one day:**
-1. **The substring checker was caught by auditing its passes.** `same_fact` labelled the Stage 4
-   pairs, and reading what it accepted found the fragment hole before it became a reward.
+1. **The substring checker was caught by auditing what it accepted.** `same_fact` labelled the
+   Stage 4 pairs, and reading what it accepted found the fragment hole before it became a reward.
 2. **The strict checker was caught by reading its code against its own one-answer rule.**
    - It caught "or", ";" and ranges but not commas, so "cripple wall, shear wall" and "17.8.3,
      Section 17.8.2" earned full credit.
@@ -289,8 +291,8 @@ an 80th, a right answer that adds a noun to a gold holding "or".
 - On the whole pool, closed-book sample accuracy falls from 34.4% to 30.1%.
 
 **The eval's scorer** (`qa_correct`) is a different function, so it never had the fragment hole.
-It is lenient elsewhere: a range for a point value passes, the first number of a fraction counts,
-units are never compared, and a child section passes by containment.
+It is lenient elsewhere: a range for a point value is accepted, the first number of a fraction counts,
+units are never compared, and a child section is accepted by containment.
 - Every row's stored answers were re-scored ([`results/qa_strict/evals.md`](../results/qa_strict/evals.md)).
 - 16 distinct verdicts change; 14 strict verdicts are right and 2 are arguable (both Large 3's).
 - `qa_acc` drops 0 to 1.6 points per 8B row (lenient → strict) and 1.9 for Large 3, and no ordering changes, Stage
@@ -300,51 +302,52 @@ units are never compared, and a child section passes by containment.
 **`dpo-strict` is the same recipe on strict labels:**
 - 463 pairs (train 445), seed 0, 28 steps, the same checkpoint rule (final step).
 - Merge gate passed (−5 added flips).
-- It ran below the registered 500-pair floor. That floor was a stop rule for whether the first set
-  was worth training at all, a question the 506-pair run and `dpo-2ep` had answered. The override
-  covers this rerun only (`notes/decisions.md`, 2026-10-09).
+- The pair builder stops below 500 pairs, a check on whether a set is worth training at all. The
+  506-pair run and `dpo-2ep` had already answered that, so the check was overridden for this rerun
+  only (`notes/decisions.md`, 2026-10-09).
 
-Against `sft-from-cpt`, read the Stage 3 way. No strict twin was run, so the floor uses the
-lenient `dpo` pair's seed gap.
+Against `sft-from-cpt`, with the same floor as the one-epoch table (the start's own seed gap
+included). No strict twin was run, so the floor uses the lenient `dpo` pair's seed gap.
 
 | line | sft-from-cpt | dpo-strict | change | floor | beyond |
 |---|---|---|---|---|---|
 | qa_seen, strict | 0.287 | 0.305 | +1.8 pt | 3.5 pt | no |
 | qa_seen, lenient | 0.281 | 0.299 | +1.8 pt | 3.5 pt | no |
 | hallucination | 4 of 76 | 3 of 76 | −1.3 pt | 3.9 pt | no |
-| seen gold-answer log-prob | −5.120 | −5.130 | −0.01 [−0.10, +0.08] nats | 0.258 | no |
+| seen gold-answer log-prob | −5.120 | −5.130 | −0.01 [−0.10, +0.08] nats | 0.247 | no |
 | of it, the answer tokens | −4.697 | −4.811 | −0.11 [−0.20, −0.03] nats | 0.173 | no |
 | of it, the end token | −0.423 | −0.319 | +0.10 [+0.08, +0.13] nats | 0.074 | yes |
-| unseen gold-answer log-prob | −6.426 | −6.695 | −0.27 [−0.40, −0.16] nats | 0.258 | at the floor |
+| unseen gold-answer log-prob | −6.426 | −6.695 | −0.27 [−0.40, −0.16] nats | 0.258 | just past it |
 | of it, the answer tokens | −5.895 | −6.274 | −0.38 [−0.50, −0.27] nats | 0.210 | yes |
 | of it, the end token | −0.531 | −0.421 | +0.11 [+0.08, +0.14] nats | 0.066 | yes |
-| MMLU (guard) | 0.766 | 0.767 | +0.1 pt | 0.35 pt | no |
-| GSM8K (guard) | 0.814 | 0.809 | −0.5 pt | 2.2 pt | no |
+| MMLU | 0.766 | 0.767 | +0.1 pt | 0.35 pt | no |
+| GSM8K | 0.814 | 0.809 | −0.5 pt | 2.2 pt | no |
 
-- **The expectation, written before it reported, held.** It moved the policy even less than `dpo`
-  (dpo_val margin 0.05, win rate 0.54 with 84 of 100 ties and 60 byte-identical answers). Seen
-  accuracy and hallucination sit inside the noise: label noise was not why DPO didn't move.
-- **Unseen gold-answer log-probability fell 0.27 nats,** just past the 0.258 floor on one run. It
-  is the same direction as `dpo`'s −0.21 and is named as a cost, not argued.
+- **It moved the policy even less than `dpo`** (dpo_val margin 0.05, win rate 0.54 with 84 of 100
+  ties and 60 byte-identical answers). Seen accuracy and hallucination sit inside the floor: label
+  noise was not why DPO didn't move.
+- **Unseen gold-answer log-probability fell 0.27 nats,** just past the 0.258 floor, on one run
+  with no twin. It is the same direction as `dpo`'s −0.21 (inside the floor), and it is a cost.
 - **Split after the fact, the cost is in the answer tokens:** −0.38 nats unseen, beyond the floor,
   and −0.11 seen, inside it. The end token rose +0.10 to +0.11, as for `dpo`: DPO made stopping
   after the gold more likely, and the composite netted that against the cost.
-- **Stage 4's checkpoint is `dpo-strict`.** Every stage from here reads "reward = the strict
-  verifier". `dpo` and `dpo-seed1` stay in the tables as the as-run rows.
+- **Stage 4's checkpoint is `dpo-strict`.** From here on, the closed-book reward is the strict
+  verifier. `dpo` and `dpo-seed1` stay in the tables as the first-label rows.
 
-**The rerun triggers:**
-- **Displacement and over-shooting** didn't fire on the one-epoch runs.
-- **Under-training:** its first clause read the win rate, which the judge's failure demoted, so
-  "not fired as written" is a clause that can no longer be evaluated, not evidence against it.
-- **The registered rerun, length-normalised `dpo-lnorm`,** was skipped because its time condition
-  was unmet. With verifier-labelled, length-capped, one-line pairs it would also have answered
-  nothing.
+**The rerun checks after the one-epoch runs:**
+- **Displacement and over-shooting:** neither fired on the one-epoch runs.
+- **Under-training:** its first part used the win rate, which the judge benchmark left as reported
+  only, so this check could not be evaluated either way.
+- **A length-normalised rerun (`dpo-lnorm`)** was skipped for lack of time. Length normalisation
+  counters length bias in judge-labelled pairs; these pairs are verifier-labelled, length-capped
+  and mostly one line.
 - **Preemption:** `dpo` was preempted on Modal mid-training and restarted (`notes/decisions.md`);
   the seed twin ran clean.
 
 **Stage 4 final and the chain:** `checkpoints/dpo-strict` (seed 0, strict labels, merged sha256
-`e686ca7b`), replacing the registered `checkpoints/dpo` after the label audit. It is the SFT
-checkpoint within noise, so GRPO starts from a policy that is effectively the SFT checkpoint.
+`e686ca7b`), replacing `checkpoints/dpo` (the first-label run) after the label audit. It sits
+inside the floor of the SFT checkpoint on accuracy, hallucination, MMLU and GSM8K, so GRPO starts
+from a policy that is effectively the SFT checkpoint.
 That makes Stage 5 the clean comparison: the same strict verifier, offline pairs (DPO) against
 on-policy groups (GRPO). Stage 4 as first run was lenient (79 of 458 closed-book chosen labels
 wrong under the strict rule); `dpo-strict` and Stage 5 are strict.
@@ -456,26 +459,25 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
    was built for SFT, where the val loss is the model's likelihood. In DPO the loss kept falling
    (0.647 → 0.571) while val accuracy sat at 0.68 and the chosen answers lost 2.3 nats, and the
    rule picked the displaced checkpoint.
-2. **Benchmark the judge before planning around it.**
-   - The plan counted on ~300 judged grounded and ~300 judged definition pairs.
+2. **Benchmark a judge before giving it a role in pair-building.**
    - The 2026-10-06 dry run had already shown the judge scoring every grounded sample 5.0.
    - A benchmark first would have put the verifier design on day one, not at 20:30.
 3. **Size the steps from the set, before training.** 484 near-duplicate pairs at 16 per step is 31
    steps. One epoch barely moved the policy and two displaced it, so the step count and the NLL
-   anchor belonged in the pre-registration, fixed from the pair count.
-4. **A trigger needs a val set that can carry it.** dpo_val ended at 22 pairs (accuracy SE about
-   0.1), because it was held out by prompt before the pair yield was known. Hold out pairs, at
-   least ~100, after the set is built.
+   anchor should have been fixed from the pair count before training.
+4. **A rerun check needs a val set that can carry it.** dpo_val ended at 22 pairs (accuracy SE
+   about 0.1), because it was held out by prompt before the pair yield was known. Hold out pairs,
+   at least ~100, after the set is built.
 5. **Make training restarts exclusive.** A Modal preemption restarted `dpo` while the first
    attempt was still writing. An attempt lock in the output directory would have kept one writer.
-6. **Watch failed chains, not just finished ones.** `dpo-2ep`'s merge gate stopped its chain at
-   22:38, and it was noticed at 00:28: the wait looked for a completion line a failed run never
-   prints. Waiting on the process's exit status would have shown it at once.
-7. **Audit a verifier's passes before it labels anything.**
-   - `same_fact` was written for the SFT builder, where a lenient check cost little.
-   - It labelled 458 DPO pairs before anyone read what it accepted.
-   - Reading its passes took an hour and found 79 wrong chosen labels.
-   - That read belonged before the pairs, not before the RL reward.
+6. **Watch chains that stop, not just ones that finish.** `dpo-2ep`'s merge gate stopped its chain
+   at 22:38, and it was noticed at 00:28: the wait looked for a completion line a stopped run
+   never prints. Waiting on the process's exit status would have shown it at once.
+7. **Audit what a verifier accepts before it labels anything.**
+   - `same_fact` came from the SFT builder, where a lenient check cost little.
+   - It labelled 458 DPO pairs before anyone checked what it accepted.
+   - Reading its accepted answers took an hour and found 79 wrong chosen labels.
+   - That audit belonged before the pairs, not before the RL reward.
 
 
 ## What I'd do next
@@ -492,5 +494,6 @@ Diversity (100 prompts at T 0.7: 50 general, 50 domain; distinct-4 and entropy o
 4. **More abstain pairs:** the student answered only 2% of unanswerable samples, so 6 pairs.
    Harder unanswerable prompts (near-miss passages) would give the abstain preference real weight.
 5. **One yardstick for the merge gate's loss criterion at every stage:** the sft_val NLL, CPT to
-   GRPO (DPO moved onto it at its freeze), stated in nats next to the relative line. `dpo-2ep`
-   missed 0.5% by an absolute 0.0033 nats while the fp32-referenced criteria passed.
+   GRPO (DPO moved onto it at its freeze), stated in nats next to the relative line. `dpo-2ep`'s
+   merged and unmerged val losses were 0.0033 nats apart (0.58%, over the 0.5% line) while the
+   fp32-referenced criteria passed.

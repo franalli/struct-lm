@@ -1,21 +1,21 @@
 # Stage 0: the problem, the eval and the baselines
 
-![Stage 0: the eval and the baselines, its inputs, steps, the rules that decided and its output](diagrams/stage0.svg)
+![Stage 0: the eval and the baselines, its inputs, steps, the choices made and its output](diagrams/stage0.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
-**Result: the eval every later stage is read against, and the bar it sets.**
+**Result: the eval every later stage is measured on, and what the two baselines scored on it.**
 - **The eval:** 716 items in four tasks (closed-book questions, grounded answers with citations,
-  definitions, unanswerable questions), written by Mistral Large 3 from the training documents and
-  reviewed against their sources before any model was scored.
+  definitions, unanswerable questions), written by Mistral Large 3 from the training documents,
+  each reviewed against its source before any model was scored on it.
 - **The base model** finds grounded answers but neither cites nor declines: it cites correctly 10%
   of the time and answers 88% of unanswerable questions with something invented (Stage 0's row, on
   eval v2).
-- **Stock Instruct, the bar,** has that behaviour but no more domain knowledge: 9.6% closed-book
-  against the base's 12.1% (strict, 322 items; Mistral Large 3 scores 26%).
-- **So** closed-book knowledge is the gap CPT was meant to close, and SFT had to bring citation and
-  refusal at least to Instruct's level ([where it starts](#where-it-starts)).
+- **Stock Instruct, the comparison,** has that behaviour but no more domain knowledge: 9.6%
+  closed-book against the base's 12.1% (strict, 322 items; Mistral Large 3 scores 26%).
+- **So** Instruct adds the behaviour (citing, declining) but no closed-book knowledge, which is low
+  for both ([where it starts](#where-it-starts)).
 
 ## The problem
 
@@ -41,23 +41,22 @@ US federal works carry no licensing risk; copyrighted standards such as ASCE 7 a
 are deliberately excluded. The starting checkpoint is Ministral 3 8B Base, from the same model
 generation such engagements start from.
 
-The two kinds of training do different jobs:
+The two kinds of training use different data:
 
-- **Continued pre-training (CPT)** on raw domain text (next-token loss) teaches knowledge and
-  vocabulary. Its risk is forgetting general capability, which is managed by replaying general
-  text and keeping the learning rate low.
-- **Fine-tuning (SFT → DPO → GRPO)** on a few thousand curated examples teaches behaviour: answer
-  from the passages given, cite them, decline when the answer isn't there, and get verifiable
-  calculations right.
+- **Continued pre-training (CPT)** trains on raw domain text with the next-token loss: the model
+  reads the documents themselves. Its risk is forgetting general capability; to limit it,
+  general text was replayed and the learning rate kept low.
+- **Fine-tuning (SFT → DPO → GRPO)** trains on a few thousand curated examples of behaviour:
+  answering from the passages given, citing them, and declining when the answer isn't there.
 
-The goal is not a great model. It is a clean experiment with honest numbers and decisions that can
-be defended, measured before and after every stage.
+Every stage is measured before and after with the same eval, and decisions are recorded with
+their reasoning in [`notes/decisions.md`](../notes/decisions.md).
 
-## How success is measured
+## How the model is measured
 
-The eval harness was built before any training, so it couldn't be fitted to a model. The same six
-measurements run after every stage, with the base model and the off-the-shelf instruct model as
-the first two rows.
+The first version of the eval was built before any training; its later changes are dated below.
+The same six measurements run after every stage, with the base model and the off-the-shelf
+instruct model as the first two rows.
 
 | # | What it measures | Task | Metrics |
 |---|---|---|---|
@@ -92,19 +91,18 @@ v3's 322 items in [`results/table.md`](../results/table.md)):
   against the base model's 12.0% on the 325 questions (12% against 14% on the original 130). Those
   are the lenient scorer's numbers. On v3's 322 items with the strict checker of 2026-10-09 they
   are 9.6% against 12.1%. For scale, Mistral Large 3 answers 28% of them closed-book (26% strict).
-- **Closed-book domain accuracy is low for both.** That is the knowledge gap CPT is meant to close,
-  while SFT brings citation and refusal behaviour up to the instruct model's level or beyond (DPO,
-  on verifier-labelled pairs, left it where SFT put it), and the general-capability columns stay
-  flat.
+- **Closed-book domain accuracy is low for both.** What each later stage changed against these
+  rows is in its own write-up and in [`docs/results.md`](results.md).
 
-**Why the instruct model is the bar.** `Ministral-3-8B-Instruct-2512` (the BF16 HF checkpoint) is
-Mistral's own instruct post-trained version of the base trained on here (model card).
+**Why the instruct model is the comparison.** `Ministral-3-8B-Instruct-2512` (the BF16 HF
+checkpoint) is Mistral's own instruct post-trained version of the base trained on here (model
+card).
 - **Same model, different post-training:** the same 8B dense architecture, Tekken tokenizer and
   vision tower, starting from the same base. Its weights differ by Mistral's post-training, as the
   SFT runs' differ by this repo's. So every difference between them comes from post-training data
   and method, not model size.
-- **The business claim:** it is what a client would deploy off the shelf. So beating it is "an 8B
-  tuned on your corpus beats the stock 8B on your questions".
+- **What a client would deploy:** it is the stock 8B a client would run off the shelf, so the
+  comparison shows what tuning an 8B on the client's corpus changes, on the client's questions.
 
 **How it is scored: without its default system prompt.** Its HF chat template
 (`chat_template.jinja`) inserts a default system prompt ("You are Ministral-3-8B-Instruct-2512, a
@@ -113,8 +111,8 @@ template.
 - **The KPI eval** renders every chat model through the same `--chat` path: vLLM with
   `tokenizer_mode=mistral`, that is mistral-common's `encode_chat_completion` of one user turn.
   It renders `<s>[INST] prompt [/INST]` with no system prompt.
-- **The serving benchmark** goes through the same rendering, and lm-eval uses no chat template at
-  all (rule 2).
+- **The serving benchmark** goes through the same rendering, and lm-eval uses no chat template
+  for any checkpoint.
 - **So the comparison is on the template the eval renders, the one the SFT models were trained in,
   not the template Mistral ships for the instruct model.** Its default system prompt might change
   its refusal and citation behaviour; that was not measured here.

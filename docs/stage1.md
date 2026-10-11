@@ -1,9 +1,9 @@
 # Stage 1: the corpus
 
-![Stage 1: the corpus, its inputs, steps, the rules that decided and its output](diagrams/stage1.svg)
+![Stage 1: the corpus, its inputs, steps, the choices made and its output](diagrams/stage1.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
 **Result: 246 public-domain documents, 20.6M tokens after cleaning and deduplication (19.4M in the
 train split), plus a FineWeb-Edu replay slice, and no benchmark leak.**
@@ -85,10 +85,10 @@ as in Llama 2. Full tables are in [`results/contamination.md`](../results/contam
   The prompt is identical for every checkpoint, so no delta moves, and the frozen set keeps them.
   - **Tagged:** both carry `fewshot_passage_overlap: true` in `domain_qa.jsonl`, for per-item
     analyses to exclude.
-  - **Fixed for the next rebuild:** `make_tasks.py --task-version 3` splits the shots off by
+  - **Fixed in v3, the current set:** `make_tasks.py --task-version 3` splits the shots off by
     passage. It keeps the v2 ids and only removes items: 322, the two plus one identifier under the
     20% cap.
-  - **Guarded:** `tests/test_fewshot.py` fails if a new shared passage appears.
+  - **Tested:** `tests/test_fewshot.py` fails if a new shared passage appears.
 
 **Where the held-out gain sits.** The val and 2026 perplexity windows, binned by the share of their
 tokens inside a 13-gram that also occurs in train (`cpt-8b-replay10` vs `base-8b-hf`; seed 1
@@ -102,11 +102,12 @@ agrees):
 | over 20% | 9 | -5.21% | 0 | |
 | all | 296 | -2.33% | 82 | -0.43% |
 
-- **Shared text is learned most, and the gradient is the shape of learning, not of a leak.**
-  - The gain rises smoothly with overlap, from -1.70% on windows sharing under 1% of their tokens
-    to -5.21% over 20% (Spearman -0.57 over the 296 val windows).
-  - A leak would sit in a few copied windows instead.
-  - Against that -1.70% floor, verbatim sharing carries about a quarter of the val gain.
+- **Shared text gains most, and the gain rises smoothly with overlap rather than sitting in a few
+  copied windows.**
+  - The gain rises from -1.70% on windows sharing under 1% of their tokens to -5.21% over 20%
+    (Spearman -0.57 over the 296 val windows).
+  - Taking the windows that share almost nothing (-1.70%) as the base level, verbatim sharing
+    carries about a quarter of the val gain.
   - This is an association: windows with more shared text are also more formulaic (base perplexity
     5.6 against 7.2).
 - **It doesn't explain the gap to new documents.** On windows that share almost nothing, val still

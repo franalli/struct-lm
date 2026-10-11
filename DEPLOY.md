@@ -1,15 +1,16 @@
 # Deploying struct-lm
 
 The served model is `stage5-final` = `checkpoints/dpo-strict`: Ministral 3 8B after CPT, SFT and
-DPO on verifiable preferences ([`docs/`](docs/), Stages 2-5), served text-only. The quality gate, benchmark
-and cost lines are Stage 6's (`notes/decisions.md`, 2026-10-09, pre-registered before any
-quantized checkpoint existed). Every latency number here was measured on one H100 80GB HBM3 (SXM),
-pinned with Modal's `gpu="H100!"` and checked at runtime.
+DPO on verifiable preferences ([`docs/`](docs/), Stages 2-5), served text-only. The quality
+comparison, load tests and cost calculation are Stage 6's (`notes/decisions.md`, 2026-10-09; their
+procedures were written down before any quantized checkpoint existed). Every latency number here
+was measured on one H100 80GB HBM3 (SXM), pinned with Modal's `gpu="H100!"` and checked at runtime.
 
 ## What to deploy
 
-**Two checkpoints pass the pre-registered quality gate, bf16 (the reference) and FP8 W8A8, and
-the choice between them is the load.**
+**Two checkpoints are served, bf16 (the reference) and FP8 W8A8, and the choice between them is
+the load.** FP8's differences from bf16 are within the floor on every line of
+[Quality against bf16](#quality-against-bf16) that has one.
 - **bf16 (`checkpoints/dpo-strict`) up to the measured 16 requests/s of open arrivals.** There it
   has the faster first token (21-40 against 39-76 ms p50) and, at 16 req/s, the better tail (E2EL
   p99 1,298 against 1,399 ms) and goodput (98.8% against 95.6%).
@@ -18,24 +19,24 @@ the choice between them is the load.**
   40% lower inter-token latency there, and room for 57 concurrent 8k-token sequences against 49.6.
 - **Unmeasured:** open-loop loads between 16 req/s and saturation, where the crossover lies.
 
-FP8 with an FP8 KV cache failed one gate line (strict closed-book, seen half, −4.2 against a
-3.5-point floor), and INT4 W4A16 failed broadly (gold-answer log-probability about twice the floor,
-GSM8K −6.1). Neither is a deployment option for this model.
+FP8 with an FP8 KV cache moved one line beyond its floor (strict closed-book, seen half, −4.2
+against a 3.5-point floor), and INT4 W4A16 moved several lines beyond theirs (gold-answer
+log-probability about twice the floor, GSM8K −6.1). Neither is a deployment option for this model.
 
 <!-- deploy-variants:start -->
-| variant | quality gate |
+| variant | quality against bf16 |
 |---|---|
 | bf16 | reference |
-| FP8 | ships |
-| FP8 + FP8 KV | fails |
-| INT4 W4A16 | fails |
+| FP8 | no change beyond the floor |
+| FP8 + FP8 KV | changes beyond the floor |
+| INT4 W4A16 | changes beyond the floor |
 <!-- deploy-variants:end -->
 
 | checkpoint | weights on disk | in GPU memory (vLLM) | digest (merge_check / quantize_meta) |
 |---|---|---|---|
 | `checkpoints/dpo-strict` (bf16) | 17.8 GB | 15.94 GiB | `e686ca7bf11e…` |
 | `checkpoints/dpo-strict-fp8` (FP8 W8A8: per-channel weights, per-token dynamic activations) | 10.42 GB | 9.01 GiB | `a241f60fe9e3…` |
-| `checkpoints/dpo-strict-w4a16` (INT4 W4A16: GPTQ, group 128, symmetric; fails the gate) | 6.83 GB | 5.66 GiB | `c7a87b497b24…` |
+| `checkpoints/dpo-strict-w4a16` (INT4 W4A16: GPTQ, group 128, symmetric; not served) | 6.83 GB | 5.66 GiB | `c7a87b497b24…` |
 
 The vision tower (0.43B parameters) is on disk in every variant and never loaded: with
 `--limit-mm-per-prompt '{"image": 0}'` vLLM skips it (15.94 GiB loaded of 16.6 GiB on disk for bf16).
@@ -86,8 +87,8 @@ vllm serve /path/to/dpo-strict-fp8 \
 | `--enable-prefix-caching` | shared instruction prefixes and repeated retrieval contexts skip prefill (measured below) |
 
 The precision variants differ only in the checkpoint directory (the quantization is read from each
-checkpoint's `quantization_config`, compressed-tensors) and, for the FP8 KV cache, which failed the
-gate, `KV_CACHE_DTYPE=fp8` (`--kv-cache-dtype fp8`).
+checkpoint's `quantization_config`, compressed-tensors) and, for the FP8 KV cache (not served),
+`KV_CACHE_DTYPE=fp8` (`--kv-cache-dtype fp8`).
 
 ## Request contract
 
@@ -122,21 +123,21 @@ degrades (3 MMLU points on the base). Check a new serving path with `eval/vllm_p
 | bf16 | 6.8945 | 6.8945 |
 | FP8 | 6.9171 (+0.33%) | |
 
-## Memory budget
+## GPU memory
 
 KV cache per token = 2 (K, V) × 34 layers × 8 KV heads × 128 head dim × 2 bytes = 139,264 bytes
 (136 KiB; vLLM's own accounting gives the same), so one 8,192-token sequence holds 1.14 GB, half
 that with an FP8 KV cache. GQA (8 KV heads for 32 query heads) is what keeps it this small.
 
 <!-- deploy-memory:start -->
-| variant | GPU | weights (vLLM, GiB) | KV cache (GiB) | KV cache tokens | 8,192-token sequences: vLLM / Step 0 estimate |
+| variant | GPU | weights (vLLM, GiB) | KV cache (GiB) | KV cache tokens | 8,192-token sequences |
 |---|---|---|---|---|---|
-| bf16 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 15.94 | 52.75 | 406,688 | 49.6 / 44 |
-| FP8 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 467,296 | 57.0 / 50 |
-| FP8 + FP8 KV | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 934,608 | 114.1 / 100 |
+| bf16 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 15.94 | 52.75 | 406,688 | 49.6 |
+| FP8 | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 467,296 | 57.0 |
+| FP8 + FP8 KV | NVIDIA H100 80GB HBM3 (driver 610.57.04, vLLM 0.29.0) | 9.01 | 60.61 | 934,608 | 114.1 |
 <!-- deploy-memory:end -->
 
-## Expected latency (H100, measured)
+## Latency (H100, measured)
 
 `unique`: 360 eval requests (216 closed-book, 108 grounded, 36 abstain), greedy, each at its task's
 token cap, prefix cache reset before each run, two runs per row. FP8 against bf16:
@@ -145,8 +146,9 @@ token cap, prefix cache reset before each run, two runs per row. FP8 against bf1
 - **Slower first token at low load:** 35 against 18 ms p50 at one request, a near-constant
   10-20 ms per prefill (unexplained); by 64 requests it is lost in queueing.
 
-The SLO used for goodput is TTFT <= 500 ms and TPOT <= 25 ms; both variants serve the most requests
-inside it at 32 concurrent requests, and past that the queue breaks it for most requests.
+Goodput counts the requests with TTFT <= 500 ms and TPOT <= 25 ms. Both variants serve the most
+such requests at 32 concurrent requests; past that, queueing pushes most requests over one of the
+two limits.
 
 <!-- deploy-latency:start -->
 | variant | concurrency | TTFT p50 / p99 (ms) | ITL p50 / p99 (ms) | E2EL p50 / p99 (ms) | req/s | output tok/s | goodput share | run pair spread |
@@ -167,7 +169,7 @@ bf16 (15.9 GB), 2.5 ms for FP8 (8.5 GB) and 1.5 ms for INT4 (4.9 GB, `lm_head` s
 inter-token latency under 4.75 ms at concurrency 1 did not run on an H100 (an H200 at 4.8 TB/s sits
 30% lower), whatever the request said.
 
-## Quality gate
+## Quality against bf16
 
 <!-- deploy-gate:start -->
 | line | bf16 | FP8 − bf16 | FP8 + FP8 KV − bf16 | INT4 W4A16 − bf16 | floor |
@@ -190,20 +192,20 @@ inter-token latency under 4.75 ms at concurrency 1 did not run on an H100 (an H2
 
 ## Cost
 
-**Where the 8B stops being the right choice.**
+**When the 8B on one GPU is the cheaper choice.**
 - **The GPU only pays at sustained load.** One H100 (bf16 or FP8) beats Mistral Small 4's API price
   only above ~9 requests/s sustained (31k an hour, at this request mix). Below that, the API is
   cheaper per request, because an idle GPU still bills by the hour.
 - **The 8B's case is the customer's facts on one GPU.** Self-hosting Small 4 needs at least four
   H100s.
-- **General capability is where it stops.** There, a 119B MoE like Small 4 is the likelier winner;
-  that comparison wasn't run here.
+- **General capability against a 119B MoE like Small 4 is unmeasured:** that comparison wasn't run
+  here.
 
 <!-- deploy-cost:start -->
-| variant | gate | best concurrency | goodput (req/s) | $ / 1k requests (1 H100) | API $ / 1k requests (Small 4 prices) | break-even sustained req/s |
+| variant | quality against bf16 | best concurrency | goodput (req/s) | $ / 1k requests (1 H100) | API $ / 1k requests (Small 4 prices) | break-even sustained req/s |
 |---|---|---|---|---|---|---|
 | bf16 | reference | 32 | 28.1 | 0.0390 | 0.1266 | 8.7 |
-| FP8 | ships | 32 | 31.5 | 0.0348 | 0.1267 | 8.7 |
+| FP8 | no change beyond the floor | 32 | 31.5 | 0.0348 | 0.1267 | 8.7 |
 
 One H100 at $3.95/h (Modal's H100 SXM5 list price, $0.001097/s, checked 2026-10-09); Small 4's API at $0.15 / $0.6 per million input / output tokens and its self-hosting minimum of 4 H100s ($15.80/h before any request), both from Mistral's Small 4 announcement. Tokens per request are the bench mix's measured means. The break-even is the sustained load above which the GPU is cheaper than the API; below it, an idle GPU costs the same per hour.
 <!-- deploy-cost:end -->

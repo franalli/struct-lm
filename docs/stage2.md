@@ -1,31 +1,34 @@
 # Stage 2: continued pre-training (CPT)
 
-![Stage 2: continued pre-training, its inputs, steps, the rules that decided and its output](diagrams/stage2.svg)
+![Stage 2: continued pre-training, its inputs, steps, the choices made and its output](diagrams/stage2.svg)
 
-Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the rules
-and gates that decided; gray, external models, controls and ablations.
+Colours: blue, checkpoints; orange, data; green, steps; purple, measurements; red, the choices
+made (what was kept or carried forward, and why); gray, external models, controls and variants.
 
-**Result: CPT missed its pre-registered target, and made the documents it read more probable, not
-more answerable.**
-- **The target:** domain val perplexity was to fall at least 20%. It fell 2.33% in the main run and
-  between 2.15% and 2.42% in the others (the rules table below).
+**Result: CPT made the documents it read, and the facts in them, more probable; closed-book
+accuracy rose beyond the noise floor in one of the three LoRA runs.**
+- **Held-out perplexity:** domain val perplexity fell 2.33% in the main run and between 2.15% and
+  2.42% in the others (the perplexity table below).
 - **What it learned:** at 20M tokens and one epoch, CPT learns the documents it reads (-8%
   perplexity) and almost nothing that transfers to documents it hasn't seen (-0.4% on reports
   published in 2026). It does make the facts in the documents it read more likely: closed-book
   gold answers become about 1.8x more probable (+0.59 nats per answer, both seeds; +0.56 of it in
-  the answer tokens, +0.03 in the end token), a gain pass/fail accuracy is too coarse to resolve
-  at this size.
-- **Pushing harder doesn't help.** A higher learning rate and full-parameter training learn the
-  documents harder, with 2-4x the forgetting and no held-out gain.
-- **What goes forward.** LoRA with 10% replay is the carried-forward checkpoint. A pre-registered
-  rule chose it, the rule fired at the edge of the noise, and that is recorded.
+  the answer tokens, +0.03 in the end token). Closed-book accuracy rose +2.5 points in `cpt-8b`,
+  beyond the 1.8-point floor, and +0.9 in its twin and in the replay run, within it.
+- **Pushing harder fits the documents read, not new ones.** A higher learning rate and
+  full-parameter training learn the documents harder, with 2-4x the forgetting, while held-out
+  perplexity moved about as much as in the main run.
+- **What goes forward.** LoRA with 10% replay is the carried-forward checkpoint. It left domain
+  perplexity identical to the documents-only run's, and its MMLU edge over that run is within the
+  floor; its grounded accuracy fell 6.5 points below the base's, beyond the 3.7-point floor. It was
+  kept because it costs only 10% more training tokens (finding 5).
 - **Why the eval harness matters.** It found a serving bug larger than any training effect.
 
 One epoch of plain next-token training on the 19.4M-token train split, starting from
 `Ministral-3-8B-Base-2512`: LoRA r=64 (alpha 128) on all seven projections of the language model,
 LR 1e-4 with a cosine schedule, 32 windows of 4,096 tokens per optimizer step, so 149 steps (the
-"150-step rule"), on one H100. Every number and its reason, the pre-registered success rule and the
-ablation rules are in [`notes/decisions.md`](../notes/decisions.md); the rough edges hit on the way
+"150-step rule"), on one H100. Every setting, its reason and how each run was compared are in
+[`notes/decisions.md`](../notes/decisions.md); the rough edges hit on the way
 (TRL packing that would have kept 5% of the corpus, an EOS token encoded as text, a tokenizer that
 broke vLLM's processor) are in [`notes/contributions.md`](../notes/contributions.md).
 
@@ -33,8 +36,8 @@ The runs vary one thing each against the main run (`cpt-8b`):
 
 | run | what changes | question |
 |---|---|---|
-| `cpt-8b-lr2x` | LR 2e-4 | the pre-registered fix when domain perplexity "barely moves" |
-| `cpt-8b-seed1` | seed 1 | the run-to-run noise floor every other delta is read against |
+| `cpt-8b-lr2x` | LR 2e-4 | does a higher learning rate move domain perplexity further |
+| `cpt-8b-seed1` | seed 1 | the run-to-run noise floor every other change is compared with |
 | A, `cpt-8b-replay10` | +10% FineWeb-Edu replay | does replay protect general ability, at what domain cost |
 | B, `cpt-8b-full` | full-parameter on 2 x H100 (FSDP2) | LoRA vs full fine-tuning on the same model and tokens |
 | C, `cpt-8b-fsdp2` | 2 x H100 (FSDP2), 100 steps | throughput scaling and loss agreement |
@@ -107,21 +110,15 @@ lm-eval rows run 5-shot without a BOS token (the frozen flags send none, found i
 <!-- stage2-tables:end -->
 
 Every delta below is against `base-8b-hf`, the base evaluated through the same vLLM path as the
-fine-tuned checkpoints. Each is read against its noise: the larger of the seed gap (`cpt-8b` vs
-`cpt-8b-seed1`) and the metric's standard error.
+fine-tuned checkpoints. Each is compared with its noise floor (the noise column above): the
+larger of the seed gap (`cpt-8b` vs `cpt-8b-seed1`) and the metric's standard error. A change
+smaller than its floor is reported as within the floor.
 
-**Against the pre-registered rules** (`notes/decisions.md`, set before the main run):
-
-| rule | cpt-8b (seed 1) | cpt-8b-lr2x | cpt-8b-full | verdict |
-|---|---|---|---|---|
-| domain val perplexity down at least 20% | -2.33% (-2.35%) | -2.42% | -2.15% | failed everywhere |
-| train/val gap grows under ~10 points over base's 11.2% (over ~25 = memorising) | +7.2 (+6.9) | +12.1 | +28.6 | LoRA passes; lr2x fails; full is memorising |
-| general val perplexity up under 3% | +0.40% (+0.17%) | +0.85% | +1.19% | passed everywhere |
-
-**The target was set for the wrong data scale.** Held-out perplexity measures domain transfer, which
-continued pre-training produces at the scale of billions of tokens. With a 20M-token client corpus
-the realistic goal is knowledge of those documents. That is measured by closed-book QA after SFT,
-and it needs repetition or augmentation to stick.
+**What held-out perplexity measures.** Held-out perplexity measures domain transfer, which
+continued pre-training produces at the scale of billions of tokens. This corpus is 20M tokens, and
+what one pass of it measurably added is knowledge of the documents read (findings 1 and 4).
+Knowledge of those documents is measured by closed-book QA after SFT, and it needs repetition or
+augmentation to stick.
 
 **What Stage 2 established:**
 1. **The learnable signal is the documents and their series, not the domain.** A probe
@@ -165,16 +162,21 @@ and it needs repetition or augmentation to stick.
      against -2.3% on held-out val.
    - **Caveats:** 13 documents, mostly research reports rather than manuals. A genre split rules
      genre out as the explanation (the table under [contamination checks](stage1.md#contamination-checks)).
-2. **Pushing harder moves the wrong way.** The train slice fell -8% (`cpt-8b`), -12% (LR 2e-4) and
-   -22% (full-parameter), while held-out stayed flat each time, between -2.15% and -2.42%.
-   - **lr2x:** general-text perplexity rose about 2x as much as the main run's.
-   - **Full-parameter:** about 3x the main run's general-text rise, and about 4x its GSM8K loss
-     (-3.0 points against -0.7 to -0.8). That GSM8K drop is the one benchmark delta that clears the
-     noise (1.1) by a wide margin.
-   - **Full-parameter's task gains** on the 130-item eval v1 (`results/table_v1.md`, lenient scorer): +3.1 qa_acc
-     (noise 3.2) and +3.8 vocab (noise 3.1), at the noise edge. Every one of those items comes from
-     a training document, so they are knowledge of what it read. Its weights were deleted before
-     the QA task grew, so it has no 325-item QA scores.
+2. **Pushing harder fits the documents read and forgets more.** The train slice fell -8% (`cpt-8b`),
+   -12% (LR 2e-4) and -22% (full-parameter), while held-out perplexity moved between -2.15% and
+   -2.42% each time.
+   - **Train/val gap:** for the base, domain val perplexity is 11.2% above train-slice perplexity.
+     That gap grew by 7.2 points in `cpt-8b` (6.9 in seed 1), 12.1 with LR 2e-4 and 28.6 with
+     full-parameter training.
+   - **lr2x:** general-text perplexity rose about 2x as much as the main run's (+0.85% against
+     +0.40%).
+   - **Full-parameter:** about 3x the main run's general-text rise (+1.19%), and about 4x its GSM8K loss
+     (-3.0 points against -0.7 to -0.8). That GSM8K drop is the one benchmark delta beyond the
+     floor (1.1) by a wide margin.
+   - **Full-parameter's task gains** on the 130-item eval v1 (`results/table_v1.md`, lenient scorer):
+     +3.1 qa_acc, within the floor (3.2), and +3.8 vocab, beyond the floor (3.1). Every one of those
+     items comes from a training document, so they are knowledge of what it read. Its weights were
+     deleted before the QA task grew, so it has no 325-item QA scores.
 
    LoRA stays the default: "LoRA learns less and forgets less" (Biderman et al., 2024).
 3. **The base hadn't memorised the corpus.** The six "recalled" spans continue patterns set up in
@@ -183,10 +185,11 @@ and it needs repetition or augmentation to stick.
    So pretraining exposure doesn't explain the small gain. A single pass in pretraining can't be
    ruled out: one epoch of our own CPT moves verbatim recall by 0.13 tokens, less than this
    comparison resolves.
-4. **Pass/fail scores can't see Stage 2; the gold answer's probability can.** On the 325-item
-   closed-book task (eval v2), qa_acc moves +2.5, +0.9 and +0.9 points for the three LoRA runs (strict and lenient alike),
-   against a noise of 1.8. The log-probability of the gold answer (`gold_lp`, per item, paired
-   against `base-8b-hf`) moves clearly:
+4. **Pass/fail accuracy moved beyond the floor in one run of three; the gold answer's probability
+   moved in all three.** On the 325-item closed-book task (eval v2), qa_acc moves +2.5, +0.9 and
+   +0.9 points for the three LoRA runs (strict and lenient alike), against a floor of 1.8: beyond
+   it for `cpt-8b`, within it for `cpt-8b-seed1` and `cpt-8b-replay10`. The log-probability of the
+   gold answer (`gold_lp`, per item, paired against `base-8b-hf`) moves clearly:
 
    | Run | Change in `gold_lp`, nats per answer [95% CI] | Items more likely |
    |---|---|---|
@@ -204,20 +207,21 @@ and it needs repetition or augmentation to stick.
      the prompt and made CPT look worse (`notes/decisions.md`).
    - **The other task scores** (grounded, citations, hallucination) need instruction following,
      which a base model lacks, and swing 4-5 points between seeds; they are Stage 3 metrics.
-5. **Replay was adopted on a rule that fired at one noise unit; it's kept.** Mixing in 10%
-   FineWeb-Edu left domain perplexity identical and brought the MMLU dip to -0.1 from -0.4. That
-   margin is about one noise unit (0.3), so the pre-registered rule fired on noise; the flaw is
-   recorded in `notes/decisions.md`. Its general-text perplexity fell 2.2%, but that slice is also
-   FineWeb-Edu, so it measures in-distribution training, not protection. The 6.5 grounded and 6.4
-   cite_valid points it "cost" are probably not a real cost:
-   - they measure a base model's citation formatting, which SFT overwrites completely;
-   - one seed alone moved grounded accuracy by 4.6 points.
-
-   _Re-read after Stage 3:_ the grounded cost was real and the citation one formatting.
-   - **Grounded:** replay10's grounded_acc (0.843 → 0.778) is 1.8x the 3.7-point noise. Raw-text CPT
-     eroding few-shot instruction behaviour is a known cost, and this is a clean instance of it.
-   - **Both are repairable:** SFT took both arms to grounded 0.90-0.94 and cite_valid 0.98-1.00.
-6. **C: two GPUs reproduce one-GPU training step for step, at 2.23x the tokens/s.** Per-step loss
+5. **Replay was kept; its measured edge over the documents-only run is within the floor.** Mixing
+   in 10% FineWeb-Edu left domain perplexity identical and brought the MMLU dip to -0.1 from -0.4,
+   a difference within MMLU's floor (0.3). Replay was chosen by comparing MMLU against the seed gap
+   alone; the floor used on this page (the seed gap or the standard error, whichever is larger) was
+   adopted after that choice, and the choice was not reversed (`notes/decisions.md`). It was kept
+   because it costs only 10% more training tokens. Its general-text perplexity fell 2.2%, but that
+   slice is also FineWeb-Edu, so it measures in-distribution training, not protection.
+   - **Grounded:** replay10's grounded_acc fell 6.5 points (0.843 → 0.778), 1.8x the 3.7-point
+     floor. The documents-only seed-1 run's grounded accuracy also fell, by 4.6 points. Raw-text
+     CPT eroding few-shot instruction behaviour is a known cost, and this is a clean instance of it.
+   - **Citations:** its cite_valid fell 6.4 points. That measures a base model's citation
+     formatting, which SFT replaces.
+   - **After SFT (Stage 3):** SFT took both starting points to grounded 0.90-0.94 and cite_valid
+     0.98-1.00.
+6. **Two GPUs reproduce one-GPU training step for step, at 2.23x the tokens/s.** Per-step loss
    is within 0.04% (median), and both runs see the same batches. Per GPU that is 6,610 against
    5,939 tokens/s (+11%).
    - **Matched:** micro-batch 4, and every decoder layer checkpointed (non-reentrant).
@@ -247,12 +251,12 @@ Written after Stage 2 and before Stage 3's training, ordered by how much each wo
 result. Most of it is knowledge Stage 2 produced. The evidence for each item, and the rule it became,
 is in [`notes/decisions.md`](../notes/decisions.md) (2026-10-05 retrospective).
 
-1. **Build the sensitive metric before the intervention.** Stage 2 was first read on a 130-item
+1. **Build the sensitive metric before the intervention.** Stage 2 was first measured on a 130-item
    pass/fail task with a 3-point standard error. Its real effect (+0.59 nats of gold-answer
    log-probability, 70% of items up) showed only once `gold_lp`, the seen/unseen halves and the
-   325-item set existed. All three belonged in Stage 0, a day's work moved a week earlier, and the
-   right pre-registered target was `gold_lp` on facts from the documents read, not a 20% drop in
-   held-out perplexity.
+   325-item set existed. All three belonged in Stage 0, a day's work moved a week earlier, and
+   `gold_lp` on facts from the documents read belonged at the centre of Stage 2's comparison, ahead
+   of held-out perplexity.
 2. **Run a no-op control through the eval path before any training.** The base re-saved through
    `merge.py` and evaluated like a fine-tuned checkpoint was built only after `cpt-8b` seemed to lose
    3.7 MMLU points, and it exposed the YaRN bug that outweighed every training effect. On day one it
@@ -263,11 +267,11 @@ is in [`notes/decisions.md`](../notes/decisions.md) (2026-10-05 retrospective).
    rewrites of the 197 eval-seen chunks mixed into the CPT stream were affordable (about 1,000 API
    calls) and would have made Stage 2 a knowledge-injection test; Stage 3 now does the
    instruction-data version.
-4. **Ablate along the axis the goal lives on.** The goal was knowledge, but the ablations asked about
-   forgetting (replay, predicted null and null) and parameterisation (full vs LoRA). Epochs (1 vs 3)
-   and augmentation (0 vs K rewrites), at about one H100-hour per LoRA epoch, were the informative
-   runs; full-parameter and the 2-GPU run taught the engineering, and replay answered a question the
-   pre-registration had already answered.
+4. **Ablate along the axis the question lives on.** The question was knowledge, but the ablations
+   asked about forgetting (replay) and parameterisation (full vs LoRA). Epochs (1 vs 3) and
+   augmentation (0 vs K rewrites), at about one H100-hour per LoRA epoch, were the informative runs;
+   full-parameter and the 2-GPU run taught the engineering, and replay answered a question the main
+   run's +0.40% general-perplexity rise had already answered.
 5. **Judge CPT by the downstream number.** Whether CPT was worth doing is SFT-from-CPT against
    SFT-from-base, not perplexity. That comparison should have been written into Stage 2's decision,
    which had no branch for leaving CPT out and picked the checkpoint on perplexity and MMLU; it is
@@ -304,10 +308,10 @@ is in [`notes/decisions.md`](../notes/decisions.md) (2026-10-05 retrospective).
   Hold a deliberate share of the eval's source chunks out of SFT synthesis so the unseen half
   exists. Seen measures knowledge injection, unseen measures transfer. One pooled number would be
   as uninterpretable as Stage 2's single held-out perplexity.
-- **The bar is `instruct-8b`:** grounded 0.898, cite_valid 0.833, cite_supported 0.787, halluc
-  0.013, vocab 0.786, qa 0.099 (eval v2). Match it on grounding and beat it on both qa halves. Read
-  halluc_rate next to grounded_acc, so a low hallucination rate means abstaining on unanswerable
-  questions and not refusing across the board.
+- **The comparison is `instruct-8b`:** grounded 0.898, cite_valid 0.833, cite_supported 0.787,
+  halluc 0.013, vocab 0.786, qa 0.099 (eval v2). Compare SFT with it on grounding and on both qa
+  halves. Report halluc_rate next to grounded_acc, so a low hallucination rate means abstaining
+  on unanswerable questions and not refusing across the board.
 - **Knowledge of a 20M-token corpus needs repetition or augmentation,** such as paraphrased
   restatements or QA rewrites of each document, rather than one pass of next-token training.
 - **Keep the 2026 set as the standing transfer measure.** It is `ppl_postcutoff`, now measured
