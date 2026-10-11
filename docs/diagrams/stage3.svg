@@ -16,7 +16,7 @@
   <rect x="515" y="1028" width="320" height="132" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
   <rect x="447.5" y="1240" width="160" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
   <rect x="667.5" y="1240" width="250" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
-  <rect x="535" y="1428" width="280" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
+  <rect x="515" y="1428" width="320" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
   <polyline points="200,172 200,252" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
   <polyline points="200,384 200,464" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
   <polyline points="200,572 390,652" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)" />
@@ -62,8 +62,8 @@
     <tspan x="675" dy="20">two seeds per arm</tspan>
   </text>
   <text x="675" y="1080" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
-    <tspan x="675" dy="0">B4 picks epoch 1 (the recall losses</tspan>
-    <tspan x="675" dy="20">rose in epoch 2); merge gate</tspan>
+    <tspan x="675" dy="0">epoch 1 kept (closed-book and definition</tspan>
+    <tspan x="675" dy="20">val losses rose in epoch 2); merge check</tspan>
     <tspan x="675" dy="20">against an fp32 reference</tspan>
   </text>
   <text x="527.5" y="1290" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
@@ -75,7 +75,7 @@
     <tspan x="792.5" dy="20">(control arm: no CPT)</tspan>
   </text>
   <text x="675" y="1478" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle">
-    <tspan x="675" dy="0">two-arm read: CPT's gain</tspan>
-    <tspan x="675" dy="20">survives as probability</tspan>
+    <tspan x="675" dy="0">CPT start vs Base start:</tspan>
+    <tspan x="675" dy="20">CPT's gain survives as probability</tspan>
   </text>
 </svg>

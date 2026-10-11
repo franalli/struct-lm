@@ -201,3 +201,8 @@ number	context	source	in
 64	per second at 64	results/serve/bench/fp8/c64-rep0.json	README.md
 22%	completes 22%	results/summary_stats.json	README.md
 16	(up to 16 per second	results/serve/bench/bf16/r16-rep0.json	README.md
+10%	10% replay kept	results/summary_stats.json	docs/diagrams/src/stage2.json
+138	Of the 138	results/cpt_coverage.json	README.md
+150	4 of the 150	results/cpt_coverage.json	README.md
+17	The other 17	results/cpt_coverage.json	README.md
+138	5 of the 138	results/cpt_coverage.json	README.md

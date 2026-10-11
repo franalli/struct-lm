@@ -12,7 +12,7 @@
   <rect x="190" y="440" width="300" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
   <rect x="185" y="628" width="310" height="108" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2" opacity="1" />
   <rect x="565" y="816" width="240" height="108" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2" opacity="1" />
-  <rect x="575" y="1004" width="220" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
+  <rect x="525" y="1004" width="320" height="108" rx="8" ry="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2" opacity="1" />
   <rect x="590" y="1192" width="190" height="108" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2" opacity="1" />
   <rect x="555" y="628" width="260" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
   <rect x="875" y="628" width="260" height="108" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" opacity="1" />
@@ -54,8 +54,8 @@
     <tspan x="685" dy="20">KPI generations</tspan>
   </text>
   <text x="685" y="1054" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
-    <tspan x="685" dy="0">ablation A's rule:</tspan>
-    <tspan x="685" dy="20">replay adopted</tspan>
+    <tspan x="685" dy="0">10% replay kept</tspan>
+    <tspan x="685" dy="20">(cheap; the evidence for it is thin)</tspan>
   </text>
   <text x="685" y="1242" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
     <tspan x="685" dy="0">cpt-8b-replay10</tspan>

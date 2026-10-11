@@ -22,7 +22,7 @@
     },
     {
       "id": "bench",
-      "label": "judge benchmark:\nrecall 0.28 / 0.09 → judge out",
+      "label": "judge benchmark:\nrecall 0.28 / 0.09 → no judge labels",
       "type": "component",
       "color": "red"
     },
@@ -58,7 +58,7 @@
     },
     {
       "id": "train",
-      "label": "DPO: sigmoid loss, β 0.1,\n1 epoch, LoRA r64;\nfinal step, merge gate on sft_val",
+      "label": "DPO: sigmoid loss, β 0.1,\n1 epoch, LoRA r64;\nfinal step, merge check on sft_val",
       "type": "component",
       "color": "green"
     },

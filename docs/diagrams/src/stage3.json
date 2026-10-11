@@ -52,7 +52,7 @@
     },
     {
       "id": "rules",
-      "label": "B4 picks epoch 1 (the recall losses\nrose in epoch 2); merge gate\nagainst an fp32 reference",
+      "label": "epoch 1 kept (closed-book and definition\nval losses rose in epoch 2); merge check\nagainst an fp32 reference",
       "type": "component",
       "color": "red"
     },
@@ -70,7 +70,7 @@
     },
     {
       "id": "arm",
-      "label": "two-arm read: CPT's gain\nsurvives as probability",
+      "label": "CPT start vs Base start:\nCPT's gain survives as probability",
       "type": "component",
       "color": "purple"
     }

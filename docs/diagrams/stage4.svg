@@ -40,7 +40,7 @@
   </text>
   <text x="645" y="302" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
     <tspan x="645" dy="0">judge benchmark:</tspan>
-    <tspan x="645" dy="20">recall 0.28 / 0.09 → judge out</tspan>
+    <tspan x="645" dy="20">recall 0.28 / 0.09 → no judge labels</tspan>
   </text>
   <text x="455" y="490" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle">
     <tspan x="455" dy="0">labels by rule: substring verifier,</tspan>
@@ -65,7 +65,7 @@
   <text x="630" y="1244" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle">
     <tspan x="630" dy="0">DPO: sigmoid loss, β 0.1,</tspan>
     <tspan x="630" dy="20">1 epoch, LoRA r64;</tspan>
-    <tspan x="630" dy="20">final step, merge gate on sft_val</tspan>
+    <tspan x="630" dy="20">final step, merge check on sft_val</tspan>
   </text>
   <text x="630" y="1454" font-family="Virgil, Segoe UI Emoji, Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="middle">
     <tspan x="630" dy="0">dpo-strict</tspan>

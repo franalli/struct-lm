@@ -52,13 +52,13 @@
     },
     {
       "id": "read",
-      "label": "Stage 5 read: sharpening only\n→ grpo, grpo-seed1 rejected",
+      "label": "sampled accuracy up,\nright answers less probable:\ngrpo, grpo-seed1 not served",
       "type": "component",
       "color": "gray"
     },
     {
       "id": "out",
-      "label": "stage5-final stays\ndpo-strict",
+      "label": "the served model stays\ndpo-strict",
       "type": "component",
       "color": "blue"
     }

@@ -18,9 +18,10 @@ usual training steps, and is then compressed and served:
 Every step is compared with the untouched model (**Base**) and with Mistral's own chat version of
 the same model (**Instruct**). Each training section below says what the step does, shows one
 real example of its training data, explains how its training works, and gives all its scores and
-its training curves. Each section ends with a link to its full write-up in `docs/`, the working record kept as
-the step ran: it has more detail, and some of its figures split a measure differently (for
-example, a log-probability that includes the end-of-answer token).
+its training curves. Each section ends with a link to its full write-up in `docs/`, which has more
+detail; some of its figures split a measure differently (for example, a log-probability that
+includes the end-of-answer token). The decisions made along the way, and when, are logged in
+[`notes/decisions.md`](notes/decisions.md).
 
 ## In brief
 
@@ -179,6 +180,13 @@ deduplicated, and scrubbed of personal data. That left 246 documents and 20.6M t
 a word or part of a word), of which 19.4M form the training split; the rest is held out for
 testing.
 
+The cleaning also removed some test answers. Of the 138 document-only closed-book answers that
+appear word for word in their source passage, 5 are missing from the cleaned text CPT read, and
+so are 4 of the 150 on the taught half; all 9 were in the extracted text and went with the
+paragraphs around them (mostly tables, lists and reference entries). The other 17 answers in each
+half don't appear word for word in their passage, so this check can't cover them
+([`results/cpt_coverage.json`](results/cpt_coverage.json)).
+
 **Overlap checks** (GPT-3's method): no GSM8K or HellaSwag question shares any run of 13 tokens
 with the training text, and 21 of 14,042 MMLU questions do, all through stock phrases. No test
 question was copied into the SFT, DPO or GRPO data
@@ -245,7 +253,9 @@ among the wheels at either side of the runway.
 - **Closed-book accuracy barely moved.** For the run used next, taught facts went from 12.6% to
   15.0% and document-only facts from 11.6% to 11.0%, both within the floor. Of the two
   documents-only twins, one rose beyond the floor on taught facts (15.6%) and the other didn't
-  (13.2%). Reading made the text familiar, but mostly didn't make the model able to recall it.
+  (13.2%). Reading made the text familiar, but mostly didn't make the model able to recall it. A
+  few answers were never in the text it read (5 of the 138 checkable document-only ones; see The
+  documents).
 - **Document and section numbers are the exception:** all three LoRA runs answered 12.5% of them,
   against Base's 7.8%, beyond the 4.1-point floor.
 - **With passages, the CPT models did worse than Base** (tested as base models, which don't cite

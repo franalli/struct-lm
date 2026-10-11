@@ -1,0 +1,25 @@
+{
+ "taught": {
+  "items": 167,
+  "in_passage": 150,
+  "not_in_passage": 17,
+  "missing_from_cpt": [
+   "qa-0501",
+   "qa-1086",
+   "qa-1141",
+   "qa-1172"
+  ]
+ },
+ "document_only": {
+  "items": 155,
+  "in_passage": 138,
+  "not_in_passage": 17,
+  "missing_from_cpt": [
+   "qa-0005",
+   "qa-0047",
+   "qa-1005",
+   "qa-1045",
+   "qa-1142"
+  ]
+ }
+}

@@ -100,7 +100,8 @@ reproduce-stage0:  # row 0: the instruct bar (KPI + lm-eval); the base comes wit
 		--run-name instruct-8b --chat --generate-only
 	$(RUN_GPU) eval/modal_app.py --which lm --model mistralai/Ministral-3-8B-Instruct-2512-BF16 \
 		--run-name instruct-8b
-reproduce-stage1: data
+reproduce-stage1: data  # then which eval answers the cleaned text still holds
+	$(PY) eval/cpt_coverage.py
 reproduce-stage2:  # the base re-saved through merge.py, the chain's CPT, the main run and its seed, full-parameter
 	$(RUN_GPU) train/modal_train.py --model mistralai/Ministral-3-8B-Base-2512 --run-name base-8b-hf \
 		--steps merge,eval
