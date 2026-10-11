@@ -1,5 +1,5 @@
 """train/readme_audit.py: every number in the README's prose traces to a generated table or a named
-file, the prose stays under 3,000 words, and the lifecycle diagram names only real rows."""
+file, the lifecycle diagram names only real rows, and the README's data samples are real records."""
 
 import re
 import sys
@@ -14,10 +14,6 @@ import readme_audit
 def test_readme_numbers_trace():
     problems = readme_audit.audit()
     assert not problems, "\n".join(problems)
-
-
-def test_readme_word_budget():
-    assert readme_audit.word_count() < 3000
 
 
 def test_audit_catches_untraced_and_misattributed(tmp_path, monkeypatch):
@@ -78,20 +74,20 @@ def test_diagram_numbers_are_checked(tmp_path):
 CAVEATS = [
     "so CPT missed its aim",  # its perplexity aim, set before the run, failed
     "hallucination is worse than Instruct's",  # SFT against Instruct, at the seed gap
-    "two-arm floor added after the analysis",  # DPO's hallucination metric depends on the floor
-    "in a metric added after the fact",  # DPO's pass@1 metric was post hoc
+    "the stricter floor adopted after the results were in",  # DPO's hallucination depends on it
+    "a measure added after the fact",  # DPO's pass@1 metric was post hoc
     "the mean of its two seeds",  # GRPO's figures are two-seed means
-    "from only two runs per arm",  # two seeds per arm
+    "from only two runs of each",  # two seeds per arm
     "grew from 130 to 322 items after continued pre-training",  # the eval changed after a read
     "includes 0",  # the unseen SFT-vs-Instruct CI
-    "the untrained base also scores",  # the unseen lead is the base's too
-    "the highest open-loop rate measured",  # 16 req/s is not a measured limit
-    "single-seed rows are read against the same floor",
+    "the untrained Base also scores",  # the unseen lead is the base's too
+    "the highest rate measured",  # 16 req/s is not a measured limit
+    "Runs trained once are read against the same floor",
     "rewritten after it fired",  # the entropy stop rule was post hoc
-    "only after DPO's analysis",  # the two-arm floor change was post hoc
+    "only after DPO's results were in",  # the two-arm floor change was post hoc
     "not on merit",  # why dpo-strict, not sft-from-cpt, is served
     "Retrieval is untested",  # the grounded eval supplies the gold passage
-    "Chat behaviour beyond the eval is untested",  # no instruction-following or safety evals
+    "Chat behaviour beyond the test is untested",  # no instruction-following or safety evals
     "No structural engineer saw items or outputs",  # no domain-expert review
     "No minimum detectable effect was set",  # the eval was not sized for 3-point gains
     "are fixtures and are never trained on",  # rule 13
@@ -102,3 +98,55 @@ def test_readme_keeps_its_caveats():
     text = " ".join((REPO / "README.md").read_text().split())  # line wrapping doesn't matter
     missing = [c for c in CAVEATS if c not in text]
     assert not missing, missing
+
+
+def flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def record(path: str, key: str, value: str) -> dict | None:
+    """The first record of a JSONL file whose `key` is `value` (None if the file isn't built)."""
+    import json
+
+    f = REPO / path
+    if not f.exists():
+        return None
+    return next(r for r in map(json.loads, f.open()) if r.get(key) == value)
+
+
+CRANE = "usace-em-1110-2-3001:p21:c2:f2:closed_book:2"  # one fact, in every training set
+
+
+def test_readme_samples_are_real_records():
+    """Each step's training-data sample in the README is quoted from its data file: the CPT text
+    (data/processed, built by make data: skipped without it), the SFT record, the DPO pair, the
+    GRPO task with one step's group of rollouts, and the eval question."""
+    import json
+
+    readme = flat((REPO / "README.md").read_text())
+    if cpt := record("data/processed/train.jsonl", "slug", "usace-em-1110-2-3001"):
+        start = "Dimensional data, weights, and truck reactions for cranes installed"
+        end = "either side of the runway."
+        excerpt = readme[readme.index(start) : readme.index(end) + len(end)]
+        assert excerpt in flat(cpt["text"])
+    sft = record("data/sft/hosted/train.jsonl", "eid", CRANE)
+    question = sft["prompt"][-1]["content"]
+    assert f"user: {flat(question)} assistant: {sft['completion'][0]['content']}" in readme
+    dpo = record("data/dpo/strict/train.jsonl", "id", CRANE + "#0")
+    assert dpo["prompt"] == sft["prompt"]
+    assert f"chosen: {dpo['chosen'][0]['content']} (" in readme
+    assert f"rejected: {dpo['rejected'][0]['content']} (" in readme
+    grpo = record("data/grpo/train.jsonl", "id", CRANE)
+    assert grpo["prompt"] == sft["prompt"]
+    assert f"gold answer: {grpo['verifier']['gold']}" in readme
+    group = [
+        r
+        for r in map(json.loads, (REPO / "results/runs/grpo/rollouts.jsonl").open())
+        if r["task_id"] == CRANE and r["step"] == 20 and r["mode"] == "train"
+    ]
+    rows = " ".join(
+        f"{r['text']} {r['total']:.1f}" + (" (correct)" if r["correct"] else "") for r in group
+    )
+    assert len(group) == 8 and f"answer reward {rows}" in readme
+    item = record("eval/tasks/domain_qa.jsonl", "id", "qa-0016")
+    assert f"Q: {item['question']} gold answer: {item['answer']}" in readme

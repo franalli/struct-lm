@@ -105,5 +105,4 @@ task of 622. No eval item has a year gold, so no eval row moved.
    judge that fails is reported, not used.
 
 **At larger scale:** open-ended tasks have no exact rule, so the judge comes back. The work then is
-calibrating it against subject-matter experts' labels, as here, before it labels anything
-(README, [What changes at Forge scale](../README.md#5-what-changes-at-forge-scale)).
+calibrating it against subject-matter experts' labels, as here, before it labels anything.

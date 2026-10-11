@@ -403,6 +403,11 @@ BLOCK_FILES = {
     "headline-knowledge": "README.md",
     "headline-behaviour": "README.md",
     "headline-general": "README.md",
+    "step-cpt": "README.md",
+    "step-sft": "README.md",
+    "step-dpo": "README.md",
+    "step-grpo": "README.md",
+    "step-serving": "README.md",
     "reproduce-table": "README.md",
     "replay-licences": "README.md",
 }
@@ -2423,23 +2428,23 @@ def stage6_md(usd: float) -> str:
 # docs/results.md. cpt-8b-lr2x and cpt-8b-fsdp2 were training-only runs (docs/stage2.md).
 HEADLINE_ROWS = [
     ("base-8b-hf", "Ministral 3 8B Base"),
-    ("instruct-8b", "stock Instruct (comparison)"),
-    ("mistral-large-3", "frontier reference (API, closed-book only)"),
-    ("cpt-8b", "CPT"),
-    ("cpt-8b-seed1", "CPT, seed 1"),
-    ("cpt-8b-replay10", "CPT + 10% replay (shipped)"),
+    ("instruct-8b", "Ministral 3 8B Instruct (Mistral's chat model)"),
+    ("mistral-large-3", "Mistral Large 3 (API, closed-book only)"),
+    ("cpt-8b", "CPT, documents only"),
+    ("cpt-8b-seed1", "CPT, documents only, seed 1"),
+    ("cpt-8b-replay10", "CPT + 10% general text (used next)"),
     ("cpt-8b-full", "CPT, all weights (ablation)"),
-    ("sft-from-base", "SFT without CPT (control)"),
-    ("sft-from-base-seed1", "SFT without CPT, seed 1"),
-    ("sft-from-cpt", "SFT after CPT (shipped)"),
-    ("sft-from-cpt-seed1", "SFT after CPT, seed 1"),
-    ("dpo", "DPO, original labels"),
-    ("dpo-seed1", "DPO, original labels, seed 1"),
+    ("sft-from-base", "SFT on Base (control)"),
+    ("sft-from-base-seed1", "SFT on Base, seed 1"),
+    ("sft-from-cpt", "SFT on CPT (used next)"),
+    ("sft-from-cpt-seed1", "SFT on CPT, seed 1"),
+    ("dpo", "DPO, first labels"),
+    ("dpo-seed1", "DPO, first labels, seed 1"),
     ("dpo-2ep", "DPO, 2 epochs (ablation; failed the merge check)"),
-    ("dpo-strict", "DPO, corrected labels (shipped, bf16)"),
-    ("grpo", "GRPO, step 25 (not shipped)"),
+    ("dpo-strict", "DPO, corrected labels (served, bf16)"),
+    ("grpo", "GRPO (not served)"),
     ("grpo-seed1", "GRPO, seed 1"),
-    ("dpo-strict-fp8", "shipped model in FP8 (passed the quality check)"),
+    ("dpo-strict-fp8", "served model in FP8 (passed the quality check)"),
     ("dpo-strict-fp8kv", "FP8 + FP8 KV cache (failed the quality check)"),
     ("dpo-strict-w4a16", "INT4 W4A16 (failed the quality check)"),
 ]
@@ -2471,7 +2476,7 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
             "dpo-strict-fp8, dpo-strict-fp8kv, dpo-strict-w4a16",
             (
                 "have no lm-eval or perplexity run with the "
-                "settings the other rows used; their quality-check GSM8K (one BOS) and perplexity are in "
+                "settings the other rows used; their quality-check GSM8K (run with a start-of-text token) and perplexity are in "
                 "[`docs/stage6.md`](docs/stage6.md)"
             ),
         ),
@@ -2490,37 +2495,37 @@ FLOOR_ROWS = [  # (label, the seed pair whose gap, or the metric's SE, sets each
 ]
 HEADLINE = {  # block -> [(header, metrics key, kind, noise() extra)]; rates in %, gold_lp in nats
     "headline-knowledge": [
-        ("closed-book seen (strict)", "qa_strict_seen", "kpi", "qa_seen"),
-        ("closed-book unseen (strict)", "qa_strict_unseen", "kpi", "qa_unseen"),
-        ("identifiers (strict)", "qa_strict_ident", "kpi", "qa_identifier"),
-        ("gold_lp answer, seen", "gold_lp_ans_seen", "lp_ans", "seen"),
-        ("gold_lp answer, unseen", "gold_lp_ans_unseen", "lp_ans", "unseen"),
-        ("gold_lp end, seen", "gold_lp_end_seen", "lp_end", "seen"),
-        ("gold_lp end, unseen", "gold_lp_end_unseen", "lp_end", "unseen"),
+        ("closed-book, taught (%)", "qa_strict_seen", "kpi", "qa_seen"),
+        ("closed-book, document-only (%)", "qa_strict_unseen", "kpi", "qa_unseen"),
+        ("closed-book, document numbers (%)", "qa_strict_ident", "kpi", "qa_identifier"),
+        ("gold-answer log-prob, taught", "gold_lp_ans_seen", "lp_ans", "seen"),
+        ("gold-answer log-prob, document-only", "gold_lp_ans_unseen", "lp_ans", "unseen"),
+        ("end-token log-prob, taught", "gold_lp_end_seen", "lp_end", "seen"),
+        ("end-token log-prob, document-only", "gold_lp_end_unseen", "lp_end", "unseen"),
     ],
     "headline-behaviour": [
-        ("grounded_acc (judge)", "grounded_acc", "kpi", "grounded"),
-        ("cite_valid", "cite_valid", "kpi", "grounded"),
-        ("cite_supported (judge, reported)", "cite_supported", "kpi", "grounded"),
-        ("halluc_rate ↓", "halluc_rate", "kpi", "adversarial"),
-        ("false_abstain ↓", "false_abstain", "kpi", "grounded"),
-        ("vocab_recall (judge)", "vocab_recall", "kpi", "vocab"),
+        ("grounded correct (%, judge)", "grounded_acc", "kpi", "grounded"),
+        ("citations valid (%)", "cite_valid", "kpi", "grounded"),
+        ("citations supported (%, judge)", "cite_supported", "kpi", "grounded"),
+        ("unanswerable answered (%) ↓", "halluc_rate", "kpi", "adversarial"),
+        ("answerable declined (%) ↓", "false_abstain", "kpi", "grounded"),
+        ("definitions (%, judge)", "vocab_recall", "kpi", "vocab"),
     ],
     "headline-general": [
-        ("MMLU (no BOS)", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
-        ("GSM8K (no BOS)", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
-        ("HellaSwag (no BOS)", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
-        ("ppl domain val ↓", "ppl_domain_val", "ppl", None),
-        ("ppl general val ↓", "ppl_general_val", "ppl", None),
+        ("MMLU (%)", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
+        ("GSM8K (%)", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
+        ("HellaSwag (%)", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
+        ("perplexity, documents ↓", "ppl_domain_val", "ppl", None),
+        ("perplexity, web text ↓", "ppl_general_val", "ppl", None),
     ],
 }
 SUMMARY = [  # the README's first table: the chain's checkpoints against the base and the bar
     ("base-8b-hf", "Ministral 3 8B Base"),
-    ("instruct-8b", "stock Instruct"),
-    ("sft-from-base", "SFT without CPT (control)"),
+    ("instruct-8b", "Ministral 3 8B Instruct"),
+    ("sft-from-base", "SFT on Base (control)"),
     ("sft-from-cpt", "CPT → SFT"),
-    ("dpo-strict", "CPT → SFT → DPO (shipped)"),
-    ("grpo", "CPT → SFT → DPO → GRPO (not shipped)"),
+    ("dpo-strict", "CPT → SFT → DPO (served)"),
+    ("grpo", "CPT → SFT → DPO → GRPO (not served)"),
 ]
 SUMMARY_COLS = [
     *HEADLINE["headline-knowledge"][:2],
@@ -2576,7 +2581,11 @@ def headline_tables() -> dict[str, str]:
     def table(rows, cols, latency: bool, name: str = "") -> str:
         head = ["run", "what it is", *(c[0] for c in cols)]
         if latency:
-            head += ["TTFT p50 @1 (ms)", "ITL p50 @1 (ms)", "latency source"]
+            head += [
+                "first token, 1 request (ms)",
+                "per token, 1 request (ms)",
+                "latency measured on",
+            ]
         lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
         empty = [r for r, _ in rows if r not in m]
         for run, what in rows:
@@ -2620,6 +2629,176 @@ def headline_tables() -> dict[str, str]:
         for name, cols in HEADLINE.items()
     }
     blocks["headline-summary"] = table(SUMMARY, SUMMARY_COLS, False)
+    return blocks
+
+
+# The README's per-step tables: every measure a row in plain words, the step's runs as columns,
+# the floor last (a few runs and many measures read down, not across). The kinds after "ppl" are
+# read from their own files (step_extra) and appear only in the steps that list them; a row with
+# no number in any column is left out.
+STEP_MEASURES = [  # (label, metrics key, kind, noise() extra), as HEADLINE
+    ("closed-book, taught facts (%)", "qa_strict_seen", "kpi", "qa_seen"),
+    ("closed-book, document-only facts (%)", "qa_strict_unseen", "kpi", "qa_unseen"),
+    ("closed-book, document and section numbers (%)", "qa_strict_ident", "kpi", "qa_identifier"),
+    ("closed-book, taught facts, sampled (%, mean of 8 answers)", "", "passk", None),
+    ("gold answer's log-probability, taught facts (nats)", "gold_lp_ans_seen", "lp_ans", "seen"),
+    (
+        "gold answer's log-probability, document-only facts (nats)",
+        "gold_lp_ans_unseen",
+        "lp_ans",
+        "unseen",
+    ),
+    ("grounded: answer correct (%, judge)", "grounded_acc", "kpi", "grounded"),
+    ("grounded: citations name only given passages (%)", "cite_valid", "kpi", "grounded"),
+    ("grounded: cited passages support the answer (%, judge)", "cite_supported", "kpi", "grounded"),
+    ("grounded: answerable question declined (%) ↓", "false_abstain", "kpi", "grounded"),
+    ("unanswerable: answered anyway (%) ↓", "halluc_rate", "kpi", "adversarial"),
+    ("definitions correct (%, judge)", "vocab_recall", "kpi", "vocab"),
+    ("judge prefers its answer to SFT's (%, 50 = even)", "", "winrate", None),
+    ("MMLU (%)", "mmlu", "lm", ("mmlu", "acc_stderr,none")),
+    ("GSM8K (%)", "gsm8k", "lm", ("gsm8k", "exact_match_stderr,strict-match")),
+    (
+        "GSM8K, the quality check's run (%)",
+        "gsm8k",
+        "gate",
+        ("gsm8k", "exact_match_stderr,strict-match"),
+    ),
+    ("HellaSwag (%)", "hellaswag", "lm", ("hellaswag", "acc_norm_stderr,none")),
+    ("perplexity, held-out document text ↓", "ppl_domain_val", "ppl", None),
+    ("perplexity, general web text ↓", "ppl_general_val", "ppl", None),
+    ("first-token latency, one request (ms) ↓", "", "ttft", None),
+    ("time per output token, one request (ms) ↓", "", "itl", None),
+]
+STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kinds, notes)
+    "step-cpt": (
+        [
+            ("base-8b-hf", "Base"),
+            ("cpt-8b-replay10", "CPT + 10% general text (used next)"),
+            ("cpt-8b", "CPT, documents only"),
+            ("cpt-8b-seed1", "same, seed 1"),
+            ("cpt-8b-full", "CPT, all weights"),
+        ],
+        SEED_PAIR,
+        (),
+        [
+            (
+                "The floor is the gap between the two documents-only seeds, or the standard error if "
+                "larger; perplexity's floor is that gap as a % change."
+            ),
+            (
+                "CPT, all weights has no closed-book numbers: its weights were deleted before the "
+                "closed-book set grew, and a full-weight run can't be rebuilt from an adapter."
+            ),
+        ],
+    ),
+    "step-sft": (
+        [
+            ("base-8b-hf", "Base"),
+            ("instruct-8b", "Instruct"),
+            ("sft-from-base", "SFT on Base"),
+            ("sft-from-cpt", "SFT on CPT (used next)"),
+            ("sft-from-cpt-seed1", "same, seed 1"),
+        ],
+        SFT_SEED_PAIR,
+        ("passk",),
+        [
+            (
+                "The floor is the gap between the two SFT-on-CPT seeds, or the standard error if "
+                "larger."
+            ),
+            (
+                "Base is scored as a base model (a plain-text prompt, no chat format), so its "
+                "log-probabilities don't compare with the other columns'."
+            ),
+            "Sampled scores were measured for Instruct and SFT on CPT only.",
+        ],
+    ),
+    "step-dpo": (
+        [
+            ("sft-from-cpt", "SFT (start)"),
+            ("dpo", "DPO, first labels"),
+            ("dpo-seed1", "same, seed 1"),
+            ("dpo-strict", "DPO, corrected labels (served)"),
+            ("dpo-2ep", "DPO, 2 epochs"),
+        ],
+        SFT_SEED_PAIR,
+        ("passk", "winrate"),
+        [
+            "The floor is SFT's (the gap between its two seeds, or the standard error if larger).",
+            "The judge's preference is reported only: that judge failed its own accuracy check.",
+            "DPO, 2 epochs has no sampled score: it was an ablation.",
+        ],
+    ),
+    "step-grpo": (
+        [("dpo-strict", "DPO (start)"), ("grpo", "GRPO"), ("grpo-seed1", "GRPO, seed 1")],
+        SFT_SEED_PAIR,
+        ("passk",),
+        ["The floor is SFT's (the gap between its two seeds, or the standard error if larger)."],
+    ),
+    "step-serving": (
+        [
+            ("dpo-strict", "bf16 (served)"),
+            ("dpo-strict-fp8", "FP8 (served)"),
+            ("dpo-strict-fp8kv", "FP8 + FP8 KV cache"),
+            ("dpo-strict-w4a16", "INT4"),
+        ],
+        SFT_SEED_PAIR,
+        ("gate", "ttft", "itl"),
+        [
+            "The floor is SFT's (the gap between its two seeds, or the standard error if larger).",
+            (
+                "The quality check reran GSM8K with one start-of-text token for every variant; FP8 + "
+                "FP8 KV cache's run, and its and INT4's latency runs, weren't done (Modal spend "
+                "limit)."
+            ),
+            "Latency is the median on one H100, one request at a time, mean of two runs.",
+        ],
+    ),
+}
+
+
+def step_extra(kind: str, run: str) -> str:
+    """A cell read from its own file: pass@1 on the taught half (results/passk), the DPO win
+    rate against SFT (results/winrate), the quality check's GSM8K (s6_metrics) or the serving
+    bench's medians at one request (headline_latency, Stage 6's H100 rows only)."""
+    if kind == "passk":
+        f = Path("results/passk") / f"{run}.json"
+        return (
+            f"{json.loads(f.read_text())['seen']['strict_pass@1'] * 100:.1f}" if f.exists() else ""
+        )
+    if kind == "winrate":
+        f = Path("results/winrate") / f"{run}_vs_sft-from-cpt.json"
+        return f"{json.loads(f.read_text())['overall']['win_rate'] * 100:.0f}" if f.exists() else ""
+    if kind == "gate":
+        variant = {r: v for v, r in S6_RUN.items()}.get(run)
+        g = s6_metrics(variant).get("gsm8k_gate") if variant else None
+        return "" if g is None else f"{g * 100:.1f}"
+    ttft, itl, source = headline_latency(run)
+    return (ttft if kind == "ttft" else itl) if source.startswith("H100") else ""
+
+
+def step_tables() -> dict[str, str]:
+    """README: one table per training step (STEPS), every measure of STEP_MEASURES against the
+    floor of the step's seed pair."""
+    runs = {r for cols, pair, _, _ in STEPS.values() for r in (*(c for c, _ in cols), *pair)}
+    m = {r: v for r in runs if (v := load_metrics(r)) is not None}
+    sizes = half_sizes()
+    blocks = {}
+    for name, (cols, pair, extras, notes) in STEPS.items():
+        head = ["measure", *(h for _, h in cols), "noise floor"]
+        lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+        for label, key, kind, extra in STEP_MEASURES:
+            if kind in ("passk", "winrate", "gate", "ttft", "itl"):
+                if kind not in extras:
+                    continue
+                cells = [step_extra(kind, r) for r, _ in cols]
+                floor = headline_floor(m, pair, key, "lm", extra, sizes) if kind == "gate" else ""
+            else:
+                cells = [headline_cell(m[r], key, kind) if r in m else "" for r, _ in cols]
+                floor = headline_floor(m, pair, key, kind, extra, sizes)
+            if any(cells):
+                lines.append("| " + " | ".join([label, *cells, floor]) + " |")
+        blocks[name] = "\n".join(lines) + "\n\n" + "\n".join(f"- {n}" for n in notes)
     return blocks
 
 
@@ -2766,6 +2945,7 @@ def main() -> None:
             "results-table": results_table(),
             "serving-table": serving_table(),
             **headline_tables(),
+            **step_tables(),
             "reproduce-table": reproduce_table(),
             "replay-licences": replay_licence_table(),
         }

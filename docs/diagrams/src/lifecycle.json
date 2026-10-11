@@ -10,55 +10,55 @@
     },
     {
       "id": "base",
-      "label": "base-8b-hf\nMinistral 3 8B Base",
+      "label": "Ministral 3 8B Base\n(base-8b-hf)",
       "type": "component",
       "color": "blue"
     },
     {
       "id": "cpt",
-      "label": "cpt-8b-replay10\nCPT + 10% replay (ablation A's rule)",
+      "label": "CPT: reads the documents once,\n+ 10% general text\n(cpt-8b-replay10)",
       "type": "component",
       "color": "blue"
     },
     {
       "id": "sft",
-      "label": "sft-from-cpt\nSFT, epoch 1 (rule B4)",
+      "label": "SFT: worked examples, 1 epoch\n(sft-from-cpt)",
       "type": "component",
       "color": "blue"
     },
     {
       "id": "dpo",
-      "label": "dpo-strict\nDPO on verifier labels (final step)",
+      "label": "DPO: pairs of its own answers,\nlabelled by rule\n(dpo-strict)",
       "type": "component",
       "color": "blue"
     },
     {
       "id": "served",
-      "label": "served after the quality gate:\ndpo-strict (bf16) up to 16 req/s,\ndpo-strict-fp8 near saturation",
+      "label": "served: bf16 up to 16 req/s,\nFP8 near saturation\n(dpo-strict, dpo-strict-fp8)",
       "type": "component",
       "color": "blue"
     },
     {
       "id": "grpo",
-      "label": "grpo\nGRPO: rejected by the Stage 5 read",
+      "label": "GRPO: rewarded answers\n(grpo), not served",
       "type": "component",
       "color": "gray"
     },
     {
       "id": "ctrl",
-      "label": "sft-from-base\ncontrol arm: SFT without CPT",
+      "label": "control: SFT on Base\n(sft-from-base)",
       "type": "component",
       "color": "gray"
     },
     {
       "id": "full",
-      "label": "cpt-8b, cpt-8b-full\nCPT ablations",
+      "label": "CPT variants: documents only,\nall weights (cpt-8b, cpt-8b-full)",
       "type": "component",
       "color": "gray"
     },
     {
       "id": "ep2",
-      "label": "dpo-2ep\nDPO ablation",
+      "label": "DPO, 2 epochs\n(dpo-2ep)",
       "type": "component",
       "color": "gray"
     }

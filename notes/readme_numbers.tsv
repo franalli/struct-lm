@@ -1,69 +1,26 @@
 number	context	source	in
-246	on 246 public-domain	results/summary_stats.json	README.md
-20.6M	NASA; 20.6M tokens	results/summary_stats.json	README.md
-716	716 items	results/summary_stats.json	README.md
 +24.6	+10.8 to +24.6	results/summary_stats.json	README.md
 7.7%	against 7.7%	results/summary_stats.json	README.md
 0.38	became 0.38 nats	results/train_runs.md	README.md
-1.32	cost of 1.32	results/train_runs.md	README.md
-16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	README.md
-10%	10% general replay	results/summary_stats.json	README.md
-+0.2	MMLU +0.2	results/summary_stats.json	README.md
-0.1	against a 0.1 seed floor	results/summary_stats.json	README.md
 0.34	own 0.34	results/summary_stats.json	README.md
-−2.24%	its −2.24% general	results/train_runs.md	README.md
-6.5	fell 6.5 points	results/train_runs.md	README.md
 10%	only 10% more tokens	results/summary_stats.json	README.md
-−22%	perplexity −22%	results/train_runs.md	README.md
-−8%	LoRA's −8%	results/train_runs.md	README.md
-+1.19%	perplexity +1.19%	results/train_runs.md	README.md
-+0.40%	against +0.40%	results/train_runs.md	README.md
-−3.0	GSM8K −3.0	results/train_runs.md	README.md
-1.1	a 1.1 floor	results/train_runs.md	README.md
 1.17	from 1.17 to 1.30	results/train_runs.md	README.md
-28%	caught 28% of grounded	results/dpo/judge_bench.json	README.md
-9%	9% of definition	results/dpo/judge_bench.json	README.md
-0.5	a 0.5 bar	data/scripts/dpo_judge_bench.py	README.md
-−4.2	(−4.2 against 3.5)	results/train_runs.md	README.md
-3.5	−4.2 against 3.5	results/train_runs.md	README.md
-−6.1	GSM8K −6.1	results/train_runs.md	README.md
 2.2	against 2.2	results/train_runs.md	README.md
 22%	serves 22% more	results/summary_stats.json	README.md
-64	per second at 64	results/serve/bench/fp8/c64-rep0.json	README.md
-246	246 public PDFs	results/summary_stats.json	README.md
-20.6M	20.6M tokens after	results/summary_stats.json	README.md
-54	54 of the 2,516	results/summary_stats.json	README.md
-2,516	of the 2,516	results/summary_stats.json	README.md
-19.4M	19.4M-token train split	results/summary_stats.json	README.md
-10%	+ 10% general replay	results/summary_stats.json	README.md
-2,436	SFT on 2,436	results/summary_stats.json	README.md
-1,778	(1,778 teacher-written)	results/summary_stats.json	README.md
-445	DPO on 445	results/summary_stats.json	README.md
-622	622 verifiable tasks	results/summary_stats.json	README.md
-716	a 716-item KPI eval	results/summary_stats.json	README.md
-8.8	8.8 GPU-hours	results/summary_stats.json	README.md
-11%	11% faster per GPU	results/train_runs.md	README.md
-80	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
-458	80 of 458 closed-book chosen	results/qa_strict/dpo_pairs.json	README.md
 17%	(17%)	results/summary_stats.json	README.md
-79	79 are wrong	notes/decisions.md	README.md
 1.6	0–1.6 points	results/summary_stats.json	README.md
 1.9	Large 3 moved 1.9	results/summary_stats.json	README.md
 2%	within 2%	eval/scorers.py	README.md
 4.8	fell 4.8 points	results/summary_stats.json	README.md
 3.1	fell 3.1 nats	results/summary_stats.json	README.md
-4.4	and 4.4 unseen	results/summary_stats.json	README.md
-512	used 512 domain	results/serve/quantize/w4a16/quantize_meta.json	README.md
 1,067	1,067 of 1,319	results/summary_stats.json	README.md
 1,319	1,067 of 1,319	results/summary_stats.json	README.md
-57%	57% of the steps	results/summary_stats.json	README.md
 415	415 of the 1,778	results/summary_stats.json	README.md
 1,778	415 of the 1,778	results/summary_stats.json	README.md
 500	500 general records	results/summary_stats.json	README.md
 246	246 US federal documents	results/summary_stats.json	README.md
 27	§ 105); 27 reproduce	results/summary_stats.json	README.md
 251	the 251 candidates	results/summary_stats.json	README.md
-500	500 replay records	results/summary_stats.json	README.md
 50	50 probe prompts	results/summary_stats.json	README.md
 74	FLAN v2's 74 records	results/summary_stats.json	README.md
 54	those 54 records	results/summary_stats.json	README.md
@@ -73,7 +30,6 @@ number	context	source	in
 72	(72 in FP8)	results/summary_stats.json	README.md
 246	246 public-domain	results/summary_stats.json	docs/diagrams/src/lifecycle.json
 20.6M	20.6M tokens	results/summary_stats.json	docs/diagrams/src/lifecycle.json
-10%	+ 10% replay	results/summary_stats.json	docs/diagrams/src/lifecycle.json
 16	up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/lifecycle.json
 234	234 training documents	results/summary_stats.json	docs/diagrams/src/stage0.json
 716	716 items	results/summary_stats.json	docs/diagrams/src/stage0.json
@@ -120,32 +76,21 @@ number	context	source	in
 64	concurrency 1-64	results/serve/bench/fp8/c64-rep0.json	docs/diagrams/src/stage6.json
 16	Poisson 1-16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
 16	bf16 up to 16 req/s	results/serve/bench/bf16/r16-rep0.json	docs/diagrams/src/stage6.json
-0.71	cost 0.71	results/summary_stats.json	README.md
 130	from 130 to 322	results/table_v1.md	README.md
 322	from 130 to 322	results/table.md	README.md
 2.6	the 2.6-point floor	results/train_runs.md	README.md
 −1.3	CI (−1.3 to	results/summary_stats.json	README.md
 +9.0	(−1.3 to +9.0)	results/summary_stats.json	README.md
 3.5	rose 3.5 points	results/train_runs.md	README.md
-+1.2	[+1.2, +6.0]	results/train_runs.md	README.md
-+6.0	[+1.2, +6.0]	results/train_runs.md	README.md
 3.1	rose 3.1 points	results/train_runs.md	README.md
-+1.3	[+1.3, +5.0]	results/train_runs.md	README.md
-+5.0	[+1.3, +5.0]	results/train_runs.md	README.md
-0.21	its 0.21 floor	results/train_runs.md	README.md
-3.7	a 3.7 floor	results/train_runs.md	README.md
 0.23%	the 0.23% floor	results/train_runs.md	README.md
 76	4 of 76	results/summary_stats.json	README.md
 13	13-gram overlap	eval/contamination.py	README.md
 21	21 of 14,042	results/contamination.md	README.md
 14,042	21 of 14,042	results/contamination.md	README.md
 7.4%	refuses 7.4%	results/table.md	README.md
-20%	the 20% aimed	notes/decisions.md	README.md
 2.33%	fell 2.33%	results/train_runs.md	README.md
 3%	the 3% rise	notes/decisions.md	README.md
-0.40%	(+0.40% without	results/train_runs.md	README.md
-+0.28	[+0.28, +0.66]	results/train_runs.md	README.md
-+0.66	[+0.28, +0.66]	results/train_runs.md	README.md
 1.2	it fell 1.2	results/train_runs.md	README.md
 +10.8	CI +10.8	results/summary_stats.json	README.md
 0.11	(0.11 on	results/summary_stats.json	README.md
@@ -154,7 +99,66 @@ number	context	source	in
 167	155 to 167	results/summary_stats.json	README.md
 2.6	floors are 2.6	results/train_runs.md	README.md
 3.5	2.6 to 3.5	results/train_runs.md	README.md
-0.46	are 0.46 nats	results/train_runs.md	README.md
-10%	corpus plus 10%	results/summary_stats.json	README.md
-2,436	on 2,436 examples	results/summary_stats.json	README.md
-1,778	2,436 examples: 1,778	results/summary_stats.json	README.md
+716	716 questions	results/summary_stats.json	README.md
+322	closed-book | 322	results/table.md	README.md
+108	grounded | 108	results/table.md	README.md
+210	definitions | 210	results/table.md	README.md
+76	unanswerable | 76	results/table.md	README.md
+167	half (167 questions)	results/summary_stats.json	README.md
+121	for 121 of the 167	data/sft/stats.json	README.md
+167	121 of the 167	results/summary_stats.json	README.md
+155	half (155 questions)	results/summary_stats.json	README.md
+2.6	floor is 2.6	results/train_runs.md	README.md
+251	251 candidate PDFs	results/summary_stats.json	README.md
+246	leaving 246 documents	results/summary_stats.json	README.md
+20.6M	246 documents and 20.6M	results/summary_stats.json	README.md
+19.4M	split is 19.4M	results/summary_stats.json	README.md
+10%	mixed with 10% general	results/summary_stats.json	README.md
+64	(rank 64)	train/configs/cpt.yaml	README.md
+20%	was 20%	notes/decisions.md	README.md
++0.40%	rise allowed (+0.40%	results/train_runs.md	README.md
+10%	10% general text, kept	results/summary_stats.json	README.md
+0.2	MMLU rose 0.2	results/summary_stats.json	README.md
+0.1	a 0.1-point gap	results/summary_stats.json	README.md
+6.5	It cost 6.5	results/train_runs.md	README.md
+3.7	(floor 3.7)	results/train_runs.md	README.md
+22%	training text fell 22%	results/train_runs.md	README.md
+8%	LoRA's 8%	results/train_runs.md	README.md
+1.19%	rose 1.19%	results/train_runs.md	README.md
++0.40%	against LoRA's +0.40%	results/train_runs.md	README.md
+3.0	lost 3.0 points	results/train_runs.md	README.md
+1.1	(floor 1.1)	results/train_runs.md	README.md
+2,436	set is 2,436	results/summary_stats.json	README.md
+1,778	1,778 domain examples	results/summary_stats.json	README.md
+415	Medium 3.5 wrote 415	results/summary_stats.json	README.md
+183	183 refusals	results/summary_stats.json	README.md
+475	475 general records	results/summary_stats.json	README.md
+0.46	facts are 0.46	results/train_runs.md	README.md
++0.28	(95% CI +0.28 to +0.66)	results/train_runs.md	README.md
++0.66	(95% CI +0.28 to +0.66)	results/train_runs.md	README.md
+445	gave 445 training pairs	results/summary_stats.json	README.md
+28%	caught 28%	results/dpo/judge_bench.json	README.md
+9%	and 9% in definitions	results/dpo/judge_bench.json	README.md
+50%	a 50% bar	data/scripts/dpo_judge_bench.py	README.md
++1.2	(95% CI +1.2 to +6.0)	results/train_runs.md	README.md
++6.0	(95% CI +1.2 to +6.0)	results/train_runs.md	README.md
+0.21	the 0.21 floor	results/train_runs.md	README.md
+80	so 80 of 458	results/qa_strict/dpo_pairs.json	README.md
+458	so 80 of 458	results/qa_strict/dpo_pairs.json	README.md
+79	and 79 of those	notes/decisions.md	README.md
+4.4	and 4.4 on document-only	results/summary_stats.json	README.md
+0.1	0.1 for a well-formed	train/grpo_rewards.py	README.md
+0.9	plus 0.9 if	train/grpo_rewards.py	README.md
+0.1	up to 0.1 for	train/grpo_rewards.py	README.md
+622	were 622 training	results/summary_stats.json	README.md
++1.3	(95% CI +1.3 to +5.0)	results/train_runs.md	README.md
++5.0	(95% CI +1.3 to +5.0)	results/train_runs.md	README.md
+1.32	It cost 1.32	results/train_runs.md	README.md
+0.71	and 0.71 on taught	results/summary_stats.json	README.md
+512	on 512 domain	results/serve/quantize/w4a16/quantize_meta.json	README.md
+−4.2	accuracy −4.2	results/train_runs.md	README.md
+3.5	against a 3.5 floor	results/train_runs.md	README.md
+−6.1	(−6.1, against	results/train_runs.md	README.md
+64	At 64 concurrent	results/serve/bench/fp8/c64-rep0.json	README.md
+16	serves up to 16	results/serve/bench/bf16/r16-rep0.json	README.md
+10%	+ 10% general text	results/summary_stats.json	docs/diagrams/src/lifecycle.json

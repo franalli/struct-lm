@@ -17,7 +17,7 @@ targets and HTML comments; hand-typed tables count as prose. Not numbers to trac
 N`, section signs, identifiers with digits in them (H100, r64, FP8, GSM8K, 8B), and integers below
 10 written without a decimal or a percent sign (counts such as "2 GPUs" or "1 df").
 
-The word count leaves out tables too (headings included): the measure behind "under 3,000 words".
+The word count (--words) leaves out tables too, headings included.
 """
 
 import argparse
@@ -47,6 +47,7 @@ CONFIDENCE = re.compile(r"95%(?= CI| confidence)")  # a confidence level, not a 
 DATE = re.compile(
     r"\d{4}-\d{2}-\d{2}|\b(19|20)\d{2}\b"
     r"|\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*"
+    r"|\b\d+(?:-\d+){2,}\b"  # a document number (EM 1110-2-3001), not a measurement
 )
 
 

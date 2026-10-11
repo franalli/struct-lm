@@ -105,13 +105,15 @@ set -a; . ./.env; set +a
 - **Then update the write-up's figures and tables every time new results land:** rerun
   `train/report.py` (`make report`). It overwrites the plots in `results/curves/` and
   `results/train_runs.md`, and rewrites every generated block where `report.BLOCK_FILES` puts it:
-  the README's `headline-*` tables, each stage's `<!-- stageN-tables -->` in `docs/stageN.md`,
+  the README's `headline-*` and `step-*` tables, each stage's `<!-- stageN-tables -->` in `docs/stageN.md`,
   `results-table` in `docs/results.md`, `serving-table` in `docs/stage6.md`, and DEPLOY.md's
   `deploy-*`. Never edit inside a block by hand; a missing marker stops the report. Embed any new
   figure in its stage doc and update the prose findings next to it. Every stage shows its
   train/val loss curves and its headline metric (perplexity for CPT) as plots, not only tables.
-- **The README** (Stage 7) holds seven parts in under 3,000 prose words; the stage write-ups live
-  in `docs/`. Every number in its prose must trace: `make audit` (`train/readme_audit.py`) passes
+- **The README** (Stage 7) is written for a reader with no context: what each step did, one real
+  training-data sample per step (checked by `tests/test_readme_audit.py`), its full scores
+  (`step-*` blocks) and its curves, then limits, failures, all runs, reproduction and licences. No
+  word limit; the stage write-ups live in `docs/`. Every number in its prose must trace: `make audit` (`train/readme_audit.py`) passes
   a number with 3+ significant digits found in a generated block, anything else only through a row
   of `notes/readme_numbers.tsv` naming a file that contains it. That file must be data (`results/`,
   the data sets, `eval/tasks/`, often via `eval/summary_stats.py`), code or a config, or the
