@@ -2440,7 +2440,7 @@ HEADLINE_ROWS = [
     ("sft-from-cpt-seed1", "SFT on CPT, seed 1"),
     ("dpo", "DPO, first labels"),
     ("dpo-seed1", "DPO, first labels, seed 1"),
-    ("dpo-2ep", "DPO, 2 epochs (ablation; failed the merge check)"),
+    ("dpo-2ep", "DPO, 2 epochs (variant; its merged weights failed a numeric check)"),
     ("dpo-strict", "DPO, corrected labels (served, bf16)"),
     ("grpo", "GRPO (not served)"),
     ("grpo-seed1", "GRPO, seed 1"),
@@ -2461,8 +2461,8 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
         (
             "mistral-large-3",
             (
-                "has no `gold_lp`, which is computed on the weights in the generation engine; "
-                "Large 3 ran through the API"
+                "has no log-probabilities: they need the model's weights, and Large 3 ran through "
+                "Mistral's API"
             ),
         ),
     ],
@@ -2483,15 +2483,19 @@ BLANKS = {  # block -> (runs, why their cells are blank), printed under the tabl
         (
             "",
             (
-                "latency is measured per deployed checkpoint, not per seed or ablation; FP8-KV's and "
-                "INT4's bench rows weren't run (Modal spend limit)"
+                "latency was measured for some runs only; the two sources use different prompts, so "
+                "compare rows within one source; FP8-KV's and INT4's serving-benchmark rows weren't "
+                "run (Modal spend limit)"
             ),
         ),
     ],
 }
 FLOOR_ROWS = [  # (label, the seed pair whose gap, or the metric's SE, sets each column's floor)
-    ("floor, base-format rows: two CPT seeds' gap, or SE", ("cpt-8b", "cpt-8b-seed1")),
-    ("floor, chat rows: two SFT seeds' gap, or SE", SFT_SEED_PAIR),
+    (
+        "floor, base-format rows: gap between two CPT seeds, or the standard error",
+        ("cpt-8b", "cpt-8b-seed1"),
+    ),
+    ("floor, chat rows: gap between two SFT seeds, or the standard error", SFT_SEED_PAIR),
 ]
 HEADLINE = {  # block -> [(header, metrics key, kind, noise() extra)]; rates in %, gold_lp in nats
     "headline-knowledge": [
@@ -2675,7 +2679,7 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
             ("base-8b-hf", "Base"),
             ("cpt-8b-replay10", "CPT + 10% general text (used next)"),
             ("cpt-8b", "CPT, documents only"),
-            ("cpt-8b-seed1", "same, seed 1"),
+            ("cpt-8b-seed1", "CPT, documents only, seed 1"),
             ("cpt-8b-full", "CPT, all weights"),
         ],
         SEED_PAIR,
@@ -2686,8 +2690,13 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
                 "larger; perplexity's floor is that gap as a % change."
             ),
             (
+                "'Taught' names the half of the closed-book questions that SFT later covers: at "
+                "this step neither half has been taught."
+            ),
+            (
                 "CPT, all weights has no closed-book numbers: its weights were deleted before the "
-                "closed-book set grew, and a full-weight run can't be rebuilt from an adapter."
+                "closed-book set grew, and a run that trains every weight can't be rebuilt from a "
+                "small saved adapter the way the other runs can."
             ),
         ],
     ),
@@ -2696,8 +2705,9 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
             ("base-8b-hf", "Base"),
             ("instruct-8b", "Instruct"),
             ("sft-from-base", "SFT on Base"),
+            ("sft-from-base-seed1", "SFT on Base, seed 1"),
             ("sft-from-cpt", "SFT on CPT (used next)"),
-            ("sft-from-cpt-seed1", "same, seed 1"),
+            ("sft-from-cpt-seed1", "SFT on CPT, seed 1"),
         ],
         SFT_SEED_PAIR,
         ("passk",),
@@ -2717,7 +2727,7 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
         [
             ("sft-from-cpt", "SFT (start)"),
             ("dpo", "DPO, first labels"),
-            ("dpo-seed1", "same, seed 1"),
+            ("dpo-seed1", "DPO, first labels, seed 1"),
             ("dpo-strict", "DPO, corrected labels (served)"),
             ("dpo-2ep", "DPO, 2 epochs"),
         ],
@@ -2737,8 +2747,8 @@ STEPS = {  # block -> (columns [(run, header)], the floor's seed pair, extra kin
     ),
     "step-serving": (
         [
-            ("dpo-strict", "bf16 (served)"),
-            ("dpo-strict-fp8", "FP8 (served)"),
+            ("dpo-strict", "bf16, uncompressed (served at low load)"),
+            ("dpo-strict-fp8", "FP8 (served near full load)"),
             ("dpo-strict-fp8kv", "FP8 + FP8 KV cache"),
             ("dpo-strict-w4a16", "INT4"),
         ],
@@ -2804,13 +2814,13 @@ def step_tables() -> dict[str, str]:
 
 SUMMARY_STATS = Path("results/summary_stats.json")  # eval/summary_stats.py
 REPRODUCE = [  # (stage, make target, its results/train_runs.md section, data: a SHA256SUMS dir or a note)
-    ("0: the eval and baselines", "reproduce-stage0", None, "`eval/tasks/` (committed, reviewed)"),
-    ("1: the corpus", "reproduce-stage1", None, "data/processed"),
-    ("2: CPT", "reproduce-stage2", "Stage 2: CPT", "the corpus"),
-    ("3: SFT", "reproduce-stage3", "Stage 3: SFT", "data/sft"),
-    ("4: DPO", "reproduce-stage4", "Stage 4: DPO", "data/dpo/strict"),
-    ("5: GRPO", "reproduce-stage5", "Stage 5: GRPO", "data/grpo"),
-    ("6: serving", "reproduce-stage6", None, "`serve/bench_manifest.json`"),
+    ("the test and baselines", "reproduce-stage0", None, "`eval/tasks/` (committed, reviewed)"),
+    ("the documents", "reproduce-stage1", None, "data/processed"),
+    ("CPT", "reproduce-stage2", "Stage 2: CPT", "the documents"),
+    ("SFT", "reproduce-stage3", "Stage 3: SFT", "data/sft"),
+    ("DPO", "reproduce-stage4", "Stage 4: DPO", "data/dpo/strict"),
+    ("GRPO", "reproduce-stage5", "Stage 5: GRPO", "data/grpo"),
+    ("serving", "reproduce-stage6", None, "`serve/bench_manifest.json`"),
 ]
 REPLAY_LICENCES = {  # Tülu 3 subset -> (name, the licence the mixture's card gives it)
     "ai2-adapt-dev/evol_codealpaca_heval_decontaminated": ("Evol CodeAlpaca", "Apache 2.0"),
@@ -2844,7 +2854,7 @@ def reproduce_table() -> str:
         return ""
     cost = json.loads(SUMMARY_STATS.read_text())["training_cost"]
     lines = [
-        "| stage | command | training GPU-h | data (sha256 of its `SHA256SUMS`) |",
+        "| step | command | training GPU-hours | data (sha256 of its `SHA256SUMS`) |",
         "|---|---|---|---|",
     ]
     for stage, target, section, data in REPRODUCE:
@@ -2852,7 +2862,7 @@ def reproduce_table() -> str:
         sums = Path(data) / "SHA256SUMS"
         if sums.exists():
             data = f"`{data}`: {hashlib.sha256(sums.read_bytes()).hexdigest()[:8]}"
-        gpu = f"{c['gpu_h']:.2f}" if c else ("not totalled" if stage.startswith("6") else "")
+        gpu = f"{c['gpu_h']:.2f}" if c else ("not totalled" if stage == "serving" else "")
         lines.append(f"| {stage} | `make {target}` | {gpu} | {data} |")
     lines.append(f"| all training | | {cost['all training']['gpu_h']:.2f} | |")
     return "\n".join(lines)

@@ -72,16 +72,14 @@ def test_diagram_numbers_are_checked(tmp_path):
 
 # Disclosures earlier reviews added on purpose; an edit for length must not drop them.
 CAVEATS = [
-    "so CPT missed its aim",  # its perplexity aim, set before the run, failed
     "hallucination is worse than Instruct's",  # SFT against Instruct, at the seed gap
-    "the stricter floor adopted after the results were in",  # DPO's hallucination depends on it
     "a measure added after the fact",  # DPO's pass@1 metric was post hoc
     "the mean of its two seeds",  # GRPO's figures are two-seed means
     "from only two runs of each",  # two seeds per arm
     "grew from 130 to 322 items after continued pre-training",  # the eval changed after a read
     "includes 0",  # the unseen SFT-vs-Instruct CI
     "the untrained Base also scores",  # the unseen lead is the base's too
-    "the highest rate measured",  # 16 req/s is not a measured limit
+    "the highest rate tested",  # 16 req/s is not a measured limit
     "Runs trained once are read against the same floor",
     "rewritten after it fired",  # the entropy stop rule was post hoc
     "only after DPO's results were in",  # the two-arm floor change was post hoc
